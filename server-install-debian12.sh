@@ -30,8 +30,21 @@ apt install -y software-properties-common apt-transport-https dirmngr ca-certifi
 if [ -e /etc/apt/sources.list.d/debian.sources ]; then
   # Digital Ocean uses an unusual location for its repo source.
   sed -i 's#^Components: .*#Components: main non-free contrib#g' /etc/apt/sources.list.d/debian.sources
+elif grep -Eq '^deb (http|https)://.*debian\.org' /etc/apt/sources.list; then
+  # Normal behaviour, debian.org is listed in sources.list
+  if [ -z "$(grep -E '^deb (http|https)://.*debian\.org.*' /etc/apt/sources.list | grep 'contrib')" ]; then
+    # Enable contrib if not already enabled.
+    add-apt-repository -sy -c 'contrib'
+  fi
+  if [ -z "$(grep -E '^deb (http|https)://.*debian\.org.*' /etc/apt/sources.list | grep 'non-free')" ]; then
+    # Enable non-free if not already enabled.
+    add-apt-repository -sy -c 'non-free'
+  fi
 else
-  add-apt-repository -sy -c 'contrib non-free'
+  # If the machine doesn't have the repos added, we need to add the full list.
+  add-apt-repository -sy 'deb http://ftp.us.debian.org/debian/ bookworm non-free non-free-firmware contrib main'
+  add-apt-repository -sy 'deb http://security.debian.org/debian-security bookworm-security non-free non-free-firmware contrib main'
+  add-apt-repository -sy 'deb http://ftp.us.debian.org/debian/ bookworm-updates non-free non-free-firmware contrib main'
 fi
 
 
