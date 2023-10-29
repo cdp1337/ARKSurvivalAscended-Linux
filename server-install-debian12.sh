@@ -27,7 +27,12 @@ apt install -y software-properties-common apt-transport-https dirmngr ca-certifi
 
 
 # Enable "non-free" repos for Debian (for steamcmd)
-add-apt-repository -sy -c 'contrib non-free'
+if [ -e /etc/apt/sources.list.d/debian.sources ]; then
+  # Digital Ocean uses an unusual location for its repo source.
+  sed -i 's#^Components: .*#Components: main non-free contrib#g' /etc/apt/sources.list.d/debian.sources
+else
+  add-apt-repository -sy -c 'contrib non-free'
+fi
 
 
 # Install steam repo
