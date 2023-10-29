@@ -118,7 +118,7 @@ systemctl start ark-island
 
 # Create some helpful links for the user.
 [ -e "/home/steam/island-GameUserSettings.ini" ] || \
-  sudo -u steam ln -s "$STEAMDIR/steamapps/common/ARK Survival Ascended Dedicated Server/ShooterGame/Saved/Config/GameUserSettings.ini" /home/steam/island-GameUserSettings.ini
+  sudo -u steam ln -s "$STEAMDIR/steamapps/common/ARK Survival Ascended Dedicated Server/ShooterGame/Saved/Config/WindowsServer/GameUserSettings.ini" /home/steam/island-GameUserSettings.ini
 
 [ -e "/home/steam/island-ShooterGame.log" ] || \
   sudo -u steam ln -s "$STEAMDIR/steamapps/common/ARK Survival Ascended Dedicated Server/ShooterGame/Saved/Logs/ShooterGame.log" /home/steam/island-ShooterGame.log
