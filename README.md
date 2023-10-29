@@ -2,4 +2,12 @@
 
 ## Installation on Debian 12
 
-(@todo, link the script when URL is available)
+To install ARK Survival Ascended Dedicated Server on Debian 12,
+download and run [server-install-debian12.sh](server-install-debian12.sh)
+as root or sudo.
+
+Quick run (if you trust me, which you of course should not):
+
+```bash
+sudo su -c "bash <(wget -qO- https://raw.githubusercontent.com/cdp1337/ARKSurvivalAscended-Linux/main/server-install-debian12.sh)" root
+```
