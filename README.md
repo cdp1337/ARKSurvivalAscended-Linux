@@ -72,10 +72,10 @@ sudo systemctl stop ark-island
 
 ### Configuring the game ini
 
-Configuration of your server via the configuration ini is available in `/home/steam/island-UserGameSettings.ini`
+Configuration of your server via the configuration ini is available in `/home/steam/island-GameUserSettings.ini`
 
 ```bash
-sudo -u steam nano /etc/steam/island-UserGameSettings.ini
+sudo -u steam nano /home/steam/island-GameUserSettings.ini
 ```
 
 _Sssshhh, I use `vim` too, but `nano` is easier for most newcomers._
