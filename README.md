@@ -102,3 +102,15 @@ Command line arguments can just be added to the end.  When done editing, reload 
 ```bash
 sudo systemctl daemon-reload
 ```
+
+### Automatic restarts
+
+Want to restart your server automatically at 5a each morning?
+
+Edit crontab `sudo nano /etc/crontab` and add:
+
+```bash
+0 5 * * * root systemctl restart ark-island
+```
+
+(0 is minute, 5 is hour in 24-hour notation, followed by '* * *' for every day, every month, every weekday)
