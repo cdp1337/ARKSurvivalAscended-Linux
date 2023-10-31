@@ -114,6 +114,7 @@ User=steam
 Group=steam
 ExecStartPre=/usr/games/steamcmd +login anonymous +app_update 2430930 validate +quit
 WorkingDirectory=$STEAMDIR/steamapps/common/ARK Survival Ascended Dedicated Server/ShooterGame/Binaries/Win64
+Environment=XDG_RUNTIME_DIR=/run/user/$(id -u)
 Environment="STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAMDIR"
 Environment="STEAM_COMPAT_DATA_PATH=$STEAMDIR/steamapps/compatdata/2430930"
 ExecStart=$STEAMDIR/compatibilitytools.d/$PROTON_NAME/proton run ArkAscendedServer.exe TheIsland_WP?listen
