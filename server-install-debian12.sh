@@ -112,7 +112,7 @@ Type=simple
 LimitNOFILE=10000
 User=steam
 Group=steam
-ExecPreStart=sudo -u steam /usr/games/steamcmd +login anonymous +app_update 2430930 validate +quit
+ExecStartPre=/usr/games/steamcmd +login anonymous +app_update 2430930 validate +quit
 WorkingDirectory=$STEAMDIR/steamapps/common/ARK Survival Ascended Dedicated Server/ShooterGame/Binaries/Win64
 Environment="STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAMDIR"
 Environment="STEAM_COMPAT_DATA_PATH=$STEAMDIR/steamapps/compatdata/2430930"
