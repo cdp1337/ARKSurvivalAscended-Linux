@@ -88,7 +88,9 @@ GAMEMAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter"
 
 
 # Install ARK Survival Ascended Dedicated
-sudo -u steam /usr/games/steamcmd +force_install_dir $GAMEDIR/AppFiles +login anonymous +app_update 2430930 validate +quit
+# sudo -u steam /usr/games/steamcmd +force_install_dir $GAMEDIR/AppFiles +login anonymous +app_update 2430930 validate +quit
+# STAGING TESTING - skip ark because it's huge
+sudo -u steam /usr/games/steamcmd +force_install_dir $GAMEDIR/AppFiles +login anonymous +app_update 90 validate +quit
 
 
 # Extract GE Proton into this user's Steam path
@@ -129,27 +131,27 @@ done
 
 # Install the systemd service files for ARK Survival Ascended Dedicated Server
 for MAP in $GAMEMAPS; do
-	if [ "$MAP" -eq "ark-island" ]; then
+	if [ "$MAP" == "ark-island" ]; then
 		DESC="Island"
 		NAME="TheIsland_WP"
 		GAMEPORT=7701
 		RCONPORT=27001
-	elif [ "$MAP" -eq "ark-aberration" ]; then
+	elif [ "$MAP" == "ark-aberration" ]; then
 		DESC="Aberration"
 		NAME="Aberration_P"
 		GAMEPORT=7702
 		RCONPORT=27002
-	elif [ "$MAP" -eq "ark-club" ]; then
+	elif [ "$MAP" == "ark-club" ]; then
 		DESC="Club"
 		NAME="Club_P"
 		GAMEPORT=7703
 		RCONPORT=27003
-	elif [ "$MAP" -eq "ark-scorched" ]; then
+	elif [ "$MAP" == "ark-scorched" ]; then
 		DESC="Scorched"
 		NAME="ScorchedEarth_P"
 		GAMEPORT=7704
 		RCONPORT=27004
-	elif [ "$MAP" -eq "ark-thecenter" ]; then
+	elif [ "$MAP" == "ark-thecenter" ]; then
 		DESC="TheCenter"
 		NAME="TheCenter_P"
 		GAMEPORT=7705
