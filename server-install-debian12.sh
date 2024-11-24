@@ -11,12 +11,49 @@
 #
 # F*** Nitrado
 
+
+############################################
+## Parameter Configuration
+############################################
+
+# https://github.com/GloriousEggroll/proton-ge-custom
+PROTON_URL="https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton9-20/GE-Proton9-20.tar.gz"
+PROTON_TGZ="$(basename "$PROTON_URL")"
+PROTON_NAME="$(basename "$PROTON_TGZ" ".tar.gz")"
+# Force installation directory for game
+# steam produces varying results, sometimes in ~/.local/share/Steam, other times in ~/Steam
+GAMEDIR="/home/steam/ArkSurvivalAscended"
+STEAMDIR="/home/steam/.local/share/Steam"
+# Wine/Proton compatiblity directory
+COMPATDIR="$STEAMDIR/compatibilitytools.d"
+# Specific "filesystem" directory for installed version of Proton
+GAMECOMPATDIR="$COMPATDIR/$PROTON_NAME/files/share/default_pfx"
+# Binary path for Proton
+PROTONBIN="$COMPATDIR/$PROTON_NAME/proton"
+# List of game maps currently available
+GAMEMAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter"
+
+
+############################################
+## Pre-exec Checks
+############################################
+
 # Only allow running as root
 if [ "$LOGNAME" != "root" ]; then
 	echo "Please run this script as root! (If you ran with 'su', use 'su -' instead)" >&2
 	exit 1
 fi
 
+# This script can run on an existing server, but should not run while the game is actively running.
+if [ $(ps aux | grep ArkAscendedServer.exe | wc -l) -gt 1 ]; then
+	echo "It appears that the ARK server is already running, please stop it before running this script."
+	exit 1
+fi
+
+
+############################################
+## User Prompts (pre setup)
+############################################
 
 # Ask the user some information before installing.
 echo "================================================================================"
@@ -30,6 +67,16 @@ if [ "$COMMUNITYNAME" == "" ]; then
 fi
 
 
+############################################
+## Dependency Installation and Setup
+############################################
+
+# Create a "steam" user account
+# This will create the account with no password, so if you need to log in with this user,
+# run `sudo passwd steam` to set a password.
+[ -d /home/steam ] || useradd -m -U steam
+
+
 # We will use this directory as a working directory for source files that need downloaded.
 [ -d /opt/game-resources ] || mkdir -p /opt/game-resources
 
@@ -37,12 +84,10 @@ fi
 # Preliminary requirements
 dpkg --add-architecture i386
 apt update
-apt install -y software-properties-common apt-transport-https dirmngr ca-certificates curl wget sudo
+apt install -y software-properties-common apt-transport-https dirmngr ca-certificates curl wget sudo firewalld
 
 
 # Enable "non-free" repos for Debian (for steamcmd)
-#add-apt-repository -y -c 'contrib'
-#add-apt-repository -y -c 'non-free-firmware'
 # https://stackoverflow.com/questions/76688863/apt-add-repository-doesnt-work-on-debian-12
 add-apt-repository -y -U http://deb.debian.org/debian -c non-free-firmware -c non-free
 
@@ -58,48 +103,17 @@ apt install -y lib32gcc-s1 steamcmd
 
 
 # Grab Proton from Glorious Eggroll
-# https://github.com/GloriousEggroll/proton-ge-custom
-PROTON_URL="https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton9-20/GE-Proton9-20.tar.gz"
-PROTON_TGZ="$(basename "$PROTON_URL")"
-PROTON_NAME="$(basename "$PROTON_TGZ" ".tar.gz")"
 if [ ! -e "/opt/game-resources/$PROTON_TGZ" ]; then
 	wget "$PROTON_URL" -O "/opt/game-resources/$PROTON_TGZ"
 fi
-
-
-# Force installation directory for game
-# steam produces varying results, sometimes in ~/.local/share/Steam, other times in ~/Steam
-GAMEDIR="/home/steam/ArkSurvivalAscended"
-STEAMDIR="/home/steam/.local/share/Steam"
-# Wine/Proton compatiblity directory
-COMPATDIR="$STEAMDIR/compatibilitytools.d"
-# Specific "filesystem" directory for installed version of Proton
-GAMECOMPATDIR="$COMPATDIR/$PROTON_NAME/files/share/default_pfx"
-# Binary path for Proton
-PROTONBIN="$COMPATDIR/$PROTON_NAME/proton"
-# List of game maps currently available
-GAMEMAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter"
-
-
-# Create a "steam" user account
-# This will create the account with no password, so if you need to log in with this user,
-# run `sudo passwd steam` to set a password.
-[ -d /home/steam ] || useradd -m -U steam
-
-
-# Install ARK Survival Ascended Dedicated
-sudo -u steam /usr/games/steamcmd +force_install_dir $GAMEDIR/AppFiles +login anonymous +app_update 2430930 validate +quit
-# STAGING TESTING - skip ark because it's huge
-#sudo -u steam /usr/games/steamcmd +force_install_dir $GAMEDIR/AppFiles +login anonymous +app_update 90 validate +quit
-if [ $? -ne 0 ]; then
-	echo "Could not install ARK Survival Ascended Dedicated Server, exiting"
-	exit 1
-fi
-
 # Extract GE Proton into this user's Steam path
 [ -d "$COMPATDIR" ] || sudo -u steam mkdir -p "$COMPATDIR"
 sudo -u steam tar -x -C "$COMPATDIR/" -f "/opt/game-resources/$PROTON_TGZ"
 
+
+############################################
+## Upgrade Checks
+############################################
 
 for MAP in $GAMEMAPS; do
 	# Ensure the override directory exists for the admin modifications to the CLI arguments.
@@ -124,31 +138,50 @@ done
 ## End Release 2023.10.31 - Issue #8
 
 
+############################################
+## Game Installation
+############################################
+
+# Install ARK Survival Ascended Dedicated
+sudo -u steam /usr/games/steamcmd +force_install_dir $GAMEDIR/AppFiles +login anonymous +app_update 2430930 validate +quit
+# STAGING TESTING - skip ark because it's huge
+#sudo -u steam /usr/games/steamcmd +force_install_dir $GAMEDIR/AppFiles +login anonymous +app_update 90 validate +quit
+if [ $? -ne 0 ]; then
+	echo "Could not install ARK Survival Ascended Dedicated Server, exiting"
+	exit 1
+fi
+
+
 # Install the systemd service files for ARK Survival Ascended Dedicated Server
 for MAP in $GAMEMAPS; do
 	if [ "$MAP" == "ark-island" ]; then
 		DESC="Island"
 		NAME="TheIsland_WP"
+		MODS=""
 		GAMEPORT=7701
 		RCONPORT=27001
 	elif [ "$MAP" == "ark-aberration" ]; then
 		DESC="Aberration"
 		NAME="Aberration_P"
+		MODS=""
 		GAMEPORT=7702
 		RCONPORT=27002
 	elif [ "$MAP" == "ark-club" ]; then
 		DESC="Club"
-		NAME="Club_P"
+		NAME="BobsMissions_WP"
+		MODS="1005639"
 		GAMEPORT=7703
 		RCONPORT=27003
 	elif [ "$MAP" == "ark-scorched" ]; then
 		DESC="Scorched"
 		NAME="ScorchedEarth_P"
+		MODS=""
 		GAMEPORT=7704
 		RCONPORT=27004
 	elif [ "$MAP" == "ark-thecenter" ]; then
 		DESC="TheCenter"
 		NAME="TheCenter_P"
+		MODS=""
 		GAMEPORT=7705
 		RCONPORT=27005
 	fi
@@ -167,8 +200,7 @@ WorkingDirectory=$GAMEDIR/AppFiles/ShooterGame/Binaries/Win64
 Environment=XDG_RUNTIME_DIR=/run/user/$(id -u)
 Environment="STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAMDIR"
 Environment="STEAM_COMPAT_DATA_PATH=$GAMECOMPATDIR"
-# Check /home/steam/ArkSurvivalAscended/services to adjust the CLI arguments
-ExecStart=/bin/false
+# Check $GAMEDIR/services to adjust the CLI arguments
 Restart=on-failure
 RestartSec=20s
 
@@ -182,7 +214,9 @@ EOF
 		# so we do not want to overwrite their work if they have already modified it.
 		cat > /etc/systemd/system/${MAP}.service.d/override.conf <<EOF
 [Service]
-ExecStart=$PROTONBIN run ArkAscendedServer.exe ${NAME}?listen?SessionName="${COMMUNITYNAME} (${DESC})"?RCONPort=${RCONPORT} -port=${GAMEPORT}
+# Edit this line to adjust start parameters of the server
+# After modifying, please remember to run `sudo systemctl daemon-reload` to apply changes to the system.
+ExecStart=$PROTONBIN run ArkAscendedServer.exe ${NAME}?listen?SessionName="${COMMUNITYNAME} (${DESC})"?RCONPort=${RCONPORT} -port=${GAMEPORT} -servergamelog -mods=$MODS
 EOF
     fi
 done
@@ -263,6 +297,28 @@ chmod +x $GAMEDIR/stop_all.sh
 systemctl daemon-reload
 
 
+############################################
+## Security Configuration
+############################################
+
+# Configure firewall
+[ -d "/etc/firewalld/services" ] || mkdir -p /etc/firewalld/services
+cat > /etc/firewalld/services/ark-survival.xml <<EOF
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+  <short>ARK Survival Ascended</short>
+  <description>ARK Survival Ascended game server</description>
+  <port port="7701-7720" protocol="udp"/>
+  <port port="27001-27020" protocol="tcp"/>
+</service>
+EOF
+firewall-cmd --permanent --zone=public --add-service=ark-survival
+
+
+############################################
+## Post-Install Configuration
+############################################
+
 # Create some helpful links for the user.
 [ -e "$GAMEDIR/services" ] || sudo -u steam mkdir -p "$GAMEDIR/services"
 for MAP in $GAMEMAPS; do
@@ -270,7 +326,7 @@ for MAP in $GAMEMAPS; do
 done
 [ -h "$GAMEDIR/GameUserSettings.ini" ] || sudo -u steam ln -s $GAMEDIR/AppFiles/ShooterGame/Saved/Config/WindowsServer/GameUserSettings.ini "$GAMEDIR/GameUserSettings.ini"
 [ -h "$GAMEDIR/Game.ini" ] || sudo -u steam ln -s $GAMEDIR/AppFiles/ShooterGame/Saved/Config/WindowsServer/Game.ini "$GAMEDIR/Game.ini"
-[ -h "$GAMEDIR/ShooterGame.log" ] || sudo -u steam ln -s $GAMEDIR/AppFiles/ShooterGame/Saved/Logs/WindowsServer/ShooterGame.log "$GAMEDIR/ShooterGame.log"
+[ -h "$GAMEDIR/ShooterGame.log" ] || sudo -u steam ln -s $GAMEDIR/AppFiles/ShooterGame/Saved/Logs/ShooterGame.log "$GAMEDIR/ShooterGame.log"
 
 
 echo "================================================================================"
