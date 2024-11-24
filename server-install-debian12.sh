@@ -193,11 +193,11 @@ systemctl daemon-reload
 # Create some helpful links for the user.
 [ -e "$GAMEDIR/services" ] || sudo -u steam mkdir -p "$GAMEDIR/services"
 for MAP in $GAMEMAPS; do
-	[ -e "$GAMEDIR/services/${MAP}.conf" ] || sudo -u steam ln -s /etc/systemd/system/${MAP}.service.d/override.conf "$GAMEDIR/services/${MAP}.conf"
-	[ -e "$GAMEDIR/GameUserSettings.ini" ] || sudo -u steam ln -s $GAMEDIR/AppFiles/ShooterGame/Saved/Config/WindowsServer/GameUserSettings.ini "$GAMEDIR/GameUserSettings.ini"
-	[ -e "$GAMEDIR/Game.ini" ] || sudo -u steam ln -s $GAMEDIR/AppFiles/ShooterGame/Saved/Config/WindowsServer/Game.ini "$GAMEDIR/Game.ini"
-	[ -e "$GAMEDIR/ShooterGame.log" ] || sudo -u steam ln -s $GAMEDIR/AppFiles/ShooterGame/Saved/Logs/WindowsServer/ShooterGame.log "$GAMEDIR/ShooterGame.log"
+	[ -h "$GAMEDIR/services/${MAP}.conf" ] || sudo -u steam ln -s /etc/systemd/system/${MAP}.service.d/override.conf "$GAMEDIR/services/${MAP}.conf"
 done
+[ -h "$GAMEDIR/GameUserSettings.ini" ] || sudo -u steam ln -s $GAMEDIR/AppFiles/ShooterGame/Saved/Config/WindowsServer/GameUserSettings.ini "$GAMEDIR/GameUserSettings.ini"
+[ -h "$GAMEDIR/Game.ini" ] || sudo -u steam ln -s $GAMEDIR/AppFiles/ShooterGame/Saved/Config/WindowsServer/Game.ini "$GAMEDIR/Game.ini"
+[ -h "$GAMEDIR/ShooterGame.log" ] || sudo -u steam ln -s $GAMEDIR/AppFiles/ShooterGame/Saved/Logs/WindowsServer/ShooterGame.log "$GAMEDIR/ShooterGame.log"
 
 
 echo "================================================================================"
@@ -213,11 +213,12 @@ for MAP in $GAMEMAPS; do
 	else
 		echo "Not enabling ${MAP}, you can always enable it in the future with 'sudo systemctl enable $MAP'"
 	fi
+	echo ""
 done
 echo ""
-echo "To restart a map: sudo systemctl restart NAMEOFMAP"
-echo "To start a map:   sudo systemctl start NAMEOFMAP"
-echo "To stop a map:    sudo systemctl stop NAMEOFMAP"
+echo "To restart a map: sudo systemctl restart NAME-OF-MAP"
+echo "To start a map:   sudo systemctl start NAME-OF-MAP"
+echo "To stop a map:    sudo systemctl stop NAME-OF-MAP"
 echo ""
 echo "To edit the runtime configuration of each map, edit the service file within $GAMEDIR/services/"
 echo "Logs are available at $GAMEDIR/ShooterGame.log"
