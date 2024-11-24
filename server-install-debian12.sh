@@ -7,14 +7,28 @@
 #
 # @LICENSE AGPLv3
 # @AUTHOR  Charlie Powell - cdp1337@veraciousnetwork.com
+# @SOURCE  https://github.com/cdp1337/ARKSurvivalAscended-Linux
 #
 # F*** Nitrado
 
 # Only allow running as root
 if [ "$LOGNAME" != "root" ]; then
-  echo "Please run this script as root! (If you ran with 'su', use 'su -' instead)" >&2
-  exit 1
+	echo "Please run this script as root! (If you ran with 'su', use 'su -' instead)" >&2
+	exit 1
 fi
+
+
+# Ask the user some information before installing.
+echo "================================================================================"
+echo "         	  ARK Survival Ascended *unofficial* Installer"
+echo ""
+echo "? What is the community name of the server? (e.g. My Awesome ARK Server)"
+echo -n "> "
+read COMMUNITYNAME
+if [ "$COMMUNITYNAME" == "" ]; then
+	COMMUNITYNAME="My Awesome ARK Server"
+fi
+
 
 # We will use this directory as a working directory for source files that need downloaded.
 [ -d /opt/game-resources ] || mkdir -p /opt/game-resources
@@ -27,25 +41,10 @@ apt install -y software-properties-common apt-transport-https dirmngr ca-certifi
 
 
 # Enable "non-free" repos for Debian (for steamcmd)
-if [ -e /etc/apt/sources.list.d/debian.sources ]; then
-  # Digital Ocean uses an unusual location for its repo source.
-  sed -i 's#^Components: .*#Components: main non-free contrib#g' /etc/apt/sources.list.d/debian.sources
-elif grep -Eq '^deb (http|https)://.*debian\.org' /etc/apt/sources.list; then
-  # Normal behaviour, debian.org is listed in sources.list
-  if [ -z "$(grep -E '^deb (http|https)://.*debian\.org.*' /etc/apt/sources.list | grep 'contrib')" ]; then
-    # Enable contrib if not already enabled.
-    add-apt-repository -sy -c 'contrib'
-  fi
-  if [ -z "$(grep -E '^deb (http|https)://.*debian\.org.*' /etc/apt/sources.list | grep 'non-free')" ]; then
-    # Enable non-free if not already enabled.
-    add-apt-repository -sy -c 'non-free'
-  fi
-else
-  # If the machine doesn't have the repos added, we need to add the full list.
-  add-apt-repository -sy 'deb http://ftp.us.debian.org/debian/ bookworm non-free non-free-firmware contrib main'
-  add-apt-repository -sy 'deb http://security.debian.org/debian-security bookworm-security non-free non-free-firmware contrib main'
-  add-apt-repository -sy 'deb http://ftp.us.debian.org/debian/ bookworm-updates non-free non-free-firmware contrib main'
-fi
+#add-apt-repository -y -c 'contrib'
+#add-apt-repository -y -c 'non-free-firmware'
+# https://stackoverflow.com/questions/76688863/apt-add-repository-doesnt-work-on-debian-12
+add-apt-repository -y -U http://deb.debian.org/debian -c non-free-firmware -c non-free
 
 
 # Install steam repo
@@ -55,17 +54,32 @@ echo "deb [arch=amd64,i386 signed-by=/usr/share/keyrings/steam.gpg] http://repo.
 
 # Install steam binary and steamcmd
 apt update
-apt install -y lib32gcc-s1 steamcmd steam-launcher
+apt install -y lib32gcc-s1 steamcmd
 
 
 # Grab Proton from Glorious Eggroll
 # https://github.com/GloriousEggroll/proton-ge-custom
-PROTON_URL="https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton8-21/GE-Proton8-21.tar.gz"
+PROTON_URL="https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton9-20/GE-Proton9-20.tar.gz"
 PROTON_TGZ="$(basename "$PROTON_URL")"
 PROTON_NAME="$(basename "$PROTON_TGZ" ".tar.gz")"
 if [ ! -e "/opt/game-resources/$PROTON_TGZ" ]; then
-  wget "$PROTON_URL" -O "/opt/game-resources/$PROTON_TGZ"
+	wget "$PROTON_URL" -O "/opt/game-resources/$PROTON_TGZ"
 fi
+
+
+# Force installation directory for game
+# steam produces varying results, sometimes in ~/.local/share/Steam, other times in ~/Steam
+GAMEDIR="/home/steam/ArkSurvivalAscended"
+STEAMDIR="/home/steam/.local/share/Steam"
+# Wine/Proton compatiblity directory
+COMPATDIR="$STEAMDIR/compatibilitytools.d"
+# Specific "filesystem" directory for installed version of Proton
+GAMECOMPATDIR="$COMPATDIR/$PROTON_NAME/files/share/default_pfx"
+# Binary path for Proton
+PROTONBIN="$COMPATDIR/$PROTON_NAME/proton"
+# List of game maps currently available
+GAMEMAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter"
+
 
 # Create a "steam" user account
 # This will create the account with no password, so if you need to log in with this user,
@@ -74,25 +88,12 @@ fi
 
 
 # Install ARK Survival Ascended Dedicated
-sudo -u steam /usr/games/steamcmd +login anonymous +app_update 2430930 validate +quit
-
-
-# Determine where Steam is installed
-# sometimes it's in ~/Steam, whereas other times it's in ~/.local/share/Steam
-# @todo figure out why.... this is annoying.
-if [ -e "/home/steam/Steam" ]; then
-  STEAMDIR="/home/steam/Steam"
-elif [ -e "/home/steam/.local/share/Steam" ]; then
-  STEAMDIR="/home/steam/.local/share/Steam"
-else
-  echo "Unable to guess where Steam is installed." >&2
-  exit 1
-fi
+sudo -u steam /usr/games/steamcmd +force_install_dir $GAMEDIR/AppFiles +login anonymous +app_update 2430930 validate +quit
 
 
 # Extract GE Proton into this user's Steam path
-[ -d "$STEAMDIR/compatibilitytools.d" ] || sudo -u steam mkdir -p "$STEAMDIR/compatibilitytools.d"
-sudo -u steam tar -x -C "$STEAMDIR/compatibilitytools.d/" -f "/opt/game-resources/$PROTON_TGZ"
+[ -d "$COMPATDIR" ] || sudo -u steam mkdir -p "$COMPATDIR"
+sudo -u steam tar -x -C "$COMPATDIR/" -f "/opt/game-resources/$PROTON_TGZ"
 
 
 # Install default prefix into game compatdata path
@@ -101,10 +102,63 @@ sudo -u steam tar -x -C "$STEAMDIR/compatibilitytools.d/" -f "/opt/game-resource
   sudo -u steam cp "$STEAMDIR/compatibilitytools.d/$PROTON_NAME/files/share/default_pfx" "$STEAMDIR/steamapps/compatdata/2430930" -r
 
 
-# Install the systemd service file for ARK Survival Ascended Dedicated Server (Island)
-cat > /etc/systemd/system/ark-island.service <<EOF
+
+
+for MAP in $GAMEMAPS; do
+	# Ensure the override directory exists for the admin modifications to the CLI arguments.
+	[ -e /etc/systemd/system/${MAP}.service.d ] || mkdir -p /etc/systemd/system/${MAP}.service.d
+
+	# Release 2023.10.31 - Issue #8
+	if [ -e /etc/systemd/system/${MAP}.service ]; then
+		# Check if the service is already installed and move any modifications to the override.
+		# This is important for existing installs so the admin modifications to CLI arguments do not get overwritten.
+
+		if [ ! -e /etc/systemd/system/${MAP}.service.d/override.conf ]; then
+			# Override does not exist yet, merge in any changes in the default service file.
+			SERVICE_EXEC_LINE="$(grep -E '^ExecStart=' /etc/systemd/system/${MAP}.service)"
+
+			cat > /etc/systemd/system/${MAP}.service.d/override.conf <<EOF
+	[Service]
+	$SERVICE_EXEC_LINE
+EOF
+		fi
+	fi
+done
+## End Release 2023.10.31 - Issue #8
+
+
+# Install the systemd service files for ARK Survival Ascended Dedicated Server
+for MAP in $GAMEMAPS; do
+	if [ "$MAP" -eq "ark-island" ]; then
+		DESC="Island"
+		NAME="TheIsland_WP"
+		GAMEPORT=7701
+		RCONPORT=27001
+	elif [ "$MAP" -eq "ark-aberration" ]; then
+		DESC="Aberration"
+		NAME="Aberration_P"
+		GAMEPORT=7702
+		RCONPORT=27002
+	elif [ "$MAP" -eq "ark-club" ]; then
+		DESC="Club"
+		NAME="Club_P"
+		GAMEPORT=7703
+		RCONPORT=27003
+	elif [ "$MAP" -eq "ark-scorched" ]; then
+		DESC="Scorched"
+		NAME="ScorchedEarth_P"
+		GAMEPORT=7704
+		RCONPORT=27004
+	elif [ "$MAP" -eq "ark-thecenter" ]; then
+		DESC="TheCenter"
+		NAME="TheCenter_P"
+		GAMEPORT=7705
+		RCONPORT=27005
+	fi
+
+	cat > /etc/systemd/system/${MAP}.service <<EOF
 [Unit]
-Description=ARK Survival Ascended Dedicated Server (Island)
+Description=ARK Survival Ascended Dedicated Server $DESC
 After=network.target
 
 [Service]
@@ -112,12 +166,12 @@ Type=simple
 LimitNOFILE=10000
 User=steam
 Group=steam
-ExecStartPre=/usr/games/steamcmd +login anonymous +app_update 2430930 validate +quit
-WorkingDirectory=$STEAMDIR/steamapps/common/ARK Survival Ascended Dedicated Server/ShooterGame/Binaries/Win64
+WorkingDirectory=$GAMEDIR/AppFiles/ShooterGame/Binaries/Win64
 Environment=XDG_RUNTIME_DIR=/run/user/$(id -u)
 Environment="STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAMDIR"
-Environment="STEAM_COMPAT_DATA_PATH=$STEAMDIR/steamapps/compatdata/2430930"
-ExecStart=$STEAMDIR/compatibilitytools.d/$PROTON_NAME/proton run ArkAscendedServer.exe TheIsland_WP?listen
+Environment="STEAM_COMPAT_DATA_PATH=$GAMECOMPATDIR"
+# Check /home/steam/ArkSurvivalAscended/services to adjust the CLI arguments
+ExecStart=/bin/false
 Restart=on-failure
 RestartSec=20s
 
@@ -125,9 +179,23 @@ RestartSec=20s
 WantedBy=multi-user.target
 EOF
 
+	if [ ! -e /etc/systemd/system/${MAP}.service.d/override.conf ]; then
+		# Override does not exist yet, create boilerplate file.
+		# This is the main file that the admin will use to modify CLI arguments,
+		# so we do not want to overwrite their work if they have already modified it.
+		cat > /etc/systemd/system/${MAP}.service.d/override.conf <<EOF
+[Service]
+ExecStart=$PROTONBIN run ArkAscendedServer.exe ${NAME}?listen?SessionName="${COMMUNITYNAME} (${DESC})"?RCONPort=${RCONPORT} -port=${GAMEPORT}
+EOF
+    fi
+done
+
+
+
+
 systemctl daemon-reload
-systemctl enable ark-island
-systemctl start ark-island
+#systemctl enable ark-island
+#systemctl start ark-island
 
 
 # Create some helpful links for the user.
