@@ -98,14 +98,6 @@ sudo -u steam /usr/games/steamcmd +force_install_dir $GAMEDIR/AppFiles +login an
 sudo -u steam tar -x -C "$COMPATDIR/" -f "/opt/game-resources/$PROTON_TGZ"
 
 
-# Install default prefix into game compatdata path
-[ -d "$STEAMDIR/steamapps/compatdata" ] || sudo -u steam mkdir -p "$STEAMDIR/steamapps/compatdata"
-[ -d "$STEAMDIR/steamapps/compatdata/2430930" ] || \
-  sudo -u steam cp "$STEAMDIR/compatibilitytools.d/$PROTON_NAME/files/share/default_pfx" "$STEAMDIR/steamapps/compatdata/2430930" -r
-
-
-
-
 for MAP in $GAMEMAPS; do
 	# Ensure the override directory exists for the admin modifications to the CLI arguments.
 	[ -e /etc/systemd/system/${MAP}.service.d ] || mkdir -p /etc/systemd/system/${MAP}.service.d
@@ -120,8 +112,8 @@ for MAP in $GAMEMAPS; do
 			SERVICE_EXEC_LINE="$(grep -E '^ExecStart=' /etc/systemd/system/${MAP}.service)"
 
 			cat > /etc/systemd/system/${MAP}.service.d/override.conf <<EOF
-	[Service]
-	$SERVICE_EXEC_LINE
+[Service]
+$SERVICE_EXEC_LINE
 EOF
 		fi
 	fi
@@ -160,7 +152,7 @@ for MAP in $GAMEMAPS; do
 
 	cat > /etc/systemd/system/${MAP}.service <<EOF
 [Unit]
-Description=ARK Survival Ascended Dedicated Server $DESC
+Description=ARK Survival Ascended Dedicated Server (${DESC})
 After=network.target
 
 [Service]
@@ -194,24 +186,39 @@ done
 
 
 
-
+# Reload systemd to pick up the new service files
 systemctl daemon-reload
-#systemctl enable ark-island
-#systemctl start ark-island
 
 
 # Create some helpful links for the user.
-[ -e "/home/steam/island-GameUserSettings.ini" ] || \
-  sudo -u steam ln -s "$STEAMDIR/steamapps/common/ARK Survival Ascended Dedicated Server/ShooterGame/Saved/Config/WindowsServer/GameUserSettings.ini" /home/steam/island-GameUserSettings.ini
+[ -e "$GAMEDIR/services" ] || sudo -u steam mkdir -p "$GAMEDIR/services"
+for MAP in $GAMEMAPS; do
+	[ -e "$GAMEDIR/services/${MAP}.conf" ] || sudo -u steam ln -s /etc/systemd/system/${MAP}.service.d/override.conf "$GAMEDIR/services/${MAP}.conf"
+	[ -e "$GAMEDIR/GameUserSettings.ini" ] || sudo -u steam ln -s $GAMEDIR/AppFiles/ShooterGame/Saved/Config/WindowsServer/GameUserSettings.ini "$GAMEDIR/GameUserSettings.ini"
+	[ -e "$GAMEDIR/Game.ini" ] || sudo -u steam ln -s $GAMEDIR/AppFiles/ShooterGame/Saved/Config/WindowsServer/Game.ini "$GAMEDIR/Game.ini"
+	[ -e "$GAMEDIR/ShooterGame.log" ] || sudo -u steam ln -s $GAMEDIR/AppFiles/ShooterGame/Saved/Logs/WindowsServer/ShooterGame.log "$GAMEDIR/ShooterGame.log"
+done
 
-[ -e "/home/steam/island-ShooterGame.log" ] || \
-  sudo -u steam ln -s "$STEAMDIR/steamapps/common/ARK Survival Ascended Dedicated Server/ShooterGame/Saved/Logs/ShooterGame.log" /home/steam/island-ShooterGame.log
 
 echo "================================================================================"
-echo "If everything went well, ARK Survival Ascended should be installed and starting!"
+echo "If everything went well, ARK Survival Ascended should be installed!"
 echo ""
-echo "To restart the server: sudo systemctl restart ark-island"
-echo "To start the server:   sudo systemctl start ark-island"
-echo "To stop the server:    sudo systemctl stop ark-island"
+for MAP in $GAMEMAPS; do
+	echo "? Enable game map ${MAP}? (y/N)"
+	echo -n "> "
+	read OPT
+	if [ "$OPT" == "y" -o "$OPT" == "Y" ]; then
+		systemctl enable $MAP
+		systemctl start $MAP
+	else
+		echo "Not enabling ${MAP}, you can always enable it in the future with 'sudo systemctl enable $MAP'"
+	fi
+done
 echo ""
-echo "Configuration is available in /home/steam/island-GameUserSettings.ini"
+echo "To restart a map: sudo systemctl restart NAMEOFMAP"
+echo "To start a map:   sudo systemctl start NAMEOFMAP"
+echo "To stop a map:    sudo systemctl stop NAMEOFMAP"
+echo ""
+echo "To edit the runtime configuration of each map, edit the service file within $GAMEDIR/services/"
+echo "Logs are available at $GAMEDIR/ShooterGame.log"
+echo "Server-wide game user settings configuration available at $GAMEDIR/GameUserSettings.ini"
