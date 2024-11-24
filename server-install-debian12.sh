@@ -185,6 +185,72 @@ EOF
 done
 
 
+# Create start/stop helpers for all maps
+cat > $GAMEDIR/start_all.sh <<EOF
+#!/bin/bash
+#
+# Start all ARK server maps that are enabled
+GAMEMAPS="$GAMEMAPS"
+
+function start_game {
+	echo "Starting game instance $1..."
+	sudo systemctl start $1
+	echo "Waiting 60 seconds for threads to start"
+	for i in {0..9}; do
+		sleep 6
+		echo -n '.'
+	done
+	# Check status real quick
+	sudo systemctl status $1 | grep Active
+}
+
+function update_game {
+	echo "Running game update"
+	sudo -u steam /usr/games/steamcmd +force_install_dir $GAMEDIR/AppFiles +login anonymous +app_update 2430930 validate +quit
+}
+
+if [ \$(ps aux | grep ArkAscendedServer.exe | wc -l) -le 1 ]; then
+	update_game
+else
+	echo "Game server is already running, not updating"
+fi
+
+for MAP in \$GAMEMAPS; do
+	if [ "\$(systemctl is-enabled \$MAP)" == "enabled" -a "\$(systemctl is-active \$MAP)" == "inactive" ]; then
+		start_game \$MAP
+	fi
+done
+EOF
+chown steam:steam $GAMEDIR/start_all.sh
+chmod +x $GAMEDIR/start_all.sh
+
+
+cat > $GAMEDIR/stop_all.sh <<EOF
+#!/bin/bash
+#
+# Stop all ARK server maps that are enabled
+GAMEMAPS="$GAMEMAPS"
+
+function stop_game {
+	echo "Stopping game instance $1..."
+	sudo systemctl stop $1
+	echo "Waiting 10 seconds for threads to settle"
+	for i in {0..9}; do
+		echo -n '.'
+	done
+	# Check status real quick
+	sudo systemctl status $1 | grep Active
+}
+
+for MAP in \$GAMEMAPS; do
+	if [ "\$(systemctl is-enabled \$MAP)" == "enabled" -a "\$(systemctl is-active \$MAP)" == "active" ]; then
+		stop_game \$MAP
+	fi
+done
+EOF
+chown steam:steam $GAMEDIR/stop_all.sh
+chmod +x $GAMEDIR/stop_all.sh
+
 
 # Reload systemd to pick up the new service files
 systemctl daemon-reload
@@ -209,17 +275,18 @@ for MAP in $GAMEMAPS; do
 	read OPT
 	if [ "$OPT" == "y" -o "$OPT" == "Y" ]; then
 		systemctl enable $MAP
-		systemctl start $MAP
 	else
 		echo "Not enabling ${MAP}, you can always enable it in the future with 'sudo systemctl enable $MAP'"
 	fi
 	echo ""
 done
 echo ""
-echo "To restart a map: sudo systemctl restart NAME-OF-MAP"
-echo "To start a map:   sudo systemctl start NAME-OF-MAP"
-echo "To stop a map:    sudo systemctl stop NAME-OF-MAP"
-echo ""
-echo "To edit the runtime configuration of each map, edit the service file within $GAMEDIR/services/"
-echo "Logs are available at $GAMEDIR/ShooterGame.log"
-echo "Server-wide game user settings configuration available at $GAMEDIR/GameUserSettings.ini"
+echo "To restart a map:      sudo systemctl restart NAME-OF-MAP"
+echo "To start a map:        sudo systemctl start NAME-OF-MAP"
+echo "To stop a map:         sudo systemctl stop NAME-OF-MAP"
+echo "Game files:            $GAMEDIR/AppFiles/"
+echo "Runtime configuration: $GAMEDIR/services/"
+echo "Game log:              $GAMEDIR/ShooterGame.log"
+echo "Game user settings:    $GAMEDIR/GameUserSettings.ini"
+echo "To start all maps:     $GAMEDIR/start_all.sh"
+echo "To stop all maps:      $GAMEDIR/stop_all.sh"
