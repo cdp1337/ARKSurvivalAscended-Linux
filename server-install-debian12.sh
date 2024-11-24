@@ -88,10 +88,13 @@ GAMEMAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter"
 
 
 # Install ARK Survival Ascended Dedicated
-# sudo -u steam /usr/games/steamcmd +force_install_dir $GAMEDIR/AppFiles +login anonymous +app_update 2430930 validate +quit
+sudo -u steam /usr/games/steamcmd +force_install_dir $GAMEDIR/AppFiles +login anonymous +app_update 2430930 validate +quit
 # STAGING TESTING - skip ark because it's huge
-sudo -u steam /usr/games/steamcmd +force_install_dir $GAMEDIR/AppFiles +login anonymous +app_update 90 validate +quit
-
+#sudo -u steam /usr/games/steamcmd +force_install_dir $GAMEDIR/AppFiles +login anonymous +app_update 90 validate +quit
+if [ $? -ne 0 ]; then
+	echo "Could not install ARK Survival Ascended Dedicated Server, exiting"
+	exit 1
+fi
 
 # Extract GE Proton into this user's Steam path
 [ -d "$COMPATDIR" ] || sudo -u steam mkdir -p "$COMPATDIR"
@@ -193,20 +196,24 @@ cat > $GAMEDIR/start_all.sh <<EOF
 GAMEMAPS="$GAMEMAPS"
 
 function start_game {
-	echo "Starting game instance $1..."
-	sudo systemctl start $1
+	echo "Starting game instance \$1..."
+	sudo systemctl start \$1
 	echo "Waiting 60 seconds for threads to start"
 	for i in {0..9}; do
 		sleep 6
 		echo -n '.'
 	done
 	# Check status real quick
-	sudo systemctl status $1 | grep Active
+	sudo systemctl status \$1 | grep Active
 }
 
 function update_game {
 	echo "Running game update"
 	sudo -u steam /usr/games/steamcmd +force_install_dir $GAMEDIR/AppFiles +login anonymous +app_update 2430930 validate +quit
+	if [ \$? -ne 0 ]; then
+		echo "Game update failed, not starting"
+		exit 1
+	fi
 }
 
 if [ \$(ps aux | grep ArkAscendedServer.exe | wc -l) -le 1 ]; then
@@ -232,14 +239,14 @@ cat > $GAMEDIR/stop_all.sh <<EOF
 GAMEMAPS="$GAMEMAPS"
 
 function stop_game {
-	echo "Stopping game instance $1..."
-	sudo systemctl stop $1
+	echo "Stopping game instance \$1..."
+	sudo systemctl stop \$1
 	echo "Waiting 10 seconds for threads to settle"
 	for i in {0..9}; do
 		echo -n '.'
 	done
 	# Check status real quick
-	sudo systemctl status $1 | grep Active
+	sudo systemctl status \$1 | grep Active
 }
 
 for MAP in \$GAMEMAPS; do
