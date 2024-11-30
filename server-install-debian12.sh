@@ -22,7 +22,8 @@ PROTON_TGZ="$(basename "$PROTON_URL")"
 PROTON_NAME="$(basename "$PROTON_TGZ" ".tar.gz")"
 # Force installation directory for game
 # steam produces varying results, sometimes in ~/.local/share/Steam, other times in ~/Steam
-GAMEDIR="/home/steam/ArkSurvivalAscended"
+GAME="ArkSurvivalAscended"
+GAMEDIR="/home/steam/$GAME"
 STEAMDIR="/home/steam/.local/share/Steam"
 # Wine/Proton compatiblity directory
 COMPATDIR="$STEAMDIR/compatibilitytools.d"
@@ -50,6 +51,13 @@ if [ $(ps aux | grep ArkAscendedServer.exe | wc -l) -gt 1 ]; then
 	exit 1
 fi
 
+# Determine if this is a new installation or an upgrade (/repair)
+if [ -e /etc/systemd/system/ark-island.service ]; then
+	INSTALLTYPE="upgrade"
+else
+	INSTALLTYPE="new"
+fi
+
 
 ############################################
 ## User Prompts (pre setup)
@@ -59,11 +67,13 @@ fi
 echo "================================================================================"
 echo "         	  ARK Survival Ascended *unofficial* Installer"
 echo ""
-echo "? What is the community name of the server? (e.g. My Awesome ARK Server)"
-echo -n "> "
-read COMMUNITYNAME
-if [ "$COMMUNITYNAME" == "" ]; then
-	COMMUNITYNAME="My Awesome ARK Server"
+if [ "$INSTALLTYPE" == "new" ]; then
+	echo "? What is the community name of the server? (e.g. My Awesome ARK Server)"
+	echo -n "> "
+	read COMMUNITYNAME
+	if [ "$COMMUNITYNAME" == "" ]; then
+		COMMUNITYNAME="My Awesome ARK Server"
+	fi
 fi
 
 
@@ -144,7 +154,7 @@ done
 
 # Install ARK Survival Ascended Dedicated
 sudo -u steam /usr/games/steamcmd +force_install_dir $GAMEDIR/AppFiles +login anonymous +app_update 2430930 validate +quit
-# STAGING TESTING - skip ark because it's huge
+# STAGING / TESTING - skip ark because it's huge; AppID 90 is Team Fortress 1 (a tiny server useful for testing)
 #sudo -u steam /usr/games/steamcmd +force_install_dir $GAMEDIR/AppFiles +login anonymous +app_update 90 validate +quit
 if [ $? -ne 0 ]; then
 	echo "Could not install ARK Survival Ascended Dedicated Server, exiting"
@@ -154,6 +164,7 @@ fi
 
 # Install the systemd service files for ARK Survival Ascended Dedicated Server
 for MAP in $GAMEMAPS; do
+	# Different maps will have different settings, (to allow them to coexist on the same server)
 	if [ "$MAP" == "ark-island" ]; then
 		DESC="Island"
 		NAME="TheIsland_WP"
@@ -186,6 +197,8 @@ for MAP in $GAMEMAPS; do
 		RCONPORT=27005
 	fi
 
+
+	# Install system service file to be loaded by systemd
 	cat > /etc/systemd/system/${MAP}.service <<EOF
 [Unit]
 Description=ARK Survival Ascended Dedicated Server (${DESC})
@@ -199,7 +212,7 @@ Group=steam
 WorkingDirectory=$GAMEDIR/AppFiles/ShooterGame/Binaries/Win64
 Environment=XDG_RUNTIME_DIR=/run/user/$(id -u)
 Environment="STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAMDIR"
-Environment="STEAM_COMPAT_DATA_PATH=$GAMECOMPATDIR"
+Environment="STEAM_COMPAT_DATA_PATH=$GAMEDIR/prefixes/$MAP"
 # Check $GAMEDIR/services to adjust the CLI arguments
 Restart=on-failure
 RestartSec=20s
@@ -219,6 +232,16 @@ EOF
 ExecStart=$PROTONBIN run ArkAscendedServer.exe ${NAME}?listen?SessionName="${COMMUNITYNAME} (${DESC})"?RCONPort=${RCONPORT} -port=${GAMEPORT} -servergamelog -mods=$MODS
 EOF
     fi
+
+    # Set the owner of the override to steam so that user account can modify it.
+    chown steam:steam /etc/systemd/system/${MAP}.service.d/override.conf
+
+    if [ ! -e $GAMEDIR/prefixes/$MAP ]; then
+    	# Install a new prefix for this specific map
+    	# Proton 9 seems to have issues with launching multiple binaries in the same prefix.
+    	[ -d $GAMEDIR/prefixes ] || sudo -u steam mkdir -p $GAMEDIR/prefixes
+		sudo -u steam cp $GAMECOMPATDIR $GAMEDIR/prefixes/$MAP -r
+	fi
 done
 
 

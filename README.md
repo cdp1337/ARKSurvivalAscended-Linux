@@ -32,6 +32,30 @@ for starting and stopping all maps, (not to mention updating before they start).
 Sets up multiple maps on a single install, and **all of them can run at the same time**
 (providing your server has the horsepower to do so).
 
+## Directory Structure
+
+```
+/home/steam/ArkSurvivalAscended
+├── AppFiles/                  # Game Server Files (directly managed from Steam)
+├── prefixes/                  # Proton prefix directory (emulates windows filesystem)
+│   ├── ark-aberration/
+│   ├── ark-club/
+│   ├── ark-island/
+│   ├── ark-scorched/
+│   └── ark-thecenter/
+├── services/                  # Service file overrides (for setting startup options)
+│   ├── ark-aberration.conf
+│   ├── ark-club.conf
+│   ├── ark-island.conf
+│   ├── ark-scorched.conf
+│   └── ark-thecenter.conf
+├── GameUserSettings.ini       # Game Server Configuration
+├── Game.ini                   # Game Server Configuration
+├── ShooterGame.log            # Game log file
+├── start_all.sh               # Start all maps
+└── stop_all.sh                # Stop all maps
+```
+
 ## Installation on Debian 12
 
 To install ARK Survival Ascended Dedicated Server on Debian 12,
