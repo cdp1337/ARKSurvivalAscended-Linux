@@ -24,7 +24,7 @@ so _you_ can choose how you want to manage it.
 Because it's managed with systemd, standardized commands are used for managing the server.
 This includes an auto-restart for the game server if it crashes.
 
-By default, the game server will **automatically start at boot**!
+By default, enabled game maps will **automatically start at boot**!
 
 A start and stop script is included in `/home/steam/ArkSurvivalAscended`
 for starting and stopping all maps, (not to mention updating before they start).
@@ -43,12 +43,14 @@ Sets up multiple maps on a single install, and **all of them can run at the same
 │   ├── ark-island/
 │   ├── ark-scorched/
 │   └── ark-thecenter/
+│   └── ark-extinction/
 ├── services/                  # Service file overrides (for setting startup options)
 │   ├── ark-aberration.conf
 │   ├── ark-club.conf
 │   ├── ark-island.conf
 │   ├── ark-scorched.conf
 │   └── ark-thecenter.conf
+│   └── ark-extinction.conf
 ├── GameUserSettings.ini       # Game Server Configuration
 ├── Game.ini                   # Game Server Configuration
 ├── ShooterGame.log            # Game log file
@@ -80,6 +82,7 @@ All maps are installed so they can be disabled / enabled at any time.
 * Club ARK - `ark-club`
 * Scorched - `ark-scorched`
 * The Center - `ark-thecenter`
+* Extinction - `ark-extinction`
 
 ### Start, Stop, Restart
 
@@ -100,6 +103,9 @@ sudo systemctl start ark-scorched
 
 # Start the center
 sudo systemctl start ark-thecenter
+
+# Start Extinction
+sudo systemctl start ark-extinction
 ```
 
 ---
@@ -121,6 +127,9 @@ sudo systemctl restart ark-scorched
 
 # Restart the center
 sudo systemctl restart ark-thecenter
+
+# Restart Extinction
+sudo systemctl restart ark-extinction
 ```
 
 ---
@@ -142,11 +151,17 @@ sudo systemctl stop ark-scorched
 
 # Stop the center
 sudo systemctl stop ark-thecenter
+
+# Stop Extinction
+sudo systemctl stop ark-extinction
 ```
 
 ---
 
 Start all maps (and update game server from Steam):
+
+Will start all **enabled** maps.  If no maps are running, (ie: stop_all was called prior),
+it will also issue a Steam game server update prior to starting any maps.
 
 ```bash
 /home/steam/ArkSurvivalAscended/start_all.sh
@@ -179,6 +194,9 @@ sudo systemctl enable ark-scorched
 
 # Enable The Center
 sudo systemctl enable ark-thecenter
+
+# Enable Extinction
+sudo systemctl enable ark-extinction
 ```
 
 Enabling a map will set it to start at boot, but it **will not** start the map immediately.
@@ -201,6 +219,9 @@ sudo systemctl disable ark-scorched
 
 # Disable The Center
 sudo systemctl disable ark-thecenter
+
+# Disable Extinction
+sudo systemctl disable ark-extinction
 ```
 
 Disabling a map will prevent it from starting at boot, but it **will not** stop the map.
@@ -239,9 +260,12 @@ sudo nano /home/steam/ArkSurvivalAscended/services/ark-scorched.conf
 
 # Configure start parameters for The Center
 sudo nano /home/steam/ArkSurvivalAscended/services/ark-thecenter.conf
+
+# Configure start parameters for Extinction
+sudo nano /home/steam/ArkSurvivalAscended/services/ark-extinction.conf
 ```
 
-When done editing, reload the system config:
+When done editing command line arguments for the game server, reload the system config:
 
 (This DOES NOT restart the game server)
 
