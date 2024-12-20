@@ -32,7 +32,7 @@ GAMECOMPATDIR="$COMPATDIR/$PROTON_NAME/files/share/default_pfx"
 # Binary path for Proton
 PROTONBIN="$COMPATDIR/$PROTON_NAME/proton"
 # List of game maps currently available
-GAMEMAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter"
+GAMEMAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter ark-extinction"
 
 
 ############################################
@@ -173,7 +173,7 @@ for MAP in $GAMEMAPS; do
 		RCONPORT=27001
 	elif [ "$MAP" == "ark-aberration" ]; then
 		DESC="Aberration"
-		NAME="Aberration_P"
+		NAME="Aberration_WP"
 		MODS=""
 		GAMEPORT=7702
 		RCONPORT=27002
@@ -185,16 +185,22 @@ for MAP in $GAMEMAPS; do
 		RCONPORT=27003
 	elif [ "$MAP" == "ark-scorched" ]; then
 		DESC="Scorched"
-		NAME="ScorchedEarth_P"
+		NAME="ScorchedEarth_WP"
 		MODS=""
 		GAMEPORT=7704
 		RCONPORT=27004
 	elif [ "$MAP" == "ark-thecenter" ]; then
 		DESC="TheCenter"
-		NAME="TheCenter_P"
+		NAME="TheCenter_WP"
 		MODS=""
 		GAMEPORT=7705
 		RCONPORT=27005
+	elif [ "$MAP" == "ark-extinction" ]; then
+		DESC="Extinction"
+		NAME="Extinction_WP"
+		MODS=""
+		GAMEPORT=7706
+		RCONPORT=27006
 	fi
 
 
@@ -273,7 +279,13 @@ function update_game {
 	fi
 }
 
-if [ \$(ps aux | grep ArkAscendedServer.exe | wc -l) -le 1 ]; then
+RUNNING=0
+for MAP in \$GAMEMAPS; do
+	if [ "\$(systemctl is-active $MAP)" == "active" ]; then
+		RUNNING=1
+	fi
+done
+if [ \$RUNNING -eq 0 ]; then
 	update_game
 else
 	echo "Game server is already running, not updating"
