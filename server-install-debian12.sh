@@ -58,6 +58,19 @@ else
 	INSTALLTYPE="new"
 fi
 
+# Determine if there is a firewall already installed, (to prevent issues)
+# Addresses Issue #19
+# @todo What other firewalls?
+if [ -n "$(which ufw)" ]; then
+	FIREWALL="ufw"
+elif [ -n "$(which firewall-cmd)" ]; then
+	FIREWALL="firewalld"
+elif [ -n "$(which iptables)" ]; then
+	FIREWALL="iptables"
+else
+	FIREWALL="none"
+fi
+
 
 ############################################
 ## User Prompts (pre setup)
@@ -94,7 +107,13 @@ fi
 # Preliminary requirements
 dpkg --add-architecture i386
 apt update
-apt install -y software-properties-common apt-transport-https dirmngr ca-certificates curl wget sudo firewalld
+apt install -y software-properties-common apt-transport-https dirmngr ca-certificates curl wget sudo
+
+if [ "$FIREWALL" == "none" ]; then
+	# No firewall installed, go ahead and install firewalld
+	apt install -y firewalld
+	FIREWALL="firewalld"
+fi
 
 
 # Enable "non-free" repos for Debian (for steamcmd)
@@ -336,9 +355,14 @@ systemctl daemon-reload
 ## Security Configuration
 ############################################
 
-# Configure firewall
-[ -d "/etc/firewalld/services" ] || mkdir -p /etc/firewalld/services
-cat > /etc/firewalld/services/ark-survival.xml <<EOF
+if [ "$FIREWALL" == "ufw" ]; then
+	# Enable rules for UFW
+	ufw allow 7701:7720/udp
+	ufw allow 27001:27020/tcp
+elif [ "$FIREWALL" == "firewalld" ]; then
+	# Install/enable rules for Firewalld
+	[ -d "/etc/firewalld/services" ] || mkdir -p /etc/firewalld/services
+    cat > /etc/firewalld/services/ark-survival.xml <<EOF
 <?xml version="1.0" encoding="utf-8"?>
 <service>
   <short>ARK Survival Ascended</short>
@@ -347,7 +371,8 @@ cat > /etc/firewalld/services/ark-survival.xml <<EOF
   <port port="27001-27020" protocol="tcp"/>
 </service>
 EOF
-firewall-cmd --permanent --zone=public --add-service=ark-survival
+    firewall-cmd --permanent --zone=public --add-service=ark-survival
+fi
 
 
 ############################################
