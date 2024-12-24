@@ -9,13 +9,14 @@ This script will:
 * Create a `steam` user for running the game server
 * Install ARK Survival Ascended Dedicated Server using standard Steam procedures
 * Setup a systemd service for running the game server
-* Add firewall service for game server (with firewalld)
+* Add firewall service for game server (with firewalld or UFW)
+* Setup NFS shares for multi-server environments
 
 ---
 
 What this script will _not_ do:
 
-Provide any sort of management interface over your server. 
+Provide any sort of management interface over your server.
 It's just a bootstrap script to install the game and its dependencies in a standard way
 so _you_ can choose how you want to manage it.
 
@@ -32,39 +33,47 @@ for starting and stopping all maps, (not to mention updating before they start).
 Sets up multiple maps on a single install, and **all of them can run at the same time**
 (providing your server has the horsepower to do so).
 
+If your single server cannot run all maps, this script supports multiple servers
+sharing the same `cluster` directory via NFS to allow players to jump between maps,
+even if they are on different physical servers.
+
 ## Directory Structure
 
 ```
 /home/steam/ArkSurvivalAscended
 ├── AppFiles/                  # Game Server Files (directly managed from Steam)
 ├── prefixes/                  # Proton prefix directory (emulates windows filesystem)
-│   ├── ark-aberration/
-│   ├── ark-club/
-│   ├── ark-island/
-│   ├── ark-scorched/
-│   └── ark-thecenter/
-│   └── ark-extinction/
+│   ├── ark-aberration/
+│   ├── ark-club/
+│   ├── ark-island/
+│   ├── ark-scorched/
+│   ├── ark-thecenter/
+│   └── ark-extinction/
 ├── services/                  # Service file overrides (for setting startup options)
-│   ├── ark-aberration.conf
-│   ├── ark-club.conf
-│   ├── ark-island.conf
-│   ├── ark-scorched.conf
-│   └── ark-thecenter.conf
-│   └── ark-extinction.conf
+│   ├── ark-aberration.conf
+│   ├── ark-club.conf
+│   ├── ark-island.conf
+│   ├── ark-scorched.conf
+│   ├── ark-thecenter.conf
+│   └── ark-extinction.conf
 ├── GameUserSettings.ini       # Game Server Configuration
 ├── Game.ini                   # Game Server Configuration
 ├── ShooterGame.log            # Game log file
+├── PlayersJoinNoCheckList.txt # Player whitelist
+├── admins.txt                 # Admin whitelist (needs manually setup)
 ├── start_all.sh               # Start all maps
-└── stop_all.sh                # Stop all maps
+├── stop_all.sh                # Stop all maps
+└── update.sh                  # Update game files (only when all maps stopped)
 ```
 
-## Installation on Debian 12
+## Installation on Debian 12 or Ubuntu 24.04
 
-To install ARK Survival Ascended Dedicated Server on Debian 12,
+To install ARK Survival Ascended Dedicated Server on Debian 12 or Ubuntu 24.04,
 download and run [server-install-debian12.sh](server-install-debian12.sh)
 as root or sudo.
 
-Debian 12 support tested on Digital Ocean, OVHCloud, and Proxmox.
+* Debian 12 tested on Digital Ocean, OVHCloud, and Proxmox.
+* Ubuntu 24.04 tested on Proxmox.
 
 Quick run (if you trust me, which you of course should not):
 
@@ -229,6 +238,30 @@ use `sudo systemctl stop ...` to stop the requested map manually.
 
 ---
 
+### Manually update game servers
+
+Game server code is updated automatically at server boot or when the first map is started,
+but you can issue a manual update at any time.
+
+```bash
+# Stop all maps first
+/home/steam/ArkSurvivalAscended/stop_all.sh
+# Start all maps (will issue update during start procedure)
+/home/steam/ArkSurvivalAscended/start_all.sh
+```
+
+To just update (and not start), the update can be called directly instead.
+
+```bash
+# Stop all maps first
+/home/steam/ArkSurvivalAscended/stop_all.sh
+# Update the game server, but do not start maps
+/home/steam/ArkSurvivalAscended/update.sh
+```
+
+Attempting to call `update.sh` while a game server is still running will simply result in the script exiting without updating.
+
+---
 
 ### Configuring the game ini
 
@@ -284,3 +317,11 @@ Edit crontab `sudo nano /etc/crontab` and add:
 ```
 
 (0 is minute, 5 is hour in 24-hour notation, followed by '* * *' for every day, every month, every weekday)
+
+### Cluster sharing across multiple servers
+
+Multi-server clustering is handled by sharing /home/steam/ArkSurvivalAscended/Saved/clusters with NFS.
+
+Primary server generates rules in `/etc/exports` and child servers mount via `/etc/fstab`.
+
+Firewall rules are automatically generated for child servers when their IPs are provided during setup on the master server.
