@@ -1,0 +1,5 @@
+[Service]
+# Edit this line to adjust start parameters of the server
+# After modifying, please remember to run `sudo systemctl daemon-reload` to apply changes to the system.
+# compile:noescape
+ExecStart=$PROTON_BIN run ArkAscendedServer.exe ${NAME}?listen?SessionName="${COMMUNITYNAME} (${DESC})"?RCONPort=${RCONPORT}?ServerAdminPassword=${ADMIN_PASS}?RCONEnabled=True -port=${GAMEPORT} -servergamelog ${MODS_LINE}

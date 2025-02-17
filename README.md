@@ -11,14 +11,42 @@ This script will:
 * Setup a systemd service for running the game server
 * Add firewall service for game server (with firewalld or UFW)
 * Setup NFS shares for multi-server environments
+* Adds a management script for controlling your server
 
 ---
 
-What this script will _not_ do:
+## Installation on Debian 12 or Ubuntu 24.04
 
-Provide any sort of management interface over your server.
-It's just a bootstrap script to install the game and its dependencies in a standard way
-so _you_ can choose how you want to manage it.
+To install ARK Survival Ascended Dedicated Server on Debian 12 or Ubuntu 24.04,
+download and run [server-install-debian12.sh](dist/server-install-debian12.sh)
+as root or sudo.
+
+* Debian 12 tested on Digital Ocean, OVHCloud, and Proxmox.
+* Ubuntu 24.04 tested on Proxmox.
+
+Quick run (if you trust me, which you of course should not):
+
+```bash
+sudo su -c "bash <(wget -qO- https://raw.githubusercontent.com/cdp1337/ARKSurvivalAscended-Linux/main/dist/server-install-debian12.sh)" root
+```
+
+### Advanced Usage
+
+Download the script and retain for later management use.
+
+```bash
+wget https://raw.githubusercontent.com/cdp1337/ARKSurvivalAscended-Linux/main/dist/server-install-debian12.sh
+chmod +x server-install-debian12.sh
+
+# Reset and rebuild proton directories (if the prefix gets corrupted somehow)
+sudo ./server-install-debian12.sh --reset-proton
+
+# Force reinstall game binaries, (useful after a major update when Wildcard breaks the build)
+# This will NOT remove your save data!
+sudo ./server-install-debian12.sh --force-reinstall
+```
+
+Re-running the installation script on an existing server **is safe** and will **not** overwrite or delete your existing game data.
 
 ## Features
 
@@ -48,14 +76,16 @@ even if they are on different physical servers.
 │   ├── ark-island/
 │   ├── ark-scorched/
 │   ├── ark-thecenter/
-│   └── ark-extinction/
+│   ├── ark-extinction/
+│   └── ark-astraeos/
 ├── services/                  # Service file overrides (for setting startup options)
 │   ├── ark-aberration.conf
 │   ├── ark-club.conf
 │   ├── ark-island.conf
 │   ├── ark-scorched.conf
 │   ├── ark-thecenter.conf
-│   └── ark-extinction.conf
+│   ├── ark-extinction.conf
+│   └── ark-astraeos.conf
 ├── GameUserSettings.ini       # Game Server Configuration
 ├── Game.ini                   # Game Server Configuration
 ├── ShooterGame.log            # Game log file
@@ -63,28 +93,155 @@ even if they are on different physical servers.
 ├── admins.txt                 # Admin whitelist (needs manually setup)
 ├── start_all.sh               # Start all maps
 ├── stop_all.sh                # Stop all maps
-└── update.sh                  # Update game files (only when all maps stopped)
+├── update.sh                  # Update game files (only when all maps stopped)
+└── manage.py                  # Management console for game server, maps, and settings
 ```
 
-## Installation on Debian 12 or Ubuntu 24.04
 
-To install ARK Survival Ascended Dedicated Server on Debian 12 or Ubuntu 24.04,
-download and run [server-install-debian12.sh](server-install-debian12.sh)
-as root or sudo.
 
-* Debian 12 tested on Digital Ocean, OVHCloud, and Proxmox.
-* Ubuntu 24.04 tested on Proxmox.
+## Managing your Server (Easy Method)
 
-Quick run (if you trust me, which you of course should not):
+Once installed, run `sudo /home/steam/ArkSurvivalAscended/manage.py` to access the management console:
 
-```bash
-sudo su -c "bash <(wget -qO- https://raw.githubusercontent.com/cdp1337/ARKSurvivalAscended-Linux/main/server-install-debian12.sh)" root
+```
+| # | Map              | Session                    | Port | RCON  | Auto-Start | Service | Players |
+| 1 | ScorchedEarth_WP | VN Test Boxes (Scorched)   | 7704 | 27004 | Enabled    | Stopped | N/A     |
+| 2 | TheIsland_WP     | VN Test Boxes (Island)     | 7701 | 27001 | Disabled   | Stopped | N/A     |
+| 3 | TheCenter_WP     | VN Test Boxes (TheCenter)  | 7705 | 27005 | Disabled   | Stopped | N/A     |
+| 4 | Astraeos_WP      | VN Test Boxes (Astraeos)   | 7707 | 27007 | Disabled   | Stopped | N/A     |
+| 5 | Aberration_WP    | VN Test Boxes (Aberration) | 7702 | 27002 | Disabled   | Stopped | N/A     |
+| 6 | Extinction_WP    | VN Test Boxes (Extinction) | 7706 | 27006 | Disabled   | Stopped | N/A     |
+| 7 | BobsMissions_WP  | VN Test Boxes (Club)       | 7703 | 27003 | Disabled   | Stopped | N/A     |
+
+1-7 to manage individual map settings
+Configure: [M]ods | [C]luster | [A]dmin password/RCON | re[N]ame
+Control: [S]tart all | s[T]op all | [R]estart all | [U]pdate
+or [Q]uit to exit
 ```
 
-## Managing your Server
+The main screen of the management UI shows all maps and some basic info, 
+including how many players are currently connected.
 
-On installation, you have the option of selecting which map to enable.
-All maps are installed so they can be disabled / enabled at any time.
+### Mods management
+
+Pressing `m` will open the mods overview screen:
+
+```
+| Session                    | Mods    |
+| VN Test Boxes (Scorched)   |         |
+| VN Test Boxes (Island)     |         |
+| VN Test Boxes (TheCenter)  |         |
+| VN Test Boxes (Astraeos)   |         |
+| VN Test Boxes (Aberration) |         |
+| VN Test Boxes (Extinction) |         |
+| VN Test Boxes (Club)       | 1005639 |
+
+[E]nable mod on all maps | [D]isable mod on all maps | [B]ack:
+```
+
+Here, `e` will allow you to enable a mod on all maps and `d` will disable a mod on all maps.
+
+`b` will go back to the main menu overview.
+
+### Cluster management
+
+Pressing `c` will open the cluster overview screen:
+
+```
+| Session                    | Cluster ID     |
+| VN Test Boxes (Scorched)   | some-test-name |
+| VN Test Boxes (Island)     | some-test-name |
+| VN Test Boxes (TheCenter)  | some-test-name |
+| VN Test Boxes (Astraeos)   | some-test-name |
+| VN Test Boxes (Aberration) | some-test-name |
+| VN Test Boxes (Extinction) | some-test-name |
+| VN Test Boxes (Club)       | some-test-name |
+
+[C]hange cluster id on all maps | [B]ack:
+```
+
+Pressing `c` on the cluster page will allow you to set the cluster ID for all maps.
+
+`b` will go back to the main menu overview.
+
+### Admin password and RCON management
+
+Pressing `a` will open the admin password and RCON management screen:
+
+```
+| Session                    | Admin Password | RCON  |
+| VN Test Boxes (Scorched)   | foobarblaz     | 27004 |
+| VN Test Boxes (Island)     | foobarblaz     | 27001 |
+| VN Test Boxes (TheCenter)  | foobarblaz     | 27005 |
+| VN Test Boxes (Astraeos)   | foobarblaz     | 27007 |
+| VN Test Boxes (Aberration) | foobarblaz     | 27002 |
+| VN Test Boxes (Extinction) | foobarblaz     | 27006 |
+| VN Test Boxes (Club)       | foobarblaz     | 27003 |
+
+[C]hange admin password on all | [E]nable RCON on all | [D]isable RCON on all | [B]ack:
+```
+
+This allows you to change the admin/rcon password across all maps, as well as enable or disable RCON.
+
+Note, you should leave RCON enabled, as it allows the script to warn users upon restarts and 
+gracefully save prior to shutting down the server. 
+
+
+### Renaming maps
+
+From the main menu overview, pressing `n` will allow you to rename all maps.
+By default, all maps are suffixed with the map name, allowing you to have the same name
+for every map in the cluster.
+
+### Stopping / Starting / Restarting
+
+From the main menu overview, the options `s`, `t`, and `r` respectively
+will **s**tart, s**t**op, and **r**estart all maps that are currently enabled.
+
+When RCON is enabled and available, (default), the stop logic will first check if there are 
+any players currently on the map.  If there are, it will send a 5-minute warning to all players
+and then wait for a minute before another warning is sent if they are still logged in.
+
+3 minutes, 2 minutes, 1 minute, and 30 second warnings are also sent.
+
+If all players have left the map prior to the countdown completing, 
+the server will skip the remaining countdown and will proceed with the shutdown.
+
+A world save is automatically requested on the map prior to shutdown.
+
+### Updating
+
+If all maps are stopped, the `u` option will update the game server files from Steam.
+
+### Managing individual maps
+
+Pressing 1 through (however many maps there are), will open the individual map page.
+
+```
+Map:           ScorchedEarth_WP
+Session:       VN Test Boxes (Scorched)
+Port:          7704
+RCON:          27004
+Auto-Start:    Yes
+Status:        Stopped
+Players:       None
+Mods:          
+Cluster ID:    some-test-name
+Other Options: AllowFlyerCarryPvE=True?DinoDamageMultiplier=25
+Other Flags:   -servergamelog     
+
+[E]nable | [D]isable | [M]ods | [C]luster | re[N]ame | [F]lags | [O]ptions | [S]tart | s[T]op | [R]estart | [B]ack:
+```
+
+This page allows you to configure a specific map, notably enabling, disabling, and configuring flags and options.
+
+Options are any variable as defined in the [Server Configuration](https://ark.wiki.gg/wiki/Server_configuration)
+and flags are command line arguments (ie: those that start with a `-`.)
+
+
+## Managing with systemd (manual method)
+
+A list of all maps and their relative systemd service name: 
 
 * Island - `ark-island`
 * Aberration - `ark-aberration`
@@ -92,29 +249,14 @@ All maps are installed so they can be disabled / enabled at any time.
 * Scorched - `ark-scorched`
 * The Center - `ark-thecenter`
 * Extinction - `ark-extinction`
+* Astraeos - `ark-astraeos`
 
 ### Start, Stop, Restart
 
 Start a single map:
 
 ```bash
-# Start the Island
-sudo systemctl start ark-island
-
-# Start Aberration
-sudo systemctl start ark-aberration
-
-# Start Club ARK
-sudo systemctl start ark-club
-
-# Start Scorched
-sudo systemctl start ark-scorched
-
-# Start the center
-sudo systemctl start ark-thecenter
-
-# Start Extinction
-sudo systemctl start ark-extinction
+sudo systemctl start MAP_SERVICE_NAME
 ```
 
 ---
@@ -122,90 +264,29 @@ sudo systemctl start ark-extinction
 Restarting a single map:
 
 ```bash
-# Restart the Island
-sudo systemctl restart ark-island
-
-# Restart Aberration
-sudo systemctl restart ark-aberration
-
-# Restart Club ARK
-sudo systemctl restart ark-club
-
-# Restart Scorched
-sudo systemctl restart ark-scorched
-
-# Restart the center
-sudo systemctl restart ark-thecenter
-
-# Restart Extinction
-sudo systemctl restart ark-extinction
+sudo systemctl restart MAP_SERVICE_NAME
 ```
+
+Warning: issuing a restart manually will immediately stop the map,
+kicking any user without warning and sometimes losing a few minutes of progress.
 
 ---
 
 Stopping a single map:
 
 ```bash
-# Stop the Island
-sudo systemctl stop ark-island
-
-# Stop Aberration
-sudo systemctl stop ark-aberration
-
-# Stop Club ARK
-sudo systemctl stop ark-club
-
-# Stop Scorched
-sudo systemctl stop ark-scorched
-
-# Stop the center
-sudo systemctl stop ark-thecenter
-
-# Stop Extinction
-sudo systemctl stop ark-extinction
+sudo systemctl stop MAP_SERVICE_NAME
 ```
 
----
-
-Start all maps (and update game server from Steam):
-
-Will start all **enabled** maps.  If no maps are running, (ie: stop_all was called prior),
-it will also issue a Steam game server update prior to starting any maps.
-
-```bash
-/home/steam/ArkSurvivalAscended/start_all.sh
-```
-
----
-
-Stop all maps:
-
-```bash
-/home/steam/ArkSurvivalAscended/stop_all.sh
-```
+Warning: issuing a stop manually will immediately stop the map, 
+kicking any user without warning and sometimes losing a few minutes of progress.
 
 ---
 
 ### Enable and disable maps
 
 ```bash
-# Enable Island
-sudo systemctl enable ark-island
-
-# Enable Aberration
-sudo systemctl enable ark-aberration
-
-# Enable Club ARK
-sudo systemctl enable ark-club
-
-# Enable Scorched
-sudo systemctl enable ark-scorched
-
-# Enable The Center
-sudo systemctl enable ark-thecenter
-
-# Enable Extinction
-sudo systemctl enable ark-extinction
+sudo systemctl enable MAP_SERVICE_NAME
 ```
 
 Enabling a map will set it to start at boot, but it **will not** start the map immediately.
@@ -214,23 +295,7 @@ use `sudo systemctl start ...` to start the requested map manually.
 ---
 
 ```bash
-# Disable Island
-sudo systemctl disable ark-island
-
-# Disable Aberration
-sudo systemctl disable ark-aberration
-
-# Disable Club ARK
-sudo systemctl disable ark-club
-
-# Disable Scorched
-sudo systemctl disable ark-scorched
-
-# Disable The Center
-sudo systemctl disable ark-thecenter
-
-# Disable Extinction
-sudo systemctl disable ark-extinction
+sudo systemctl disable MAP_SERVICE_NAM
 ```
 
 Disabling a map will prevent it from starting at boot, but it **will not** stop the map.
@@ -238,30 +303,6 @@ use `sudo systemctl stop ...` to stop the requested map manually.
 
 ---
 
-### Manually update game servers
-
-Game server code is updated automatically at server boot or when the first map is started,
-but you can issue a manual update at any time.
-
-```bash
-# Stop all maps first
-/home/steam/ArkSurvivalAscended/stop_all.sh
-# Start all maps (will issue update during start procedure)
-/home/steam/ArkSurvivalAscended/start_all.sh
-```
-
-To just update (and not start), the update can be called directly instead.
-
-```bash
-# Stop all maps first
-/home/steam/ArkSurvivalAscended/stop_all.sh
-# Update the game server, but do not start maps
-/home/steam/ArkSurvivalAscended/update.sh
-```
-
-Attempting to call `update.sh` while a game server is still running will simply result in the script exiting without updating.
-
----
 
 ### Configuring the game ini
 

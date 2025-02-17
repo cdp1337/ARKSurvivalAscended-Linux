@@ -1,0 +1,22 @@
+[Unit]
+# DYNAMICALLY GENERATED FILE! Edit at your own risk
+# compile:noescape
+Description=ARK Survival Ascended Dedicated Server (${DESC})
+After=network.target
+After=ark-updater.service
+
+[Service]
+Type=simple
+LimitNOFILE=10000
+User=$GAME_USER
+Group=$GAME_USER
+WorkingDirectory=$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64
+Environment=XDG_RUNTIME_DIR=/run/user/$(id -u)
+Environment="STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_DIR"
+Environment="STEAM_COMPAT_DATA_PATH=$GAME_DIR/prefixes/$MAP"
+# Check $GAME_DIR/services to adjust the CLI arguments
+Restart=on-failure
+RestartSec=20s
+
+[Install]
+WantedBy=multi-user.target

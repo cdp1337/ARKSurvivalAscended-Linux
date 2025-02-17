@@ -1,0 +1,21 @@
+[
+    {
+        "$schema": "https://raw.githubusercontent.com/amidaware/community-scripts/main/community_scripts.schema.json",
+        "guid": "4c28dda0-3403-001b-f8ef-a4735f4ee2e8",
+        "filename": "server-install-debian12.sh",
+        "args": [],
+        "env": [],
+        "submittedBy": "Charlie Powell <cdp1337@veraciousnetwork.com>",
+        "name": "Install ARK Survival Ascended Dedicated Server",
+        "syntax": [
+            "--reset-proton - Reset proton directories back to default",
+            "--force-reinstall - Force a reinstall of the game binaries, mods, and engine"
+        ],
+        "default_timeout": "600",
+        "shell": "shell",
+        "supported_platforms": [
+            "linux"
+        ],
+        "category": "Game Server"
+    }
+]
