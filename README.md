@@ -211,6 +211,8 @@ When RCON is enabled and available, (default), the stop logic will first check i
 any players currently on the map.  If there are, it will send a 5-minute warning to all players
 and then wait for a minute before another warning is sent if they are still logged in.
 
+![Preview of output in game](images/server-shutdown-notice.png)
+
 3 minutes, 2 minutes, 1 minute, and 30 second warnings are also sent.
 
 If all players have left the map prior to the countdown completing, 
