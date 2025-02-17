@@ -377,3 +377,19 @@ Multi-server clustering is handled by sharing /home/steam/ArkSurvivalAscended/Sa
 Primary server generates rules in `/etc/exports` and child servers mount via `/etc/fstab`.
 
 Firewall rules are automatically generated for child servers when their IPs are provided during setup on the master server.
+
+## Utilized libraries
+
+* [RCON library by Conqp](https://github.com/conqp/rcon) (GPLv3)
+* [Scripts Collection compiler by eVAL](https://github.com/eVAL-Agency/ScriptsCollection) (AGPLv3)
+* [Proton-GE by Glorious Eggroll](https://github.com/GloriousEggroll/proton-ge-custom) (BSD-3)
+* [SteamCMD by Valve](https://developer.valvesoftware.com/wiki/SteamCMD)
+* curl 
+* wget 
+* sudo
+* systemd
+* python3
+* python3-venv
+* ufw
+* nfs-kernel-server 
+* nfs-common
