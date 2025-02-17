@@ -1,5 +1,14 @@
 # Tools for installing ARK Survival Ascended Dedicated Server on Linux
 
+Wanna chat?
+
+[![Discord](https://img.shields.io/discord/909843670214258729?label=Discord)](https://discord.gg/48hHdm5EgA)
+
+Help fund the project
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/Q5Q013RM9Q)
+
+
 ## What does it do?
 
 This script will:

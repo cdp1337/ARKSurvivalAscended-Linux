@@ -1711,6 +1711,12 @@ def menu_admin_password():
 def menu_main():
 	stay = True
 	while stay:
+		print('')
+		print('Welcome to the ARK Survival Ascended Linux Server Manager')
+		print('')
+		print('Find an issue? https://github.com/cdp1337/ARKSurvivalAscended-Linux/issues')
+		print('Want to help support this project? https://ko-fi.com/Q5Q013RM9Q')
+		print('')
 		table = Table(['num', 'map', 'session', 'port', 'rcon', 'enabled', 'running', 'players'])
 		table.render(services)
 
@@ -1909,6 +1915,11 @@ if [ "$WHITELIST" -eq 1 ]; then
 	echo "Whitelist:             $GAME_DIR/PlayersJoinNoCheckList.txt"
 fi
 echo "Admin list:            $GAME_DIR/admin.txt"
+echo ''
+echo ''
+echo 'Wanna stop by and chat? https://discord.gg/48hHdm5EgA'
+echo 'Have an issue or feature request? https://github.com/cdp1337/ARKSurvivalAscended-Linux/issues'
+echo 'Help support this and other projects? https://ko-fi.com/Q5Q013RM9Q'
 echo ''
 echo ''
 echo '! IMPORTANT !'

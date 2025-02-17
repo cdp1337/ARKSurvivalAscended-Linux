@@ -665,6 +665,12 @@ def menu_admin_password():
 def menu_main():
 	stay = True
 	while stay:
+		print('')
+		print('Welcome to the ARK Survival Ascended Linux Server Manager')
+		print('')
+		print('Find an issue? https://github.com/cdp1337/ARKSurvivalAscended-Linux/issues')
+		print('Want to help support this project? https://ko-fi.com/Q5Q013RM9Q')
+		print('')
 		table = Table(['num', 'map', 'session', 'port', 'rcon', 'enabled', 'running', 'players'])
 		table.render(services)
 

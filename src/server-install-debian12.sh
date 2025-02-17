@@ -601,6 +601,11 @@ fi
 echo "Admin list:            $GAME_DIR/admin.txt"
 echo ''
 echo ''
+echo 'Wanna stop by and chat? https://discord.gg/48hHdm5EgA'
+echo 'Have an issue or feature request? https://github.com/cdp1337/ARKSurvivalAscended-Linux/issues'
+echo 'Help support this and other projects? https://ko-fi.com/Q5Q013RM9Q'
+echo ''
+echo ''
 echo '! IMPORTANT !'
 echo 'to manage the server, run the following utility'
 echo "$GAME_DIR/manage.py"
