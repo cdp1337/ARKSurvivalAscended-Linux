@@ -64,7 +64,10 @@ class Services:
 
 				# Extract out all the various info from the start line
 				extracted_keys = re.match(
-					r'ExecStart=(?P<runner>[^ ]*) run ArkAscendedServer.exe (?P<map>[^/?]*)\?listen\?SessionName="(?P<session>[^"]*)"\?(?P<options>[^ ]*) (?P<flags>.*)',
+					(r'ExecStart=(?P<runner>[^ ]*) run ArkAscendedServer.exe' 
+					 r'(?P<map>[^/?]*)\?listen\?SessionName="(?P<session>[^"]*)"'
+					 r'\?(?P<options>[^ ]*) (?P<flags>.*)'
+					),
 					line
 				)
 
