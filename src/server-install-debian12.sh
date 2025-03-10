@@ -28,6 +28,7 @@
 #   OPT_FORCE_REINSTALL=--force-reinstall - Force a reinstall of the game binaries, mods, and engine
 #
 # Changelog:
+#   20250310 - Add support for Discord integration on start/stop
 #   20250217 - Switch to Proton 9.22
 #            - Add Astraeos map
 #            - Add management script

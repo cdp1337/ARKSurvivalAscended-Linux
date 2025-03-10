@@ -24,6 +24,7 @@ This script will:
 
 ---
 
+
 ## Installation on Debian 12 or Ubuntu 24.04
 
 To install ARK Survival Ascended Dedicated Server on Debian 12 or Ubuntu 24.04,
@@ -55,7 +56,21 @@ sudo ./server-install-debian12.sh --reset-proton
 sudo ./server-install-debian12.sh --force-reinstall
 ```
 
-Re-running the installation script on an existing server **is safe** and will **not** overwrite or delete your existing game data.
+Re-running the installation script on an existing server **is safe** and will **not** overwrite 
+or delete your existing game data.  To install new features as they come out, simply
+re-download the script installer via the steps above and re-run the installer application.
+
+
+## Finding Your Game
+
+Once installed and running, you should be able to search for your server
+in the "Unofficial" server list after ticking "Show Player Servers".
+
+![Show Player Servers button](images/show-player-servers.png)
+
+(This was an added step Wildcard implemented to make it harder for players to find servers
+that are hosted outside Nitrado's network...)
+
 
 ## Features
 
@@ -73,6 +88,7 @@ Sets up multiple maps on a single install, and **all of them can run at the same
 If your single server cannot run all maps, this script supports multiple servers
 sharing the same `cluster` directory via NFS to allow players to jump between maps,
 even if they are on different physical servers.
+
 
 ## Directory Structure
 
@@ -107,12 +123,13 @@ even if they are on different physical servers.
 ```
 
 
-
 ## Managing your Server (Easy Method)
 
 Once installed, run `sudo /home/steam/ArkSurvivalAscended/manage.py` to access the management console:
 
 ```
+== Welcome to the ARK Survival Ascended Linux Server Manager ==
+
 | # | Map              | Session                    | Port | RCON  | Auto-Start | Service | Players |
 | 1 | ScorchedEarth_WP | VN Test Boxes (Scorched)   | 7704 | 27004 | Enabled    | Stopped | N/A     |
 | 2 | TheIsland_WP     | VN Test Boxes (Island)     | 7701 | 27001 | Disabled   | Stopped | N/A     |
@@ -123,7 +140,7 @@ Once installed, run `sudo /home/steam/ArkSurvivalAscended/manage.py` to access t
 | 7 | BobsMissions_WP  | VN Test Boxes (Club)       | 7703 | 27003 | Disabled   | Stopped | N/A     |
 
 1-7 to manage individual map settings
-Configure: [M]ods | [C]luster | [A]dmin password/RCON | re[N]ame
+Configure: [M]ods | [C]luster | [A]dmin password/RCON | re[N]ame | [D]iscord integration
 Control: [S]tart all | s[T]op all | [R]estart all | [U]pdate
 or [Q]uit to exit
 ```
@@ -136,6 +153,8 @@ including how many players are currently connected.
 Pressing `m` will open the mods overview screen:
 
 ```
+== Mods Configuration ==
+
 | Session                    | Mods    |
 | VN Test Boxes (Scorched)   |         |
 | VN Test Boxes (Island)     |         |
@@ -157,6 +176,8 @@ Here, `e` will allow you to enable a mod on all maps and `d` will disable a mod 
 Pressing `c` will open the cluster overview screen:
 
 ```
+== Cluster Configuration ==
+
 | Session                    | Cluster ID     |
 | VN Test Boxes (Scorched)   | some-test-name |
 | VN Test Boxes (Island)     | some-test-name |
@@ -178,6 +199,8 @@ Pressing `c` on the cluster page will allow you to set the cluster ID for all ma
 Pressing `a` will open the admin password and RCON management screen:
 
 ```
+== Admin and RCON Configuration ==
+
 | Session                    | Admin Password | RCON  |
 | VN Test Boxes (Scorched)   | foobarblaz     | 27004 |
 | VN Test Boxes (Island)     | foobarblaz     | 27001 |
@@ -194,6 +217,40 @@ This allows you to change the admin/rcon password across all maps, as well as en
 
 Note, you should leave RCON enabled, as it allows the script to warn users upon restarts and 
 gracefully save prior to shutting down the server. 
+
+
+### Discord Integration (New feature as of 2025.03.10)
+
+```
+== Discord Integration ==
+
+Discord integration is currently available and enabled!
+
+Discord Webhook URL:  https://canary.discord.com/api/webhooks/1348175098775081070/xjCt************
+Discord Channel ID:   919624281904783472
+Discord Guild ID:     909843670214258729
+Discord Webhook Name: Testy McTesterFace
+
+[D]isable | [C]hange Discord webhook URL | configure [M]essages | [B]ack
+```
+
+Provides an option to automatically send messages to Discord on start, restart, and stop
+events for maps.  Default messages provided, and can be customized to match your preferences.
+
+To setup Discord integration, grab a webhook URL from Discord by browsing to 
+Server Settings -> Integrations
+
+![Discord step 1](images/discord-integration-1.png)
+
+Then Webhooks
+
+![Discord step 2](images/discord-integration-2.png)
+
+And create a new webhook and configure as desired.
+
+![Discord step 3](images/discord-integration-3.png)
+
+Copy the webhook URL and paste into the management console when prompted.
 
 
 ### Renaming maps
@@ -219,6 +276,8 @@ If all players have left the map prior to the countdown completing,
 the server will skip the remaining countdown and will proceed with the shutdown.
 
 A world save is automatically requested on the map prior to shutdown.
+
+**New as of 2025.03.10 release**, Discord messages are sent prior to shutdown and after startup.
 
 ### Updating
 

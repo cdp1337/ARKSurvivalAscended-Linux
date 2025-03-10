@@ -28,6 +28,7 @@
 #   --force-reinstall - Force a reinstall of the game binaries, mods, and engine
 #
 # Changelog:
+#   20250310 - Add support for Discord integration on start/stop
 #   20250217 - Switch to Proton 9.22
 #            - Add Astraeos map
 #            - Add management script
@@ -1070,6 +1071,10 @@ import subprocess
 import readline
 import re
 from rcon.source import Client
+import configparser
+from urllib import request
+from urllib import error as urlerror
+import json
 
 
 # Require sudo / root to run this script
@@ -1092,6 +1097,57 @@ def rlinput(prompt, prefill=''):
 		readline.set_startup_hook()
 
 
+def discord_message(message: str) -> str:
+	"""
+	Get the user-defined message to be sent to Discord, or default if not configured.
+	:param message:
+	:return:
+	"""
+	messages = {
+		'map_started': ':green_square: %s has started',
+		'maps_stopping': ':small_red_triangle_down: Shutting down: %s',
+		'map_stopping': ':small_red_triangle_down: %s shutting down',
+	}
+	if message in messages:
+		# Check if there is a configured value
+		configured_message = config['Discord'].get(message, '')
+		if configured_message == '':
+			# No configured message, use default.
+			message = messages[message]
+		else:
+			message = configured_message
+
+	return message
+
+
+def discord_alert(message: str, parameters: list):
+	enabled = config['Discord'].get('enabled', '0') == '1'
+	webhook = config['Discord'].get('webhook', '')
+	message = discord_message(message)
+
+	# Verify the number of '%s' replacements in the string
+	# This is important because this is a user-definable string, and users may forget to include '%s'.
+	if message.count('%s') < len(parameters):
+		message = message + ' %s' * (len(parameters) - message.count('%s'))
+	message = message % tuple(parameters)
+
+	if enabled and webhook != '':
+		print('Sending to discord: ' + message)
+		req = request.Request(
+			webhook,
+			headers={'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0'},
+			method='POST'
+		)
+		data = json.dumps({'content': message}).encode('utf-8')
+		try:
+			with request.urlopen(req, data=data) as resp:
+				pass
+		except urlerror.HTTPError as e:
+			print('Could not notify Discord: %s' % e)
+	else:
+		print('Would be sent to discord: ' + message)
+
+
 class Services:
 	"""
 	Service definition and handler
@@ -1110,12 +1166,15 @@ class Services:
 
 				# Extract out all the various info from the start line
 				extracted_keys = re.match(
-					r'ExecStart=(?P<runner>[^ ]*) run ArkAscendedServer.exe (?P<map>[^/?]*)\?listen\?SessionName="(?P<session>[^"]*)"\?(?P<options>[^ ]*) (?P<flags>.*)',
+					(r'ExecStart=(?P<runner>[^ ]*) run ArkAscendedServer.exe' 
+					 r'(?P<map>[^/?]*)\?listen\?SessionName="(?P<session>[^"]*)"'
+					 r'\?(?P<options>[^ ]*) (?P<flags>.*)'
+					),
 					line
 				)
 
 				self.runner = extracted_keys.group('runner')
-				self.map = extracted_keys.group('map')
+				self.map = extracted_keys.group('map').strip()
 				self.session = extracted_keys.group('session')
 				self.rcon = None
 				self.rcon_enabled = None
@@ -1221,6 +1280,8 @@ class Services:
 			with Client('127.0.0.1', int(self.rcon), passwd=self.admin_password) as client:
 				return client.run(cmd).strip()
 		except ConnectionRefusedError:
+			return None
+		except ConnectionResetError:
 			return None
 
 	def rcon_get_number_players(self) -> Union[None, int]:
@@ -1442,10 +1503,20 @@ def _safe_stop_inner(services, time_message):
 
 def safe_stop(services):
 	"""
-
+	Safely stop all requested service files
 	:param services: Services[]
 	:return:
 	"""
+
+	maps = []
+	for s in services:
+		if s.is_running():
+			maps.append(s.session)
+	if len(maps) > 1:
+		discord_alert('maps_stopping', [', '.join(maps)])
+	elif len(maps) == 1:
+		discord_alert('map_stopping', [maps[0]])
+
 	players_connected = _safe_stop_inner(services, 'in 5 minutes')
 
 	if players_connected:
@@ -1501,55 +1572,77 @@ def safe_restart(services):
 		if s.is_running():
 			running_services.append(s)
 
-	players_connected = _safe_stop_inner(running_services, 'in 5 minutes')
+	safe_stop(running_services)
 
-	if players_connected:
-		print('Waiting a minute until the next warning (5 minutes remaining)')
-		sleep(60)
-		players_connected = _safe_stop_inner(running_services, 'in 4 minutes')
+	print('Running maps have been stopped, waiting a moment to restart them')
+	sleep(5)
+	safe_start(running_services, True)
 
-	if players_connected:
-		print('Waiting a minute until the next warning (4 minutes remaining)')
-		sleep(60)
-		players_connected = _safe_stop_inner(running_services, 'in 3 minutes')
 
-	if players_connected:
-		print('Waiting a minute until the next warning (3 minutes remaining)')
-		sleep(60)
-		players_connected = _safe_stop_inner(running_services, 'in 2 minutes')
+def safe_start(services, ignore_enabled = False):
+	"""
+	Start all enabled services that are not currently running
+	:param services: Services[]
+	:param ignore_enabled: bool Set to True to ignore the enabled flag
+	:return:
+	"""
+	for s in services:
+		if not s.is_enabled() and not ignore_enabled:
+			print('Skipping disabled map %s' % s.session)
+		elif s.is_running():
+			print('%s already running' % s.session)
+		else:
+			print('Starting %s, please wait, may take a minute...' % s.session)
+			s.start()
+			players_connected = None
+			if s.rcon_enabled:
+				retry = 0
+				while retry < 5:
+					retry += 1
+					players_connected = s.rcon_get_number_players()
+					if players_connected is None:
+						sleep(6)
+					else:
+						break
+			else:
+				# No rcon available... just wait a bit.
+				sleep(30)
 
-	if players_connected:
-		print('Waiting a minute until the next warning (2 minutes remaining)')
-		sleep(60)
-		players_connected = _safe_stop_inner(running_services, 'in 1 minute')
+			if s.rcon_enabled:
+				if players_connected is None:
+					print('WARNING - Service marked as started, but unable to retrieve any data from RCON.')
+					print('Please manually check if the game is available.')
+				else:
+					discord_alert('map_started', [s.session])
+			else:
+				discord_alert('map_started', [s.session])
 
-	if players_connected:
-		print('Waiting 30 seconds until the next warning (1 minute remaining)')
-		sleep(30)
-		players_connected = _safe_stop_inner(running_services, 'in 30 seconds')
 
-	if players_connected:
-		print('Last warning')
-		sleep(30)
-		_safe_stop_inner(running_services, 'NOW')
+def save_config():
+	"""
+	Save the management application configuration to disk
+	:return:
+	"""
+	with open(os.path.join(here, '.settings.ini'), 'w') as f:
+		config.write(f)
+	os.chmod(os.path.join(here, '.settings.ini'), 0o600)
 
-	for s in running_services:
-		if s.is_running():
-			players = s.rcon_get_number_players()
-			if players is not None:
-				# RCON enabled, we can request a manual save
-				print('Saving %s' % s.session)
-				s.rcon_save_world()
-				sleep(10)
-			print('Shutting down %s' % s.session)
-			s.stop()
 
-	print('Running maps have been stopped, waiting a minute to restart them')
-	sleep(60)
-	for s in running_services:
-		print('Starting %s' % s.session)
-		s.start()
-		sleep(30)
+def header(line):
+	"""
+	Print a header line
+	:param line: string
+	:return:
+	"""
+	#os.system('clear')
+	# Instead of clearing the screen, just print some newlines.
+	# This way errors from the previous screen will be visible.
+	print('')
+	print('')
+	print('')
+	print('')
+	print('== %s ==' % line)
+	print('')
 
 
 def menu_service(service):
@@ -1559,6 +1652,7 @@ def menu_service(service):
 	:return:
 	"""
 	while True:
+		header('Service Details')
 		print('Map:           %s' % service.map)
 		print('Session:       %s' % service.session)
 		print('Port:          %s' % service.port)
@@ -1571,7 +1665,23 @@ def menu_service(service):
 		print('Other Options: %s' % service.other_options)
 		print('Other Flags:   %s' % service.other_flags)
 		print('')
-		opt = input('[E]nable | [D]isable | [M]ods | [C]luster | re[N]ame | [F]lags | [O]ptions | [S]tart | s[T]op | [R]estart | [B]ack: ').lower()
+
+		options = []
+		if service.is_enabled():
+			options.append('[D]isable')
+		else:
+			options.append('[E]nable')
+
+		options.append('[M]ods | [C]luster | re[N]ame | [F]lags | [O]ptions')
+
+		if service.is_running():
+			options.append('s[T]op')
+			options.append('[R]estart')
+		else:
+			options.append('[S]tart')
+
+		options.append('[B]ack')
+		opt = input(' | '.join(options) + ': ').lower()
 
 		if opt == 'b':
 			return
@@ -1609,12 +1719,7 @@ def menu_service(service):
 			service.other_options = val.strip('?')
 			service.save()
 		elif opt == 's':
-			if service.is_running():
-				print('%s already running' % service.session)
-			else:
-				print('Starting %s...' % service.session)
-				service.start()
-				sleep(60)
+			safe_start([service], True)
 		elif opt == 't':
 			safe_stop([service])
 		elif opt == 'r':
@@ -1622,12 +1727,14 @@ def menu_service(service):
 		else:
 			print('Invalid option')
 
+
 def menu_mods():
 	"""
 	Interface to manage mods across all maps
 	:return:
 	"""
 	while True:
+		header('Mods Configuration')
 		table = Table(['session', 'mods'])
 		table.render(services)
 		print('')
@@ -1652,8 +1759,10 @@ def menu_mods():
 		else:
 			print('Invalid option')
 
+
 def menu_cluster():
 	while True:
+		header('Cluster Configuration')
 		table = Table(['session', 'cluster'])
 		table.render(services)
 		print('')
@@ -1677,12 +1786,14 @@ def menu_cluster():
 		else:
 			print('Invalid option')
 
+
 def menu_admin_password():
 	"""
 	Interface to manage rcon and administration password
 	:return:
 	"""
 	while True:
+		header('Admin and RCON Configuration')
 		table = Table(['session', 'admin_password', 'rcon'])
 		table.render(services)
 		print('')
@@ -1708,12 +1819,132 @@ def menu_admin_password():
 		else:
 			print('Invalid option')
 
+
+def menu_discord():
+	while True:
+		header('Discord Integration')
+		enabled = config['Discord'].get('enabled', '0') == '1'
+		webhook = config['Discord'].get('webhook', '')
+		if webhook == '':
+			print('Discord has not been integrated yet.')
+			print('')
+			print('If you would like to send shutdown / startup notifications to Discord, you can')
+			print('do so by adding a Webhook (Discord -> Settings -> Integrations -> Webhooks -> Create Webhook)')
+			print('and pasting the generated URL here.')
+			print('')
+			print('URL or just the character "b" to go [B]ack.')
+			opt = input(': ')
+
+			if 'https://' in opt:
+				config['Discord']['webhook'] = opt
+				config['Discord']['enabled'] = '1'
+				save_config()
+			else:
+				return
+		else:
+			discord_channel = None
+			discord_guild = None
+			discord_name = None
+			req = request.Request(webhook, headers={'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0'}, method='GET')
+			try:
+				with request.urlopen(req) as resp:
+					data = json.loads(resp.read().decode('utf-8'))
+					discord_channel = data['channel_id']
+					discord_guild = data['guild_id']
+					discord_name = data['name']
+			except urlerror.HTTPError as e:
+				print('Error: %s' % e)
+			except json.JSONDecodeError as e:
+				print('Error: %s' % e)
+
+			if enabled and discord_name:
+				print('Discord integration is currently available and enabled!')
+			elif discord_name:
+				print('Discord integration is currently DISABLED.')
+			else:
+				print('Discord integration is currently unavailable, bad Webhook URL?')
+			print('')
+			print('Discord Webhook URL:  %s' % webhook[0:webhook.rindex('/')+5] + '************' + webhook[-4:])
+			print('Discord Channel ID:   %s' % discord_channel)
+			print('Discord Guild ID:     %s' % discord_guild)
+			print('Discord Webhook Name: %s' % discord_name)
+			print('')
+
+			options = []
+			if enabled:
+				options.append('[D]isable')
+			else:
+				options.append('[E]nable')
+
+			options.append('[C]hange Discord webhook URL')
+			options.append('configure [M]essages')
+			options.append('[B]ack')
+			print(' | '.join(options))
+			opt = input(': ').lower()
+
+			if opt == 'b':
+				return
+			elif opt == 'm':
+				menu_discord_messages()
+			elif opt == 'c':
+				print('do so by adding a Webhook (Discord -> Settings -> Integrations -> Webhooks -> Create Webhook)')
+				print('and pasting the generated URL here.')
+				val = input('Enter new Discord webhook URL: ').strip()
+				if val != '':
+					config['Discord']['webhook'] = val
+					save_config()
+			elif opt == 'e':
+				config['Discord']['enabled'] = '1'
+				save_config()
+			elif opt == 'd':
+				config['Discord']['enabled'] = '0'
+				save_config()
+			else:
+				print('Invalid option')
+
+
+def menu_discord_messages():
+	while True:
+		header('Discord Messages')
+		print('The following messages will be sent to Discord when certain events occur.')
+		print('')
+		print('| 1 | Map Started   | ' + discord_message('map_started'))
+		print('| 2 | Maps Stopping | ' + discord_message('map_stopping'))
+		print('| 3 | Map Stopping  | ' + discord_message('maps_stopping'))
+		print('')
+		opt = input('[1-3] change message | [B]ack: ').lower()
+		key = None
+		val = ''
+
+		if opt == 'b':
+			return
+		elif opt == '1':
+			key = 'map_started'
+			print('')
+			print('Edit the message, left/right works to move cursor.  Blank to use default.')
+			val = rlinput('Map Started: ', discord_message(key)).strip()
+		elif opt == '2':
+			key = 'map_stopping'
+			print('')
+			print('Edit the message, left/right works to move cursor.  Blank to use default.')
+			val = rlinput('Maps Stopping: ', discord_message(key)).strip()
+		elif opt == '3':
+			key = 'maps_stopping'
+			print('')
+			print('Edit the message, left/right works to move cursor.  Blank to use default.')
+			val = rlinput('Map Stopping: ', discord_message(key)).strip()
+		else:
+			print('Invalid option')
+
+		if key is not None:
+			config['Discord'][key] = val.replace('%', '%%')
+			save_config()
+
+
 def menu_main():
 	stay = True
 	while stay:
-		print('')
-		print('Welcome to the ARK Survival Ascended Linux Server Manager')
-		print('')
+		header('Welcome to the ARK Survival Ascended Linux Server Manager')
 		print('Find an issue? https://github.com/cdp1337/ARKSurvivalAscended-Linux/issues')
 		print('Want to help support this project? https://ko-fi.com/Q5Q013RM9Q')
 		print('')
@@ -1722,7 +1953,7 @@ def menu_main():
 
 		print('')
 		print('1-%s to manage individual map settings' % len(services))
-		print('Configure: [M]ods | [C]luster | [A]dmin password/RCON | re[N]ame')
+		print('Configure: [M]ods | [C]luster | [A]dmin password/RCON | re[N]ame | [D]iscord integration')
 		print('Control: [S]tart all | s[T]op all | [R]estart all | [U]pdate')
 		print('or [Q]uit to exit')
 		opt = input(': ').lower()
@@ -1735,21 +1966,15 @@ def menu_main():
 			menu_cluster()
 		elif opt == 'a':
 			menu_admin_password()
+		elif opt == 'd':
+			menu_discord()
 		elif opt == 'n':
 			val = input('Please enter new name: ').strip()
 			if val != '':
 				for s in services:
 					s.rename(val)
 		elif opt == 's':
-			for s in services:
-				if not s.is_enabled():
-					print('Skipping disabled map %s' % s.session)
-				elif s.is_running():
-					print('%s already running' % s.session)
-				else:
-					print('Starting %s...' % s.session)
-					s.start()
-					sleep(30)
+			safe_start(services)
 		elif opt == 't':
 			safe_stop(services)
 		elif opt == 'r':
@@ -1766,6 +1991,12 @@ def menu_main():
 				subprocess.run([os.path.join(here, 'update.sh')], stderr=sys.stderr, stdout=sys.stdout)
 		elif opt.isdigit() and 1 <= int(opt) <= len(services):
 			menu_service(services[int(opt)-1])
+
+# Get the script configuration, useful for settings not directly related to the game
+config = configparser.ConfigParser()
+config.read(os.path.join(here, '.settings.ini'))
+if 'Discord' not in config.sections():
+	config['Discord'] = {}
 
 services = []
 services_path = os.path.join(here, 'services')
