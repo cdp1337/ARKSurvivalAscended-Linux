@@ -803,7 +803,7 @@ for MAP in $GAME_MAPS; do
 	fi
 
 	if [ "$MODS" != "" ]; then
-		MODS_LINE="-mods $MODS"
+		MODS_LINE="-mods=$MODS"
 	else
 		MODS_LINE=""
 	fi
@@ -2154,5 +2154,5 @@ echo 'Help support this and other projects? https://ko-fi.com/Q5Q013RM9Q'
 echo ''
 echo ''
 echo '! IMPORTANT !'
-echo 'to manage the server, run the following utility'
+echo 'to manage the server, as root/sudo run the following utility'
 echo "$GAME_DIR/manage.py"
