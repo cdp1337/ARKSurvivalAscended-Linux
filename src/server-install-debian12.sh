@@ -28,6 +28,10 @@
 #   OPT_FORCE_REINSTALL=--force-reinstall - Force a reinstall of the game binaries, mods, and engine
 #
 # Changelog:
+#   20250302 - Add checks for running out of memory
+#            - Add timeout to RCON for a more responsive UI when there are problems
+#            - Modify map start logic to watch for memory issues in the first minute
+#            - Update table listing to be Markdown compliant
 #   20250310 - Add support for Discord integration on start/stop
 #   20250217 - Switch to Proton 9.22
 #            - Add Astraeos map

@@ -28,6 +28,10 @@
 #   --force-reinstall - Force a reinstall of the game binaries, mods, and engine
 #
 # Changelog:
+#   20250302 - Add checks for running out of memory
+#            - Add timeout to RCON for a more responsive UI when there are problems
+#            - Modify map start logic to watch for memory issues in the first minute
+#            - Update table listing to be Markdown compliant
 #   20250310 - Add support for Discord integration on start/stop
 #   20250217 - Switch to Proton 9.22
 #            - Add Astraeos map
@@ -1071,6 +1075,7 @@ import subprocess
 import readline
 import re
 from rcon.source import Client
+from rcon import SessionTimeout
 import configparser
 from urllib import request
 from urllib import error as urlerror
@@ -1277,11 +1282,9 @@ class Services:
 			return None
 
 		try:
-			with Client('127.0.0.1', int(self.rcon), passwd=self.admin_password) as client:
+			with Client('127.0.0.1', int(self.rcon), passwd=self.admin_password, timeout=2) as client:
 				return client.run(cmd).strip()
-		except ConnectionRefusedError:
-			return None
-		except ConnectionResetError:
+		except (ConnectionRefusedError, ConnectionResetError, SessionTimeout, TimeoutError):
 			return None
 
 	def rcon_get_number_players(self) -> Union[None, int]:
@@ -1415,18 +1418,17 @@ class Table:
 		:param services: Services[]
 		:return:
 		"""
+		headers = []
 		rows = []
 		col_lengths = []
 
-		row = []
 		for col in self.columns:
 			if col in self.headers:
 				col_lengths.append(len(self.headers[col]))
-				row.append(self.headers[col])
+				headers.append(self.headers[col])
 			else:
 				col_lengths.append(3)
-				row.append('???')
-		rows.append(row)
+				headers.append('???')
 
 		row_counter = 0
 		for service in services:
@@ -1463,6 +1465,20 @@ class Table:
 				col_lengths[counter] = max(col_lengths[counter], len(row[-1]))
 				counter += 1
 			rows.append(row)
+
+		counter = 0
+		vals = []
+		while counter < len(headers):
+			vals.append(headers[counter].ljust(col_lengths[counter]))
+			counter += 1
+		print('| %s |' % ' | '.join(vals))
+
+		counter = 0
+		vals = []
+		while counter < len(headers):
+			vals.append('-'.ljust(col_lengths[counter], '-'))
+			counter += 1
+		print('|-%s-|' % '-|-'.join(vals))
 
 		for row in rows:
 			counter = 0
@@ -1595,22 +1611,59 @@ def safe_start(services, ignore_enabled = False):
 			print('Starting %s, please wait, may take a minute...' % s.session)
 			s.start()
 			players_connected = None
+			last_line = ''
+			check_counter = 0
+			exec_status = 0
+			while check_counter < 120:
+				check_counter += 1
+
+				# Print a log of output from the systemd service,
+				# provides minimal usefulness, but better than nothing.
+				line = subprocess.run([
+					'journalctl', '-n', '1', '-u', s.name
+				], stdout=subprocess.PIPE).stdout.decode().strip()
+				if line != last_line:
+					print(line)
+					last_line = line
+				elif check_counter % 30 == 0 and check_counter < 100:
+					print('Waiting about %s seconds...' % ((120 - check_counter) / 2))
+
+				# Watch the exit status of the service,
+				# if this changes to something other than 0, it indicates a game crash.
+				exec_status = int(subprocess.run([
+					'systemctl', 'show', '-p', 'ExecMainStatus', s.name
+				], stdout=subprocess.PIPE).stdout.decode().strip()[15:])
+
+				if exec_status == 1:
+					print('❗⛔❗ WARNING - Service has exited with status 1')
+					print('This may indicate corrupt files, please check logs and verify files with Steam.')
+					break
+				elif exec_status == 15:
+					print('❗⛔❗ WARNING - Service has exited with status 15')
+					print('This may indicate that your server ran out of memory.')
+					break
+				elif exec_status != 0:
+					print('❗⛔❗ WARNING - Service has exited with status %s' % exec_status)
+					break
+
+				sleep(0.5)
+
+			if exec_status != 0:
+				return
+
 			if s.rcon_enabled:
 				retry = 0
-				while retry < 5:
+				while retry < 3:
 					retry += 1
 					players_connected = s.rcon_get_number_players()
 					if players_connected is None:
-						sleep(6)
+						sleep(3)
 					else:
 						break
-			else:
-				# No rcon available... just wait a bit.
-				sleep(30)
 
 			if s.rcon_enabled:
 				if players_connected is None:
-					print('WARNING - Service marked as started, but unable to retrieve any data from RCON.')
+					print('❗⛔❗ WARNING - Service tried to start, but unable to retrieve any data from RCON.')
 					print('Please manually check if the game is available.')
 				else:
 					discord_alert('map_started', [s.session])
@@ -1653,18 +1706,41 @@ def menu_service(service):
 	"""
 	while True:
 		header('Service Details')
+		running = service.is_running()
+
 		print('Map:           %s' % service.map)
 		print('Session:       %s' % service.session)
 		print('Port:          %s' % service.port)
 		print('RCON:          %s' % service.rcon)
 		print('Auto-Start:    %s' % ('Yes' if service.is_enabled() else 'No'))
-		print('Status:        %s' % ('Running' if service.is_running() else 'Stopped'))
-		print('Players:       %s' % service.rcon_get_number_players())
+
+		if service.rcon_enabled:
+			# Try to guess the status of the service based on its behaviour
+			players = service.rcon_get_number_players()
+			if running and players is None:
+				print('Status:        Starting')
+				print('Players:       N/A')
+			else:
+				print('Status:        %s' % ('Running' if running else 'Stopped'))
+				print('Players:       %s' % players)
+		else:
+			print('Status:        %s' % ('Running' if running else 'Stopped'))
+			print('Players:       %s' % service.rcon_get_number_players())
+
 		print('Mods:          %s' % ', '.join(service.mods))
 		print('Cluster ID:    %s' % (service.cluster_id or ''))
 		print('Other Options: %s' % service.other_options)
 		print('Other Flags:   %s' % service.other_flags)
 		print('')
+
+		# Check for common recent issues with the server
+		log = subprocess.run([
+			'journalctl', '--since', '10 minutes ago', '--no-pager', '-u', service.name
+		], stdout=subprocess.PIPE).stdout.decode().strip()
+		if 'oom-kill' in log:
+			print('❗⛔❗ WARNING - Service was recently killed by the OOM killer')
+			print('This may indicate that your server ran out of memory!')
+			print('')
 
 		options = []
 		if service.is_enabled():

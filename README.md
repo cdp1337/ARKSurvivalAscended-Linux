@@ -437,6 +437,51 @@ Primary server generates rules in `/etc/exports` and child servers mount via `/e
 
 Firewall rules are automatically generated for child servers when their IPs are provided during setup on the master server.
 
+## Common Issues and Troubleshooting
+
+### Server Memory
+
+ARK: SA server takes a **LOT** of memory to run, so the most common issue is server out of memory.
+For example, a fresh install of The Island takes about 8GB of RAM and an established instance with some history
+can easily balloon to 22GB of memory.
+
+The most recent build of this library includes checks for this issue, and will warn you when browsing to a map:
+
+```
+== Service Details ==
+
+Map:           TheCenter_WP
+Session:       Test ARK Server (TheCenter)
+Port:          7705
+RCON:          27005
+Auto-Start:    No
+Status:        Stopped
+Players:       None
+Mods:          
+Cluster ID:    
+Other Options: 
+Other Flags:   -servergamelog  
+
+❗⛔❗ WARNING - Service was recently killed by the OOM killer
+This may indicate that your server ran out of memory!
+```
+
+### Mod Partially Downloaded
+
+It's possible that a mod was only partially downloaded from Curseforge.
+The game server may see the mod was present and will skip validation check that it was actually fully downloaded.
+
+To resolve this, remove the incomplete mod from `/home/steam/ArkSurvivalAscended/AppFiles/ShooterGame/Binaries/Win64/ShooterGame/Mods/`
+and try restarting the game server.
+(It's up to you to determine which mod is causing issues unfortunately.)
+
+### Wildcard Botched Steam
+
+Occasionally after a major update in the game server, the Steam tracking meta can get corrupted / confused.
+If there recently was a major update and your server just won't start, try force-reinstalling the binaries.
+
+`sudo ./server-install-debian12.sh --force-reinstall` can reinstall all binaries while preserving player and map data.
+
 ## Utilized libraries
 
 * [RCON library by Conqp](https://github.com/conqp/rcon) (GPLv3)
