@@ -8,31 +8,33 @@ assignees: ''
 ---
 
 **Describe the bug**
+
 A clear and concise description of what the bug is.
 
 **To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+
+What steps did you do which can reproduce the behaviour.  ie: you ran this script or were in that menu.
 
 **Expected behavior**
+
 A clear and concise description of what you expected to happen.
 
 **Screenshots**
+
 If applicable, add screenshots to help explain your problem.
 
-**Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
+**Environment**
 
-**Smartphone (please complete the following information):**
- - Device: [e.g. iPhone6]
- - OS: [e.g. iOS8.1]
- - Browser [e.g. stock browser, safari]
- - Version [e.g. 22]
+(The following series of commands can generate the relevant information, just paste the output here.)
+
+```bash
+egrep '(PRETTY_NAME=|VERSION=)' /etc/os-release && grep MemTotal /proc/meminfo && echo -n 'CPU Cores: ' && grep 'model name' /proc/cpuinfo | wc -l && grep 'model name' /proc/cpuinfo | head -n1
+```
+
+- Server OS: 
+- Server Memory:
+- Server CPU:
 
 **Additional context**
+
 Add any other context about the problem here.
