@@ -21,6 +21,7 @@ This script will:
 * Add firewall service for game server (with firewalld or UFW)
 * Setup NFS shares for multi-server environments
 * Adds a management script for controlling your server
+* Adds backup/restore scripts for archiving and migrating data
 
 ---
 
@@ -118,6 +119,8 @@ even if they are on different physical servers.
 ├── admins.txt                 # Admin whitelist (needs manually setup)
 ├── start_all.sh               # Start all maps
 ├── stop_all.sh                # Stop all maps
+├── backup.sh                  # Backup game files to local archive
+├── restore.sh                 # Restore game files from archive
 ├── update.sh                  # Update game files (only when all maps stopped)
 └── manage.py                  # Management console for game server, maps, and settings
 ```
@@ -308,6 +311,29 @@ This page allows you to configure a specific map, notably enabling, disabling, a
 Options are any variable as defined in the [Server Configuration](https://ark.wiki.gg/wiki/Server_configuration)
 and flags are command line arguments (ie: those that start with a `-`.)
 
+
+## Backups and Migrations
+
+As of 2025.05.05, simple backup and restore scripts have been added to `/home/steam/ArkSurvivalAscended/`
+
+Backups are just a tarball of the game map, user data, tribe data, and configuration files.
+You can use your native archive manager to view these files, or 7-zip, winrar, etc.
+
+```bash
+./backup.sh 
+Created backup /home/steam/ArkSurvivalAscended/backups/ArkSurvivalAscended-2025-05-05_13-04.tgz
+```
+
+To migrate this game data to another server running this system, you can copy that tarball to
+`/home/steam/ArkSurvivalAscended/backups/` (or somewhere that makes sense to you),
+and run:
+
+```bash
+./restore.sh backups/ArkSurvivalAscended-2025-05-05_09-05.tgz 
+Extracting backups/ArkSurvivalAscended-2025-05-05_09-05.tgz
+Restoring service files
+Ensuring permissions
+```
 
 ## Managing with systemd (manual method)
 

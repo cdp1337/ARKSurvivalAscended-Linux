@@ -467,6 +467,18 @@ EOF
 chown $GAME_USER:$GAME_USER $GAME_DIR/manage.py
 chmod +x $GAME_DIR/manage.py
 
+cat > $GAME_DIR/backup.sh <<EOF
+# script:backup.sh
+EOF
+chown $GAME_USER:$GAME_USER $GAME_DIR/backup.sh
+chmod +x $GAME_DIR/backup.sh
+
+cat > $GAME_DIR/restore.sh <<EOF
+# script:restore.sh
+EOF
+chown $GAME_USER:$GAME_USER $GAME_DIR/restore.sh
+chmod +x $GAME_DIR/restore.sh
+
 
 # Reload systemd to pick up the new service files
 systemctl daemon-reload

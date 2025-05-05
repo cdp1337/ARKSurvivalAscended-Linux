@@ -1653,12 +1653,16 @@ def safe_start(services, ignore_enabled = False):
 
 			if s.rcon_enabled:
 				retry = 0
-				while retry < 3:
+				print('Waiting for RCON to be available (up to about 2 minutes)...')
+				while retry < 20:
 					retry += 1
 					players_connected = s.rcon_get_number_players()
 					if players_connected is None:
+						if retry % 5 == 0:
+							print('Still waiting...')
 						sleep(3)
 					else:
+						print('RCON Connected!')
 						break
 
 			if s.rcon_enabled:
@@ -2084,6 +2088,123 @@ menu_main()
 EOF
 chown $GAME_USER:$GAME_USER $GAME_DIR/manage.py
 chmod +x $GAME_DIR/manage.py
+
+cat > $GAME_DIR/backup.sh <<EOF
+#!/bin/bash
+#
+# Backup all player data
+#
+# DYNAMICALLY GENERATED FILE! Edit at your own risk
+
+GAME_MAPS="$GAME_MAPS"
+GAME_USER="$GAME_USER"
+GAME_DIR="$GAME_DIR"
+SAVE_DIR="$GAME_DIR/AppFiles/ShooterGame/Saved"
+
+# Check if any maps are running; do not update an actively running server.
+RUNNING=0
+for MAP in \$GAME_MAPS; do
+	if [ "\$(systemctl is-active \$MAP)" == "active" ]; then
+		echo "WARNING - \$MAP is still running"
+		RUNNING=1
+	fi
+done
+
+if [ \$RUNNING -eq 1 ]; then
+	echo "At least one map is still running, do you still want to backup? (y/N): "
+	read UP
+	if [ "\$UP" != "y" -a "\$UP" != "Y" ]; then
+		exit 1
+	fi
+fi
+
+# Prep the various directories
+[ -e \$SAVE_DIR/.services ] || mkdir \$SAVE_DIR/.services
+[ -e \$GAME_DIR/backups ] || mkdir \$GAME_DIR/backups
+
+# Copy service files from systemd
+cp /etc/systemd/system/ark-*.service.d \$SAVE_DIR/.services -r
+
+FILES="clusters Config/WindowsServer .services SavedArks"
+TGZ="\$GAME_DIR/backups/ArkSurvivalAscended-\$(date +%Y-%m-%d_%H-%M).tgz"
+
+tar -czf \$TGZ \
+	-C \$SAVE_DIR  \
+	--exclude='*_WP_0*.ark' \
+	--exclude='*_WP_1*.ark' \
+	--exclude='*.profilebak' \
+	--exclude='*.tribebak' \
+	\$FILES
+
+if [ \$? -eq 0 ]; then
+	echo "Created backup \$TGZ"
+fi
+
+# Cleanup
+rm -fr "\$SAVE_DIR/.services"
+EOF
+chown $GAME_USER:$GAME_USER $GAME_DIR/backup.sh
+chmod +x $GAME_DIR/backup.sh
+
+cat > $GAME_DIR/restore.sh <<EOF
+#!/bin/bash
+#
+# Restore all player data from a backup file
+#
+# DYNAMICALLY GENERATED FILE! Edit at your own risk
+
+GAME_MAPS="$GAME_MAPS"
+GAME_USER="$GAME_USER"
+GAME_DIR="$GAME_DIR"
+SAVE_DIR="$GAME_DIR/AppFiles/ShooterGame/Saved"
+
+if [ \$(id -u) -ne 0 ]; then
+	echo "This script must be run as root or with sudo!" >&2
+	exit 1
+fi
+
+# Check if any maps are running; do not update an actively running server.
+RUNNING=0
+for MAP in \$GAME_MAPS; do
+	if [ "\$(systemctl is-active \$MAP)" == "active" ]; then
+		echo "WARNING - \$MAP is still running"
+		echo "Restore cannot proceed with a map actively running."
+		exit 1
+	fi
+done
+
+if [ -z "\$1" ]; then
+	echo "ERROR - no source file specified"
+	echo "Usage: \$0 <source.tgz>"
+	exit 1
+fi
+
+if [ ! -e "\$1" ]; then
+	echo "ERROR - cannot read source \$1"
+	echo "Usage: \$0 <source.tgz>"
+	exit 1
+fi
+
+echo "Extracting \$1"
+tar -xzf "\$1" -C \$SAVE_DIR
+if [ \$? -ne 0 ]; then
+	echo "ERROR - failed to extract \$1"
+	exit 1
+fi
+
+if [ -e \$SAVE_DIR/.services ]; then
+	echo "Restoring service files"
+	chown -R root:root \$SAVE_DIR/.services
+	cp \$SAVE_DIR/.services/* /etc/systemd/system/ -r
+	systemctl daemon-reload
+	rm -fr "\$SAVE_DIR/.services"
+fi
+
+echo "Ensuring permissions"
+chown -R \$GAME_USER:\$GAME_USER \$SAVE_DIR
+EOF
+chown $GAME_USER:$GAME_USER $GAME_DIR/restore.sh
+chmod +x $GAME_DIR/restore.sh
 
 
 # Reload systemd to pick up the new service files

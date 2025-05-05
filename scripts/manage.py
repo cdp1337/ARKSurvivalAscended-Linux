@@ -602,12 +602,16 @@ def safe_start(services, ignore_enabled = False):
 
 			if s.rcon_enabled:
 				retry = 0
-				while retry < 3:
+				print('Waiting for RCON to be available (up to about 2 minutes)...')
+				while retry < 20:
 					retry += 1
 					players_connected = s.rcon_get_number_players()
 					if players_connected is None:
+						if retry % 5 == 0:
+							print('Still waiting...')
 						sleep(3)
 					else:
+						print('RCON Connected!')
 						break
 
 			if s.rcon_enabled:
