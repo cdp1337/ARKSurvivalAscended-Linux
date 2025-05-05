@@ -28,7 +28,8 @@
 #   --force-reinstall - Force a reinstall of the game binaries, mods, and engine
 #
 # Changelog:
-#   20250302 - Add checks for running out of memory
+#   20250505 - Add backup and restore scripts
+#   20250502 - Add checks for running out of memory
 #            - Add timeout to RCON for a more responsive UI when there are problems
 #            - Modify map start logic to watch for memory issues in the first minute
 #            - Update table listing to be Markdown compliant
