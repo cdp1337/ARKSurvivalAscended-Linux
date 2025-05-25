@@ -25,6 +25,13 @@ This script will:
 
 ---
 
+## Requirements
+
+* Basic familiarity with running commands in Linux.
+* Debian or Ubuntu
+* At least 40GB free disk space (an SSD is strongly recommended)
+* 16GB RAM per map or 96GB RAM for a full cluster
+* CPU/vCPU cores, at least 2 cores per map and 4GHz or faster.
 
 ## Installation on Debian 12 or Ubuntu 24.04
 
@@ -34,8 +41,9 @@ as root or sudo.
 
 * Debian 12 tested on Digital Ocean, OVHCloud, and Proxmox.
 * Ubuntu 24.04 tested on Proxmox.
+* Ubuntu 22.04 tested on Proxmox.
 
-Quick run (if you trust me, which you of course should not):
+Quick run (if you trust me, which of course you should not):
 
 ```bash
 sudo su -c "bash <(wget -qO- https://raw.githubusercontent.com/cdp1337/ARKSurvivalAscended-Linux/main/dist/server-install-debian12.sh)" root
@@ -67,7 +75,7 @@ re-download the script installer via the steps above and re-run the installer ap
 Once installed and running, you should be able to search for your server
 in the "Unofficial" server list after ticking "Show Player Servers".
 
-![Show Player Servers button](images/show-player-servers.png)
+![Show Player Servers button](images/ark-connect-screen.webp)
 
 (This was an added step Wildcard implemented to make it harder for players to find servers
 that are hosted outside Nitrado's network...)
@@ -335,140 +343,29 @@ Restoring service files
 Ensuring permissions
 ```
 
-## Managing with systemd (manual method)
-
-A list of all maps and their relative systemd service name: 
-
-* Island - `ark-island`
-* Aberration - `ark-aberration`
-* Club ARK - `ark-club`
-* Scorched - `ark-scorched`
-* The Center - `ark-thecenter`
-* Extinction - `ark-extinction`
-* Astraeos - `ark-astraeos`
-
-### Start, Stop, Restart
-
-Start a single map:
-
-```bash
-sudo systemctl start MAP_SERVICE_NAME
-```
-
----
-
-Restarting a single map:
-
-```bash
-sudo systemctl restart MAP_SERVICE_NAME
-```
-
-Warning: issuing a restart manually will immediately stop the map,
-kicking any user without warning and sometimes losing a few minutes of progress.
-
----
-
-Stopping a single map:
-
-```bash
-sudo systemctl stop MAP_SERVICE_NAME
-```
-
-Warning: issuing a stop manually will immediately stop the map, 
-kicking any user without warning and sometimes losing a few minutes of progress.
-
----
-
-### Enable and disable maps
-
-```bash
-sudo systemctl enable MAP_SERVICE_NAME
-```
-
-Enabling a map will set it to start at boot, but it **will not** start the map immediately.
-use `sudo systemctl start ...` to start the requested map manually.
-
----
-
-```bash
-sudo systemctl disable MAP_SERVICE_NAM
-```
-
-Disabling a map will prevent it from starting at boot, but it **will not** stop the map.
-use `sudo systemctl stop ...` to stop the requested map manually.
-
----
+Feel free to read through [some advanced usages](docs/advanced-usage.md) for more information on
+how things work behind the scenes.
 
 
-### Configuring the game ini
+## Accessing Files
 
-Configuration of your server via the configuration ini is available in `/home/steam/ArkSurvivalAscended/GameUserSettings.ini`
+The game starts as a system user and thus `root` or an admin account must be used
+to start/stop/mange the server.  Accessing the files however should be done with the `steam` user.
 
-```bash
-sudo -u steam nano /home/steam/ArkSurvivalAscended/GameUserSettings.ini
-```
-
-_Sssshhh, I use `vim` too, but `nano` is easier for most newcomers._
-
-
-### Adding command line arguments
-
-Some arguments for the game server need to be passed in as CLI arguments.
-
-```bash
-# Configure start parameters for the Island
-sudo nano /home/steam/ArkSurvivalAscended/services/ark-island.conf
-
-# Configure start parameters for Aberration
-sudo nano /home/steam/ArkSurvivalAscended/services/ark-aberration.conf
-
-# Configure start parameters for Club ARK
-sudo nano /home/steam/ArkSurvivalAscended/services/ark-club.conf
-
-# Configure start parameters for Scorched
-sudo nano /home/steam/ArkSurvivalAscended/services/ark-scorched.conf
-
-# Configure start parameters for The Center
-sudo nano /home/steam/ArkSurvivalAscended/services/ark-thecenter.conf
-
-# Configure start parameters for Extinction
-sudo nano /home/steam/ArkSurvivalAscended/services/ark-extinction.conf
-```
-
-When done editing command line arguments for the game server, reload the system config:
-
-(This DOES NOT restart the game server)
-
-```bash
-sudo systemctl daemon-reload
-```
-
-### Automatic restarts
-
-Want to restart your server automatically at 5a each morning?
-
-Edit crontab `sudo nano /etc/crontab` and add:
-
-```bash
-0 5 * * * root /home/steam/ArkSurvivalAscended/stop_all.sh && /home/steam/ArkSurvivalAscended/start_all.sh
-```
-
-(0 is minute, 5 is hour in 24-hour notation, followed by '* * *' for every day, every month, every weekday)
-
-### Cluster sharing across multiple servers
-
-Multi-server clustering is handled by sharing /home/steam/ArkSurvivalAscended/Saved/clusters with NFS.
-
-Primary server generates rules in `/etc/exports` and child servers mount via `/etc/fstab`.
-
-Firewall rules are automatically generated for child servers when their IPs are provided during setup on the master server.
+[Read some tips on accessing game files via SSH](docs/access-files-sftp.md). 
 
 ## Common Issues and Troubleshooting
 
 ### Server Memory
 
+**Problem**
+
+Server starts but can never be connected to and RCON can never connect.
+
+**Details**
+
 ARK: SA server takes a **LOT** of memory to run, so the most common issue is server out of memory.
-For example, a fresh install of The Island takes about 8GB of RAM and an established instance with some history
+For example, a fresh install of The Island takes about 11GB of RAM and an established instance with some history
 can easily balloon to 22GB of memory.
 
 The most recent build of this library includes checks for this issue, and will warn you when browsing to a map:
@@ -492,10 +389,22 @@ Other Flags:   -servergamelog
 This may indicate that your server ran out of memory!
 ```
 
+**Fix**
+
+Install more memory or reduce the number of maps running at a time.
+
 ### Mod Partially Downloaded
+
+**Problem**
+
+A mod was recently updated and the server will not start.
+
+**Details**
 
 It's possible that a mod was only partially downloaded from Curseforge.
 The game server may see the mod was present and will skip validation check that it was actually fully downloaded.
+
+**Fix**
 
 To resolve this, remove the incomplete mod from `/home/steam/ArkSurvivalAscended/AppFiles/ShooterGame/Binaries/Win64/ShooterGame/Mods/`
 and try restarting the game server.
@@ -503,10 +412,82 @@ and try restarting the game server.
 
 ### Wildcard Botched Steam
 
+**Problem**
+
+New major version released and the server will not start.
+
+**Details**
+
 Occasionally after a major update in the game server, the Steam tracking meta can get corrupted / confused.
 If there recently was a major update and your server just won't start, try force-reinstalling the binaries.
 
+**Fix**
+
 `sudo ./server-install-debian12.sh --force-reinstall` can reinstall all binaries while preserving player and map data.
+
+### Cannot See Server (NAT)
+
+**Problem**
+
+Server is not visible in the server list.
+
+**Details**
+
+Game servers running on a box with a public IP should immediately be visible in the server list
+with no additional work required.
+
+For servers running on a private network, try to connect directly to verify the game server is working
+by opening the game and pressing backtick (key above TAB beside 1 on a QWERTY keyboard) and type:
+
+```
+open 192.168.0.0:7701
+```
+
+(replacing the IP and port number with the actual IP and port of your map)
+
+**important**, this only works if you are on the same network as the server or have access
+via a VPN to the server network.
+
+**Fix**
+
+For servers on a private network that you can connect to directly, you will need to configure port forwarding on your gateway.
+Add the ports to forward, (7701-7707 UDP) to forward to your internal IP.
+
+If you want to forward RCON as well, repeat for the requested map (27001-27007 TCP).
+
+![Port Forwarding](images/port-forward-on-ubiquiti.webp)
+
+### Cannot Connect to Server (NAT)
+
+**Problem**
+
+Server is visible in the server list but cannot connect to it.
+
+**Details**
+
+If you have added NAT forwarding and can see the server in the list but cannot connect to it
+while inside the same network, your gateway may have an issue with NAT reflection.
+
+Try connecting to the server directly via its internal IP address by opening the game
+and pressing backtick (key above TAB beside 1 on a QWERTY keyboard) and type:
+
+```
+open 192.168.0.0:7701
+```
+
+(replacing the IP and port number with the actual IP and port of your map)
+
+If you can connect directly and the map is visible in the list but you cannot connect via the list,
+your gateway most likely does not support NAT loopbacks.  This is very common with home wifi routers
+and residential ISP-provided equipment.
+
+**Fix**
+
+Research if your router supports NAT reflection/loopback and enable it if possible.
+
+Sadly most ISP-provided equipment is absolute garbage and does not provide this feature,
+so the only options are to switch your router to passthrough mode and buy a better router
+or continue to use the direct connect method.
 
 ## Utilized libraries
 
