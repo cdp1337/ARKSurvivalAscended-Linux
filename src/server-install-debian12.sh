@@ -28,6 +28,11 @@
 #   OPT_FORCE_REINSTALL=--force-reinstall - Force a reinstall of the game binaries, mods, and engine
 #
 # Changelog:
+#   20250525 - Fix excessive question marks in options
+#            - Expand exception handling in RCON for more meaningful error messages
+#            - Add checks to prevent changes while a game is running
+#            - Auto-create steam .ssh directory for convenience
+#            - Auto-create Game.ini for convenience
 #   20250505 - Add backup and restore scripts
 #   20250502 - Add checks for running out of memory
 #            - Add timeout to RCON for a more responsive UI when there are problems
@@ -232,6 +237,13 @@ fi
 if [ -z "$(getent passwd $GAME_USER)" ]; then
 	useradd -m -U $GAME_USER
 fi
+# Setup the ssh directory for ths steam user; this will save some steps later
+# should the user want to access the files via SFTP.
+[ -d "/home/$GAME_USER/.ssh" ] || mkdir -p "/home/$GAME_USER/.ssh"
+[ -e "/home/$GAME_USER/.ssh/authorized_keys" ] || touch "/home/$GAME_USER/.ssh/authorized_keys"
+chown -R $GAME_USER:$GAME_USER "/home/$GAME_USER/.ssh"
+chmod 700 "/home/$GAME_USER/.ssh"
+chmod 600 "/home/$GAME_USER/.ssh/authorized_keys"
 
 # Preliminary requirements
 apt install -y curl wget sudo python3-venv
@@ -532,9 +544,10 @@ else
 	fi
 fi
 
-# Ensure cluster resources exist
+# Ensure cluster and game resources exist
 sudo -u $GAME_USER touch "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters/PlayersJoinNoCheckList.txt"
 sudo -u $GAME_USER touch "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters/admins.txt"
+sudo -u $GAME_USER touch "$GAME_DIR/AppFiles/ShooterGame/Saved/Config/WindowsServer/Game.ini"
 
 ############################################
 ## Security Configuration

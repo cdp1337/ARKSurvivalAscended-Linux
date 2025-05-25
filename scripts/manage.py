@@ -25,6 +25,7 @@ import readline
 import re
 from rcon.source import Client
 from rcon import SessionTimeout
+from rcon.exceptions import WrongPassword
 import configparser
 from urllib import request
 from urllib import error as urlerror
@@ -194,6 +195,11 @@ class Services:
 		if self.other_options:
 			options += '?' + self.other_options
 
+		# Strip excessive question marks
+		options = options.replace('????', '?')
+		options = options.replace('???', '?')
+		options = options.replace('??', '?')
+
 		flags = '-port=%s' % self.port
 
 		if len(self.mods):
@@ -233,8 +239,17 @@ class Services:
 		try:
 			with Client('127.0.0.1', int(self.rcon), passwd=self.admin_password, timeout=2) as client:
 				return client.run(cmd).strip()
-		except (ConnectionRefusedError, ConnectionResetError, SessionTimeout, TimeoutError):
-			return None
+		except ConnectionRefusedError:
+			print('⛔ RCON: Connection refused, server may not be available yet', file=sys.stderr)
+		except ConnectionResetError:
+			print('⛔ RCON: Connection reset, server may not be available yet', file=sys.stderr)
+		except SessionTimeout:
+			print('⛔ RCON: Session timeout, server may not be available yet', file=sys.stderr)
+		except TimeoutError:
+			print('⛔ RCON: Timeout, server may not be available yet', file=sys.stderr)
+		except WrongPassword:
+			print('⛔ RCON: Wrong password, password may have changed while server was still running, try restarting all maps', file=sys.stderr)
+		return None
 
 	def rcon_get_number_players(self) -> Union[None, int]:
 		"""
@@ -660,26 +675,20 @@ def menu_service(service):
 	while True:
 		header('Service Details')
 		running = service.is_running()
+		if service.rcon_enabled and running:
+			players = service.rcon_get_number_players()
+			if players is None:
+				players = 'N/A (unable to retrieve player count)'
+		else:
+			players = 'N/A'
 
 		print('Map:           %s' % service.map)
 		print('Session:       %s' % service.session)
-		print('Port:          %s' % service.port)
-		print('RCON:          %s' % service.rcon)
+		print('Port:          %s (UDP)' % service.port)
+		print('RCON:          %s (TCP)' % service.rcon)
 		print('Auto-Start:    %s' % ('Yes' if service.is_enabled() else 'No'))
-
-		if service.rcon_enabled:
-			# Try to guess the status of the service based on its behaviour
-			players = service.rcon_get_number_players()
-			if running and players is None:
-				print('Status:        Starting')
-				print('Players:       N/A')
-			else:
-				print('Status:        %s' % ('Running' if running else 'Stopped'))
-				print('Players:       %s' % players)
-		else:
-			print('Status:        %s' % ('Running' if running else 'Stopped'))
-			print('Players:       %s' % service.rcon_get_number_players())
-
+		print('Status:        %s' % ('Running' if running else 'Stopped'))
+		print('Players:       %s' % players)
 		print('Mods:          %s' % ', '.join(service.mods))
 		print('Cluster ID:    %s' % (service.cluster_id or ''))
 		print('Other Options: %s' % service.other_options)
@@ -701,9 +710,12 @@ def menu_service(service):
 		else:
 			options.append('[E]nable')
 
-		options.append('[M]ods | [C]luster | re[N]ame | [F]lags | [O]ptions')
+		if running:
+			print('Map is currently running, please stop to make changes.')
+		else:
+			options.append('[M]ods | [C]luster | re[N]ame | [F]lags | [O]ptions')
 
-		if service.is_running():
+		if running:
 			options.append('s[T]op')
 			options.append('[R]estart')
 		else:
@@ -763,11 +775,19 @@ def menu_mods():
 	:return:
 	"""
 	while True:
+		running = False
+		for service in services:
+			if service.is_running():
+				running = True
 		header('Mods Configuration')
-		table = Table(['session', 'mods'])
+		table = Table(['session', 'mods', 'running'])
 		table.render(services)
 		print('')
-		opt = input('[E]nable mod on all maps | [D]isable mod on all maps | [B]ack: ').lower()
+		if running:
+			print('⚠️  At least one map is running - unable to change mods while a map is active')
+			opt = input('[B]ack: ').lower()
+		else:
+			opt = input('[E]nable mod on all maps | [D]isable mod on all maps | [B]ack: ').lower()
 
 		if opt == 'b':
 			return
@@ -791,15 +811,23 @@ def menu_mods():
 
 def menu_cluster():
 	while True:
+		running = False
+		for service in services:
+			if service.is_running():
+				running = True
 		header('Cluster Configuration')
-		table = Table(['session', 'cluster'])
+		table = Table(['session', 'cluster', 'running'])
 		table.render(services)
 		print('')
-		opt = input('[C]hange cluster id on all maps | [B]ack: ').lower()
+		if running:
+			print('⚠️  At least one map is running - unable to change cluster while a map is active')
+			opt = input('[B]ack: ').lower()
+		else:
+			opt = input('[C]hange cluster id on all maps | [B]ack: ').lower()
 
 		if opt == 'b':
 			return
-		elif opt == 'c':
+		elif opt == 'c' and not running:
 			print('WARNING - changing the cluster ID may result in loss of data!')
 			vals = []
 			for s in services:
@@ -822,24 +850,33 @@ def menu_admin_password():
 	:return:
 	"""
 	while True:
+		running = False
 		header('Admin and RCON Configuration')
-		table = Table(['session', 'admin_password', 'rcon'])
+		table = Table(['session', 'admin_password', 'rcon', 'running'])
 		table.render(services)
+		for service in services:
+			if service.is_running():
+				running = True
 		print('')
-		opt = input('[C]hange admin password on all | [E]nable RCON on all | [D]isable RCON on all | [B]ack: ').lower()
+
+		if running:
+			print('⚠️  At least one map is running - unable to change settings while a map is active')
+			opt = input('[B]ack: ').lower()
+		else:
+			opt = input('[C]hange admin password on all | [E]nable RCON on all | [D]isable RCON on all | [B]ack: ').lower()
 
 		if opt == 'b':
 			return
-		elif opt == 'e':
+		elif opt == 'e' and not running:
 			for s in services:
 				s.rcon_enabled = True
 				s.save()
-		elif opt == 'd':
+		elif opt == 'd' and not running:
 			print('WARNING - disabling RCON will prevent clean shutdowns!')
 			for s in services:
 				s.rcon_enabled = False
 				s.save()
-		elif opt == 'c':
+		elif opt == 'c' and not running:
 			val = input('Enter new password: ').strip()
 			if val:
 				for s in services:
@@ -973,6 +1010,10 @@ def menu_discord_messages():
 def menu_main():
 	stay = True
 	while stay:
+		running = False
+		for s in services:
+			if s.is_running():
+				running = True
 		header('Welcome to the ARK Survival Ascended Linux Server Manager')
 		print('Find an issue? https://github.com/cdp1337/ARKSurvivalAscended-Linux/issues')
 		print('Want to help support this project? https://ko-fi.com/Q5Q013RM9Q')
@@ -998,10 +1039,13 @@ def menu_main():
 		elif opt == 'd':
 			menu_discord()
 		elif opt == 'n':
-			val = input('Please enter new name: ').strip()
-			if val != '':
-				for s in services:
-					s.rename(val)
+			if running:
+				print('⚠️  Please stop all maps before renaming.')
+			else:
+				val = input('Please enter new name: ').strip()
+				if val != '':
+					for s in services:
+						s.rename(val)
 		elif opt == 's':
 			safe_start(services)
 		elif opt == 't':
@@ -1009,13 +1053,8 @@ def menu_main():
 		elif opt == 'r':
 			safe_restart(services)
 		elif opt == 'u':
-			running = False
-			for s in services:
-				if s.is_running():
-					running = True
-					break
 			if running:
-				print('ERROR - cannot update game from Steam while a map is running!')
+				print('⚠️ Please stop all maps prior to updating.')
 			else:
 				subprocess.run([os.path.join(here, 'update.sh')], stderr=sys.stderr, stdout=sys.stdout)
 		elif opt.isdigit() and 1 <= int(opt) <= len(services):
