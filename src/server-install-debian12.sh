@@ -272,11 +272,12 @@ install_proton "$PROTON_VERSION"
 ## Upgrade Checks
 ############################################
 
+## Release 2023.10.31 - Issue #8
+# Preserve customizations to service file
 for MAP in $GAME_MAPS; do
 	# Ensure the override directory exists for the admin modifications to the CLI arguments.
 	[ -e /etc/systemd/system/${MAP}.service.d ] || mkdir -p /etc/systemd/system/${MAP}.service.d
 
-	# Release 2023.10.31 - Issue #8
 	if [ -e /etc/systemd/system/${MAP}.service ]; then
 		# Check if the service is already installed and move any modifications to the override.
 		# This is important for existing installs so the admin modifications to CLI arguments do not get overwritten.

@@ -25,6 +25,36 @@ This script will:
 
 ---
 
+## Features
+
+Because it's managed with systemd, standardized commands are used for managing the server.
+This includes an auto-restart for the game server if it crashes.
+
+By default, any enabled game map will **automatically start at boot**!
+
+A management console (manage.py) is included for managing all maps in the cluster.
+
+Scripts start_all, stop_all, update, backup, and restore are included
+for administration tasks.
+
+Sets up multiple maps on a single install, and **all of them can run at the same time**
+(providing your server has the horsepower to do so).
+
+If your single server cannot run all maps, this script supports multiple servers
+sharing the same `cluster` directory via NFS to allow players to jump between maps,
+even if they are on different physical servers.
+
+![Discord Logo](images/discord-logo.webp)
+
+Supports integration with Discord to send messages on start, stop, and restart events.
+
+[Read more about enabling Discord integration](docs/integrate-discord.md).
+
+![Beacon App](images/beacon.svg)
+
+Supports fine-grained management of game configuration via [Beacon App](https://usebeacon.app/)
+thanks to their SFTP deployment feature.  [Read about using Beacon with this installer](docs/using-beacon.md).
+
 ## Requirements
 
 * Basic familiarity with running commands in Linux.
@@ -79,24 +109,6 @@ in the "Unofficial" server list after ticking "Show Player Servers".
 
 (This was an added step Wildcard implemented to make it harder for players to find servers
 that are hosted outside Nitrado's network...)
-
-
-## Features
-
-Because it's managed with systemd, standardized commands are used for managing the server.
-This includes an auto-restart for the game server if it crashes.
-
-By default, enabled game maps will **automatically start at boot**!
-
-A start and stop script is included in `/home/steam/ArkSurvivalAscended`
-for starting and stopping all maps, (not to mention updating before they start).
-
-Sets up multiple maps on a single install, and **all of them can run at the same time**
-(providing your server has the horsepower to do so).
-
-If your single server cannot run all maps, this script supports multiple servers
-sharing the same `cluster` directory via NFS to allow players to jump between maps,
-even if they are on different physical servers.
 
 
 ## Directory Structure
@@ -246,22 +258,11 @@ Discord Webhook Name: Testy McTesterFace
 ```
 
 Provides an option to automatically send messages to Discord on start, restart, and stop
-events for maps.  Default messages provided, and can be customized to match your preferences.
+events for maps.  Default messages are provided and can be customized to match your preferences.
 
-To setup Discord integration, grab a webhook URL from Discord by browsing to 
-Server Settings -> Integrations
+[Read more about enabling Discord integration](docs/integrate-discord.md).
 
-![Discord step 1](images/discord-integration-1.png)
 
-Then Webhooks
-
-![Discord step 2](images/discord-integration-2.png)
-
-And create a new webhook and configure as desired.
-
-![Discord step 3](images/discord-integration-3.png)
-
-Copy the webhook URL and paste into the management console when prompted.
 
 
 ### Renaming maps
