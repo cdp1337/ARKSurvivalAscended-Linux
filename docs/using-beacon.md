@@ -54,7 +54,9 @@ and select the `Game.ini` file.
 
 ![beacon-game-location.webp](../images/beacon-game-location.webp)
 
-On the next screen, select what to import, (probably everything), and finish the import.
+On the next screen, select what to import, 
+(probably just the **Server Link** so as to not overwrite any existing Beacon configuration), 
+and finish the import.
 
 ![beacon-finalize-import.webp](../images/beacon-finalize-import.webp)
 
@@ -81,3 +83,9 @@ from the management console to override Beacon's default deployed settings.
 For example, if `DifficultyOffset` is set to 1.0 in Beacon but a specific map
 is configured with `?DifficultyOffset=5.0` from the management console, that one map
 will have the higher difficulty offset while all other maps will use the default.
+
+[Beacon's Config Sets](https://usebeacon.app/help/config_sets) work by writing
+different configurations to different ini files.
+Since this installation script runs all maps from a single game install,
+all maps will share the same `Game.ini` and `GameUserSettings.ini` files,
+and therefore Config Sets may not work as expected.
