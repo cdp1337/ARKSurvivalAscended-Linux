@@ -28,6 +28,8 @@
 #   --force-reinstall - Force a reinstall of the game binaries, mods, and engine
 #
 # Changelog:
+#   20250620 - Fix $GAME_USER for non-standard installs - thanks techgo!
+#            - Add Ragnarok support
 #   20250525 - Fix excessive question marks in options
 #            - Expand exception handling in RCON for more meaningful error messages
 #            - Add checks to prevent changes while a game is running
@@ -69,12 +71,12 @@ PROTON_BIN="/opt/script-collection/GE-Proton${PROTON_VERSION}/proton"
 # Steam ID of the game
 STEAM_ID="2430930"
 # List of game maps currently available
-GAME_MAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter ark-extinction ark-astraeos"
+GAME_MAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter ark-extinction ark-astraeos ark-ragnarok"
 # Range of game ports to enable in the firewall
 PORT_GAME_START=7701
-PORT_GAME_END=7707
+PORT_GAME_END=7708
 PORT_RCON_START=27001
-PORT_RCON_END=27007
+PORT_RCON_END=27008
 
 # Parse arguments
 OPT_RESET_PROTON=0
@@ -766,7 +768,7 @@ if [ $RUNNING -eq 1 ]; then
 else
 	sudo -u $GAME_USER /usr/games/steamcmd +force_install_dir $GAME_DIR/AppFiles +login anonymous +app_update $STEAM_ID validate +quit
     # STAGING / TESTING - skip ark because it's huge; AppID 90 is Team Fortress 1 (a tiny server useful for testing)
-    #sudo -u steam /usr/games/steamcmd +force_install_dir $GAME_DIR/AppFiles +login anonymous +app_update 90 validate +quit
+    #sudo -u $GAME_USER /usr/games/steamcmd +force_install_dir $GAME_DIR/AppFiles +login anonymous +app_update 90 validate +quit
     if [ $? -ne 0 ]; then
     	echo "Could not install ARK Survival Ascended Dedicated Server, exiting" >&2
     	exit 1
@@ -818,6 +820,12 @@ for MAP in $GAME_MAPS; do
 		MODS=""
 		GAMEPORT=7707
 		RCONPORT=27007
+	elif [ "$MAP" == "ark-ragnarok" ]; then
+		DESC="Ragnarok"
+		NAME="Ragnarok_WP"
+		MODS=""
+		GAMEPORT=7708
+		RCONPORT=27008
 	fi
 
 	if [ "$MODS" != "" ]; then
@@ -2375,15 +2383,15 @@ fi
 
 
 # Create some helpful links for the user.
-[ -e "$GAME_DIR/services" ] || sudo -u steam mkdir -p "$GAME_DIR/services"
+[ -e "$GAME_DIR/services" ] || sudo -u $GAME_USER mkdir -p "$GAME_DIR/services"
 for MAP in $GAME_MAPS; do
-	[ -h "$GAME_DIR/services/${MAP}.conf" ] || sudo -u steam ln -s /etc/systemd/system/${MAP}.service.d/override.conf "$GAME_DIR/services/${MAP}.conf"
+	[ -h "$GAME_DIR/services/${MAP}.conf" ] || sudo -u $GAME_USER ln -s /etc/systemd/system/${MAP}.service.d/override.conf "$GAME_DIR/services/${MAP}.conf"
 done
-[ -h "$GAME_DIR/GameUserSettings.ini" ] || sudo -u steam ln -s $GAME_DIR/AppFiles/ShooterGame/Saved/Config/WindowsServer/GameUserSettings.ini "$GAME_DIR/GameUserSettings.ini"
-[ -h "$GAME_DIR/Game.ini" ] || sudo -u steam ln -s $GAME_DIR/AppFiles/ShooterGame/Saved/Config/WindowsServer/Game.ini "$GAME_DIR/Game.ini"
-[ -h "$GAME_DIR/ShooterGame.log" ] || sudo -u steam ln -s $GAME_DIR/AppFiles/ShooterGame/Saved/Logs/ShooterGame.log "$GAME_DIR/ShooterGame.log"
+[ -h "$GAME_DIR/GameUserSettings.ini" ] || sudo -u $GAME_USER ln -s $GAME_DIR/AppFiles/ShooterGame/Saved/Config/WindowsServer/GameUserSettings.ini "$GAME_DIR/GameUserSettings.ini"
+[ -h "$GAME_DIR/Game.ini" ] || sudo -u $GAME_USER ln -s $GAME_DIR/AppFiles/ShooterGame/Saved/Config/WindowsServer/Game.ini "$GAME_DIR/Game.ini"
+[ -h "$GAME_DIR/ShooterGame.log" ] || sudo -u $GAME_USER ln -s $GAME_DIR/AppFiles/ShooterGame/Saved/Logs/ShooterGame.log "$GAME_DIR/ShooterGame.log"
 [ -h "$GAME_DIR/PlayersJoinNoCheckList.txt" ] || sudo -u $GAME_USER ln -s "$WL_CLUSTER" "$GAME_DIR/PlayersJoinNoCheckList.txt"
-[ -h "$GAME_DIR/admins.txt" ] || sudo -u steam ln -s $GAME_DIR/AppFiles/ShooterGame/Saved/clusters/admins.txt "$GAME_DIR/admins.txt"
+[ -h "$GAME_DIR/admins.txt" ] || sudo -u $GAME_USER ln -s $GAME_DIR/AppFiles/ShooterGame/Saved/clusters/admins.txt "$GAME_DIR/admins.txt"
 
 
 echo "================================================================================"

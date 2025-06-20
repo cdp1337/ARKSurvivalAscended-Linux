@@ -28,6 +28,8 @@
 #   OPT_FORCE_REINSTALL=--force-reinstall - Force a reinstall of the game binaries, mods, and engine
 #
 # Changelog:
+#   20250620 - Fix $GAME_USER for non-standard installs - thanks techgo!
+#            - Add Ragnarok support
 #   20250525 - Fix excessive question marks in options
 #            - Expand exception handling in RCON for more meaningful error messages
 #            - Add checks to prevent changes while a game is running
@@ -69,12 +71,12 @@ PROTON_BIN="/opt/script-collection/GE-Proton${PROTON_VERSION}/proton"
 # Steam ID of the game
 STEAM_ID="2430930"
 # List of game maps currently available
-GAME_MAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter ark-extinction ark-astraeos"
+GAME_MAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter ark-extinction ark-astraeos ark-ragnarok"
 # Range of game ports to enable in the firewall
 PORT_GAME_START=7701
-PORT_GAME_END=7707
+PORT_GAME_END=7708
 PORT_RCON_START=27001
-PORT_RCON_END=27007
+PORT_RCON_END=27008
 
 # compile:argparse
 # scriptlet:_common/require_root.sh
@@ -395,6 +397,12 @@ for MAP in $GAME_MAPS; do
 		MODS=""
 		GAMEPORT=7707
 		RCONPORT=27007
+	elif [ "$MAP" == "ark-ragnarok" ]; then
+		DESC="Ragnarok"
+		NAME="Ragnarok_WP"
+		MODS=""
+		GAMEPORT=7708
+		RCONPORT=27008
 	fi
 
 	if [ "$MODS" != "" ]; then
