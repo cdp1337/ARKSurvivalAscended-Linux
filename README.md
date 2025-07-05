@@ -25,6 +25,18 @@ This script will:
 
 ---
 
+* [Features](#features)
+* [Requirements](#requirements)
+* [Installation](#installation-on-debian-12-or-ubuntu-2404)
+* [Finding Your Game](#finding-your-game)
+* [Directory Structure](#directory-structure)
+* [Managing your Server (Easy Method)](#managing-your-server-easy-method)
+* [Backups and Migrations](#backups-and-migrations)
+* [Accessing Files](#accessing-files)
+* [Common Issues and Troubleshooting](#common-issues-and-troubleshooting)
+
+---
+
 ## Features
 
 Because it's managed with systemd, standardized commands are used for managing the server.
@@ -489,6 +501,33 @@ Research if your router supports NAT reflection/loopback and enable it if possib
 Sadly most ISP-provided equipment is absolute garbage and does not provide this feature,
 so the only options are to switch your router to passthrough mode and buy a better router
 or continue to use the direct connect method.
+
+### Server Cannot Start on Proxmox
+
+**Problem**
+
+Server installs on Proxmox, but will not start and throws the message when starting:
+
+```WARNING - Service tried to start, but unable to retrieve any data from RCON.
+Please manually check if the game is available.
+```
+
+In the server logs, you will see:
+
+```
+This CPU does not support a required feature (SSE4.2)
+```
+
+**Details**
+
+The newest version of the server runs Unreal Engine 5.5 which requires the SSE4.2 instruction set on the CPU.
+The default Proxmox CPU type is `kvm64` which **does not** support this flag.
+
+**Fix**
+
+Stop your virtual machine, edit the CPU type to be `host`, and start the guest.  Modern CPUs have this instruction set
+and setting it to use the host will 1) provide better performance and 2) expose this flag to the guest.
+
 
 ## Utilized libraries
 
