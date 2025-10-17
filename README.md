@@ -75,13 +75,14 @@ thanks to their SFTP deployment feature.  [Read about using Beacon with this ins
 * 16GB RAM per map or 96GB RAM for a full cluster
 * CPU/vCPU cores, at least 2 cores per map and 4GHz or faster.
 
-## Installation on Debian 12 or Ubuntu 24.04
+## Installation on Debian 12/13 or Ubuntu 24.04
 
 To install ARK Survival Ascended Dedicated Server on Debian 12 or Ubuntu 24.04,
 download and run [server-install-debian12.sh](dist/server-install-debian12.sh)
 as root or sudo.
 
 * Debian 12 tested on Digital Ocean, OVHCloud, and Proxmox.
+* Debian 13 tested on Proxmox.
 * Ubuntu 24.04 tested on Proxmox.
 * Ubuntu 22.04 tested on Proxmox.
 
@@ -137,7 +138,8 @@ that are hosted outside Nitrado's network...)
 │   ├── ark-scorched/
 │   ├── ark-thecenter/
 │   ├── ark-extinction/
-│   └── ark-astraeos/
+│   ├── ark-astraeos/
+│   └── ark-valguero/
 ├── services/                  # Service file overrides (for setting startup options)
 │   ├── ark-aberration.conf
 │   ├── ark-club.conf
@@ -145,7 +147,8 @@ that are hosted outside Nitrado's network...)
 │   ├── ark-scorched.conf
 │   ├── ark-thecenter.conf
 │   ├── ark-extinction.conf
-│   └── ark-astraeos.conf
+│   ├── ark-astraeos.conf
+│   └── ark-valguero.conf
 ├── GameUserSettings.ini       # Game Server Configuration
 ├── Game.ini                   # Game Server Configuration
 ├── ShooterGame.log            # Game log file
@@ -403,6 +406,23 @@ Other Flags:   -servergamelog
 ❗⛔❗ WARNING - Service was recently killed by the OOM killer
 This may indicate that your server ran out of memory!
 ```
+
+**Map Sizes**
+
+Below is a table of each map (as of 73.42) and the approximate RAM required for a fresh install:
+
+| Map                       | Fresh Install RAM |
+|---------------------------|------------------:|
+| TheIsland                 |            9.4 GB |
+| Aberration                |            6.6 GB |
+| Bob's Missions (Club ARK) |            2.6 GB |
+| Scorched Earth            |            9.1 GB |
+| The Center                |            9.7 GB |
+| Extinction                |            6.3 GB |
+| Astraeos                  |           11.2 GB |
+| Ragnarok                  |           10.2 GB |
+| Valguero                  |            8.6 GB |
+
 
 **Fix**
 

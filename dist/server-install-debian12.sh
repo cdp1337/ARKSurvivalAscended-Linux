@@ -6,7 +6,7 @@
 # Please ensure to run this script as root (or at least with sudo)
 #
 # @LICENSE AGPLv3
-# @AUTHOR  Charlie Powell <cdp1337@veraciousnetwork.com>
+# @AUTHOR  Charlie Powell <cdp1337@bitsnbytes.dev>
 # @SOURCE  https://github.com/cdp1337/ARKSurvivalAscended-Linux
 # @CATEGORY Game Server
 # @TRMM-TIMEOUT 600
@@ -14,7 +14,7 @@
 # F*** Nitrado
 #
 # Supports:
-#   Debian 12
+#   Debian 12, 13
 #   Ubuntu 24.04
 #
 # Requirements:
@@ -28,6 +28,9 @@
 #   --force-reinstall - Force a reinstall of the game binaries, mods, and engine
 #
 # Changelog:
+#   20251016 - Add auto-updater checks
+#            - Fix support for Debian 13
+#            - Add Valguero map
 #   20250620 - Fix $GAME_USER for non-standard installs - thanks techgo!
 #            - Add Ragnarok support
 #   20250525 - Fix excessive question marks in options
@@ -56,7 +59,7 @@
 ## Parameter Configuration
 ############################################
 
-INSTALLER_VERSION="v20250620"
+INSTALLER_VERSION="v20251016"
 # https://github.com/GloriousEggroll/proton-ge-custom
 PROTON_VERSION="9-22"
 GAME="ArkSurvivalAscended"

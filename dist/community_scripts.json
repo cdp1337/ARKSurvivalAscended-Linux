@@ -5,7 +5,7 @@
         "filename": "server-install-debian12.sh",
         "args": [],
         "env": [],
-        "submittedBy": "Charlie Powell <cdp1337@veraciousnetwork.com>",
+        "submittedBy": "Charlie Powell <cdp1337@bitsnbytes.dev>",
         "name": "Install ARK Survival Ascended Dedicated Server",
         "syntax": [
             "--reset-proton - Reset proton directories back to default",
