@@ -2,7 +2,7 @@
 
 Wanna chat?
 
-[![Discord](https://img.shields.io/discord/909843670214258729?label=Discord)](https://discord.gg/48hHdm5EgA)
+[![Discord](https://img.shields.io/discord/791811216011952138?label=Discord)](https://discord.gg/jyFsweECPb)
 
 Help fund the project
 
@@ -90,6 +90,8 @@ Quick run (if you trust me, which of course you should not):
 ```bash
 sudo su -c "bash <(wget -qO- https://raw.githubusercontent.com/cdp1337/ARKSurvivalAscended-Linux/main/dist/server-install-debian12.sh)" root
 ```
+
+Quick note for Debian users; you need sudo installed to run the above command.
 
 ### Advanced Usage
 

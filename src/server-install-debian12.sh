@@ -56,6 +56,7 @@
 ## Parameter Configuration
 ############################################
 
+INSTALLER_VERSION="v20250620"
 # https://github.com/GloriousEggroll/proton-ge-custom
 PROTON_VERSION="9-22"
 GAME="ArkSurvivalAscended"
@@ -71,12 +72,12 @@ PROTON_BIN="/opt/script-collection/GE-Proton${PROTON_VERSION}/proton"
 # Steam ID of the game
 STEAM_ID="2430930"
 # List of game maps currently available
-GAME_MAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter ark-extinction ark-astraeos ark-ragnarok"
+GAME_MAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter ark-extinction ark-astraeos ark-ragnarok ark-valguero"
 # Range of game ports to enable in the firewall
 PORT_GAME_START=7701
-PORT_GAME_END=7708
+PORT_GAME_END=7709
 PORT_RCON_START=27001
-PORT_RCON_END=27008
+PORT_RCON_END=27009
 
 # compile:argparse
 # scriptlet:_common/require_root.sh
@@ -92,6 +93,30 @@ PORT_RCON_END=27008
 ############################################
 ## Pre-exec Checks
 ############################################
+
+# Allow for auto-update checks
+if [ -n "$(which curl)" -a "${0:0:8}" != "/dev/fd/" ]; then
+	echo "Checking Github for updates..."
+	GITHUB_VERSION="$(curl -m 4 -I https://github.com/cdp1337/ARKSurvivalAscended-Linux/releases/latest 2>&1 | egrep '^location' | sed 's:.*/::')"
+	if [ -n "$GITHUB_VERSION" ]; then
+		if [ "$GITHUB_VERSION" != "$INSTALLER_VERSION" ]; then
+			echo "A new version of the installer is available!"
+			read -p "Do you want to update the installer? (y/N): " -t 10 UPDATE
+			case "$UPDATE" in
+				[yY]*)
+					curl -L https://raw.githubusercontent.com/cdp1337/ARKSurvivalAscended-Linux/refs/tags/${GITHUB_VERSION}/dist/server-install-debian12.sh \
+						-o "$0"
+					chmod +x "$0"
+					exec "$0" "${@}"
+					exit 0
+					;;
+				*)
+					echo "Skipping update";;
+			esac
+		fi
+	fi
+fi
+
 
 # This script can run on an existing server, but should not update the game if a map is actively running.
 # Check if any maps are running; do not update an actively running server.
@@ -144,7 +169,7 @@ fi
 
 # Ask the user some information before installing.
 echo "================================================================================"
-echo "         	  ARK Survival Ascended *unofficial* Installer"
+echo "         	  ARK Survival Ascended *unofficial* Installer $INSTALLER_VERSION"
 echo ""
 if [ "$INSTALLTYPE" == "new" ]; then
 	echo "? What is the community name of the server? (e.g. My Awesome ARK Server)"
@@ -403,6 +428,12 @@ for MAP in $GAME_MAPS; do
 		MODS=""
 		GAMEPORT=7708
 		RCONPORT=27008
+	elif [ "$MAP" == "ark-valguero" ]; then
+		DESC="Valguero"
+		NAME="Valguero_WP"
+		MODS=""
+		GAMEPORT=7709
+		RCONPORT=27009
 	fi
 
 	if [ "$MODS" != "" ]; then
