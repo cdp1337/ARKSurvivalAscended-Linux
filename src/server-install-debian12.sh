@@ -587,6 +587,9 @@ fi
 # Ensure cluster and game resources exist
 sudo -u $GAME_USER touch "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters/PlayersJoinNoCheckList.txt"
 sudo -u $GAME_USER touch "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters/admins.txt"
+if [ ! -e "$GAME_DIR/AppFiles/ShooterGame/Saved/Config/WindowsServer" ]; then
+	sudo -u $GAME_USER mkdir -p "$GAME_DIR/AppFiles/ShooterGame/Saved/Config/WindowsServer"
+fi
 sudo -u $GAME_USER touch "$GAME_DIR/AppFiles/ShooterGame/Saved/Config/WindowsServer/Game.ini"
 
 ############################################
@@ -672,7 +675,7 @@ fi
 echo "Admin list:            $GAME_DIR/admin.txt"
 echo ''
 echo ''
-echo 'Wanna stop by and chat? https://discord.gg/48hHdm5EgA'
+echo 'Wanna stop by and chat? https://discord.gg/jyFsweECPb'
 echo 'Have an issue or feature request? https://github.com/cdp1337/ARKSurvivalAscended-Linux/issues'
 echo 'Help support this and other projects? https://ko-fi.com/Q5Q013RM9Q'
 echo ''
