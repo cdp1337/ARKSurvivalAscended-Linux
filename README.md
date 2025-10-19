@@ -195,14 +195,20 @@ Pressing `m` will open the mods overview screen:
 ```
 == Mods Configuration ==
 
-| Session                    | Mods    |
-| VN Test Boxes (Scorched)   |         |
-| VN Test Boxes (Island)     |         |
-| VN Test Boxes (TheCenter)  |         |
-| VN Test Boxes (Astraeos)   |         |
-| VN Test Boxes (Aberration) |         |
-| VN Test Boxes (Extinction) |         |
-| VN Test Boxes (Club)       | 1005639 |
+| Session                    | Mods           |
+| VN Test Boxes (Scorched)   |                |
+| VN Test Boxes (Island)     |                |
+| VN Test Boxes (TheCenter)  |                |
+| VN Test Boxes (Astraeos)   | 947033, 928793 |
+| VN Test Boxes (Aberration) |                |
+| VN Test Boxes (Extinction) |                |
+| VN Test Boxes (Club)       | 1005639        |
+
+Installed Mods:
+ - 1005639: Club ARK (In Use)
+ - 1365929: Fancy Ark QoL Plus (In Use)
+ - 947033: Awesome  Spyglass! (In Use)
+ - 928793: Pelayori's Cryo Storage (Crossplay!) (In Use)
 
 [E]nable mod on all maps | [D]isable mod on all maps | [B]ack:
 ```
@@ -324,7 +330,8 @@ RCON:          27004
 Auto-Start:    Yes
 Status:        Stopped
 Players:       None
-Mods:          
+Mods:          Awesome  Spyglass! (947033)
+               Pelayori's Cryo Storage (Crossplay!) (928793)
 Cluster ID:    some-test-name
 Other Options: AllowFlyerCarryPvE=True?DinoDamageMultiplier=25
 Other Flags:   -servergamelog     

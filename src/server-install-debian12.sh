@@ -28,6 +28,8 @@
 #   OPT_FORCE_REINSTALL=--force-reinstall - Force a reinstall of the game binaries, mods, and engine
 #
 # Changelog:
+#   202510xx - Add support for displaying the name of the mods installed
+#            - Assist user with troubleshooting by displaying the log on failure to start
 #   20251016 - Add auto-updater checks
 #            - Fix support for Debian 13
 #            - Add Valguero map

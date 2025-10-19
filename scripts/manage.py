@@ -349,6 +349,31 @@ class Services:
 		"""
 		subprocess.run(['systemctl', 'restart', self.name])
 
+	def get_mod_names(self) -> list:
+		"""
+		Get the list of mod names for this service
+		:return:
+		"""
+		names = []
+		for mod in self.mods:
+			mod_name = ModLibrary.resolve_mod_name(mod)
+			if mod_name is not None:
+				names.append(mod_name + ' (' + mod + ')')
+			else:
+				names.append('⚠️  NOT INSTALLED (' + mod + ')')
+		return names
+
+	def get_pid(self) -> int:
+		"""
+		Get the PID of the running service, or 0 if not running
+		:return:
+		"""
+		pid = subprocess.run([
+			'systemctl', 'show', '-p', 'MainPID', self.name
+		], stdout=subprocess.PIPE).stdout.decode().strip()[8:]
+
+		return int(pid)
+
 
 
 class Table:
@@ -453,6 +478,42 @@ class Table:
 			print('| %s |' % ' | '.join(vals))
 
 
+class ModLibrary(object):
+	_mods = None
+
+	@classmethod
+	def refresh_data(cls):
+		"""
+		Force refresh of mod data from disk
+		:return:
+		"""
+		ModLibrary._mods = None
+
+	@classmethod
+	def get_mods(cls) -> dict:
+		if cls._mods is None:
+			# Pull mod data from the JSON library file
+			lib_file = os.path.join(here, 'AppFiles', 'ShooterGame', 'Binaries', 'Win64', 'ShooterGame', 'ModsUserData', '83374', 'library.json')
+			if os.path.exists(lib_file):
+				cls._mods = {}
+				with open(lib_file, 'r', encoding='utf-8-sig') as f:
+					mod_lib = json.load(f)
+					for mod in mod_lib['installedMods']:
+						cls._mods[str(mod['details']['iD'])] = {
+							'name': mod['details']['name'],
+							'path': mod['pathOnDisk']
+						}
+
+		return cls._mods
+
+	@classmethod
+	def resolve_mod_name(cls, mod_id) -> Union[str, None]:
+		mods = cls.get_mods()
+		if mod_id in mods:
+			return mods[mod_id]['name']
+		return None
+
+
 def _safe_stop_inner(services, time_message):
 	"""
 
@@ -479,6 +540,16 @@ def _safe_stop_inner(services, time_message):
 				print('Shutting down %s' % s.session)
 				s.stop()
 	return players_connected
+
+
+def print_error_log(num_lines = 20):
+	"""
+	Print the last lines of the error log
+	:param num_lines: Number of lines (default 20) to display
+	:return:
+	"""
+	log_file = os.path.join(here, 'AppFiles', 'ShooterGame', 'Saved', 'Logs', 'ShooterGame.log')
+	subprocess.call(['tail', '-n', str(num_lines), log_file], stdout=sys.stdout)
 
 
 def safe_stop(services):
@@ -577,7 +648,7 @@ def safe_start(services, ignore_enabled = False):
 			players_connected = None
 			last_line = ''
 			check_counter = 0
-			exec_status = 0
+			error = False
 			while check_counter < 120:
 				check_counter += 1
 
@@ -599,21 +670,26 @@ def safe_start(services, ignore_enabled = False):
 				], stdout=subprocess.PIPE).stdout.decode().strip()[15:])
 
 				if exec_status == 1:
+					print_error_log()
 					print('❗⛔❗ WARNING - Service has exited with status 1')
 					print('This may indicate corrupt files, please check logs and verify files with Steam.')
-					break
+					return
 				elif exec_status == 15:
+					print_error_log()
 					print('❗⛔❗ WARNING - Service has exited with status 15')
 					print('This may indicate that your server ran out of memory.')
-					break
+					return
 				elif exec_status != 0:
+					print_error_log()
 					print('❗⛔❗ WARNING - Service has exited with status %s' % exec_status)
-					break
+					return
+
+				if s.get_pid() == 0:
+					print_error_log()
+					print('❗⛔❗ WARNING - Process has crashed!')
+					return
 
 				sleep(0.5)
-
-			if exec_status != 0:
-				return
 
 			if s.rcon_enabled:
 				retry = 0
@@ -673,6 +749,8 @@ def menu_service(service):
 	:return:
 	"""
 	while True:
+		ModLibrary.refresh_data()
+
 		header('Service Details')
 		running = service.is_running()
 		if service.rcon_enabled and running:
@@ -689,7 +767,7 @@ def menu_service(service):
 		print('Auto-Start:    %s' % ('Yes' if service.is_enabled() else 'No'))
 		print('Status:        %s' % ('Running' if running else 'Stopped'))
 		print('Players:       %s' % players)
-		print('Mods:          %s' % ', '.join(service.mods))
+		print('Mods:          %s' % '\n               '.join(service.get_mod_names()))
 		print('Cluster ID:    %s' % (service.cluster_id or ''))
 		print('Other Options: %s' % service.other_options)
 		print('Other Flags:   %s' % service.other_flags)
@@ -775,13 +853,27 @@ def menu_mods():
 	:return:
 	"""
 	while True:
+		# Pull mod data to know which mods are unused
+		ModLibrary.refresh_data()
+		mods_installed = ModLibrary.get_mods()
+		mods_used = []
+
 		running = False
 		for service in services:
 			if service.is_running():
 				running = True
+			for mod in service.mods:
+				if mod not in mods_used:
+					mods_used.append(mod)
 		header('Mods Configuration')
 		table = Table(['session', 'mods', 'running'])
 		table.render(services)
+		print('')
+
+		print('Installed Mods:')
+		for mod_id in mods_installed:
+			used = ' (In Use)' if mod_id in mods_used else ' (Not In Use)'
+			print(' - %s: %s%s' % (mod_id, mods_installed[mod_id]['name'], used))
 		print('')
 		if running:
 			print('⚠️  At least one map is running - unable to change mods while a map is active')
