@@ -28,8 +28,10 @@
 #   --force-reinstall - Force a reinstall of the game binaries, mods, and engine
 #
 # Changelog:
-#   202510xx - Add support for displaying the name of the mods installed
+#   20251019 - Add support for displaying the name of the mods installed
 #            - Assist user with troubleshooting by displaying the log on failure to start
+#            - Add backup/restore interface in management console
+#            - Add wipe player data functionality in management console
 #   20251016 - Add auto-updater checks
 #            - Fix support for Debian 13
 #            - Add Valguero map
@@ -1168,6 +1170,7 @@ cat > $GAME_DIR/manage.py <<EOF
 #!/usr/bin/env python3
 
 import os
+import shutil
 import sys
 from time import sleep
 from typing import Union
@@ -1541,6 +1544,44 @@ class Services:
 
 		return int(pid)
 
+	def get_saved_location(self) -> str:
+		if self.map == 'BobsMissions_WP':
+			map = 'BobsMissions'
+		else:
+			map = self.map
+
+		return os.path.join(
+			here,
+			'AppFiles',
+			'ShooterGame',
+			'Saved',
+			'SavedArks',
+			map
+		)
+
+	def get_num_player_profiles(self) -> int:
+		"""
+		Get the number of player profiles saved for this service
+		:return:
+		"""
+		profiles_path = self.get_saved_location()
+		if os.path.exists(profiles_path):
+			return len([
+				name for name in os.listdir(profiles_path)
+				if name.endswith('.arkprofile')
+			])
+		return 0
+
+	def get_map_file_size(self) -> int:
+		"""
+		Get the size of the map data on disk in MB
+		:return:
+		"""
+		map_path = os.path.join(self.get_saved_location(), self.map + '.ark')
+		if os.path.exists(map_path):
+			return round(os.path.getsize(map_path) // (1024 * 1024))
+		else:
+			return 0
 
 
 class Table:
@@ -1564,7 +1605,9 @@ class Table:
 			'admin_password': 'Admin Password',
 			'players': 'Players',
 			'mods': 'Mods',
-			'cluster': 'Cluster ID'
+			'cluster': 'Cluster ID',
+			'map_size': 'Map Size (MB)',
+			'player_profiles': 'Player Profiles'
 		}
 
 	def render(self, services: list):
@@ -1615,6 +1658,10 @@ class Table:
 					row.append(', '.join(service.mods))
 				elif col == 'cluster':
 					row.append(service.cluster_id or '')
+				elif col == 'map_size':
+					row.append(str(service.get_map_file_size()))
+				elif col == 'player_profiles':
+					row.append(str(service.get_num_player_profiles()))
 				else:
 					row.append('???')
 
@@ -2266,6 +2313,79 @@ def menu_discord_messages():
 			save_config()
 
 
+def menu_backup_restore():
+	while True:
+		header('Backups and Restore')
+		print('')
+		backups = []
+		if os.path.exists(os.path.join(here, 'backups')):
+			for f in os.listdir(os.path.join(here, 'backups')):
+				if f.endswith('.tgz'):
+					backups.append(f)
+		print('Existing Backups:')
+		counter = 0
+		for b in backups:
+			counter += 1
+			backup_size = os.path.getsize(os.path.join(here, 'backups', b))
+			backup_size_mb = round(backup_size / (1024 * 1024))
+			print('%s - %s (%s MB)' % (counter, b, backup_size_mb))
+		if len(backups) == 0:
+			print('No backups found')
+
+		print('')
+		if len(backups) > 0:
+			print('Enter 1-%s to restore a backup' % len(backups))
+		print('[N]ew Backup | [B]ack')
+		opt = input(': ').lower()
+
+		if opt == 'n':
+			print('Creating new backup... please wait a moment')
+			subprocess.run([os.path.join(here, 'backup.sh')], stderr=sys.stderr, stdout=sys.stdout)
+		elif opt == 'b':
+			return
+		elif opt.isdigit() and 1 <= int(opt) <= len(backups):
+			print('Restoring a backup will overwrite existing game data!  Continue? [y/N]')
+			confirm = input(': ').lower()
+			if confirm == 'y':
+				print('Restoring backup... please wait a moment')
+				subprocess.run([os.path.join(here, 'restore.sh'), 'backups/' + backups[int(opt)-1]], stderr=sys.stderr, stdout=sys.stdout)
+
+
+def menu_wipe():
+	while True:
+		header('Wipe User Data')
+		print('Wiping user data will remove all player progress, including characters, items, and structures.')
+		print('This action is irreversible and will reset the game to its initial state.')
+		print('')
+		table = Table(['num', 'map', 'map_size', 'player_profiles'])
+		table.render(services)
+
+		print('')
+		print('1-%s to reset individual map' % len(services))
+		print('or [A]ll to wipe all user data across all maps, [B]ack to return')
+		opt = input(': ').lower()
+
+		if opt == 'b':
+			return
+
+		if opt.isdigit() and 1 <= int(opt) <= len(services):
+			path = services[int(opt)-1].get_saved_location()
+		elif opt == 'a':
+			path = os.path.join(here, 'AppFiles', 'ShooterGame', 'Saved', 'SavedArks')
+		else:
+			print('Invalid option!')
+			return
+
+		print('Removing %s...' % path)
+		print('Are you sure you want to proceed? This action cannot be undone! type DELETE to confirm.')
+		confirm = input(': ')
+		if confirm == 'DELETE':
+			if os.path.exists(path):
+				shutil.rmtree(path)
+		else:
+			print('Wipe operation cancelled.')
+
+
 def menu_main():
 	stay = True
 	while stay:
@@ -2284,19 +2404,26 @@ def menu_main():
 		print('1-%s to manage individual map settings' % len(services))
 		print('Configure: [M]ods | [C]luster | [A]dmin password/RCON | re[N]ame | [D]iscord integration')
 		print('Control: [S]tart all | s[T]op all | [R]estart all | [U]pdate')
+		if running:
+			print('Manage Data: (please stop all maps to manage game data)')
+		else:
+			print('Manage Data: [B]ackup/Restore | [W]ipe User Data')
 		print('or [Q]uit to exit')
 		opt = input(': ').lower()
 
-		if opt == 'q':
-			stay = False
-		elif opt == 'm':
-			menu_mods()
+		if opt == 'a':
+			menu_admin_password()
+		elif opt == 'b':
+			if running:
+				print('⚠️  Please stop all maps before managing backups.')
+			else:
+				menu_backup_restore()
 		elif opt == 'c':
 			menu_cluster()
-		elif opt == 'a':
-			menu_admin_password()
 		elif opt == 'd':
 			menu_discord()
+		elif opt == 'm':
+			menu_mods()
 		elif opt == 'n':
 			if running:
 				print('⚠️  Please stop all maps before renaming.')
@@ -2305,17 +2432,24 @@ def menu_main():
 				if val != '':
 					for s in services:
 						s.rename(val)
+		elif opt == 'q':
+			stay = False
+		elif opt == 'r':
+			safe_restart(services)
 		elif opt == 's':
 			safe_start(services)
 		elif opt == 't':
 			safe_stop(services)
-		elif opt == 'r':
-			safe_restart(services)
 		elif opt == 'u':
 			if running:
 				print('⚠️ Please stop all maps prior to updating.')
 			else:
 				subprocess.run([os.path.join(here, 'update.sh')], stderr=sys.stderr, stdout=sys.stdout)
+		elif opt == 'w':
+			if running:
+				print('⚠️  Please stop all maps before wiping user data.')
+			else:
+				menu_wipe()
 		elif opt.isdigit() and 1 <= int(opt) <= len(services):
 			menu_service(services[int(opt)-1])
 
