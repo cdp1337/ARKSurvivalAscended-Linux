@@ -182,6 +182,7 @@ Once installed, run `sudo /home/steam/ArkSurvivalAscended/manage.py` to access t
 1-7 to manage individual map settings
 Configure: [M]ods | [C]luster | [A]dmin password/RCON | re[N]ame | [D]iscord integration
 Control: [S]tart all | s[T]op all | [R]estart all | [U]pdate
+Manage Data: [B]ackup/Restore | [W]ipe User Data
 or [Q]uit to exit
 ```
 
@@ -286,8 +287,6 @@ events for maps.  Default messages are provided and can be customized to match y
 [Read more about enabling Discord integration](docs/integrate-discord.md).
 
 
-
-
 ### Renaming maps
 
 From the main menu overview, pressing `n` will allow you to rename all maps.
@@ -344,6 +343,36 @@ This page allows you to configure a specific map, notably enabling, disabling, a
 Options are any variable as defined in the [Server Configuration](https://ark.wiki.gg/wiki/Server_configuration)
 and flags are command line arguments (ie: those that start with a `-`.)
 
+### Wiping User Data
+
+Useful for servers which have seasons that get rotated periodically,
+the `w` option from the main menu overview will allow you to wipe all user data
+for individual maps and for the entire cluster.
+
+Only map and player data is removed; all configurations and mods remain intact.
+
+```
+== Wipe User Data ==
+
+Wiping user data will remove all player progress, including characters, items, and structures.
+This action is irreversible and will reset the game to its initial state.
+
+| # | Map              | Map Size (MB) | Player Profiles |
+|---|------------------|---------------|-----------------|
+| 1 | Extinction_WP    | 0             | 0               |
+| 2 | Astraeos_WP      | 0             | 0               |
+| 3 | ScorchedEarth_WP | 33            | 0               |
+| 4 | TheCenter_WP     | 0             | 0               |
+| 5 | Aberration_WP    | 0             | 0               |
+| 6 | TheIsland_WP     | 0             | 0               |
+| 7 | BobsMissions_WP  | 0             | 0               |
+| 8 | Valguero_WP      | 0             | 0               |
+| 9 | Ragnarok_WP      | 0             | 0               |
+
+1-9 to reset individual map
+or [A]ll to wipe all user data across all maps, [B]ack to return
+```
+
 
 ## Backups and Migrations
 
@@ -351,6 +380,8 @@ As of 2025.05.05, simple backup and restore scripts have been added to `/home/st
 
 Backups are just a tarball of the game map, user data, tribe data, and configuration files.
 You can use your native archive manager to view these files, or 7-zip, winrar, etc.
+
+(As of v2025.10.19 this functionality is also available within the management interface)
 
 ```bash
 ./backup.sh 
