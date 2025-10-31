@@ -537,10 +537,10 @@ class ModLibrary(object):
 	@classmethod
 	def get_mods(cls) -> dict:
 		if cls._mods is None:
+			cls._mods = {}
 			# Pull mod data from the JSON library file
 			lib_file = os.path.join(here, 'AppFiles', 'ShooterGame', 'Binaries', 'Win64', 'ShooterGame', 'ModsUserData', '83374', 'library.json')
 			if os.path.exists(lib_file):
-				cls._mods = {}
 				with open(lib_file, 'r', encoding='utf-8-sig') as f:
 					mod_lib = json.load(f)
 					for mod in mod_lib['installedMods']:

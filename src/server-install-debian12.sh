@@ -29,6 +29,7 @@
 #
 # Changelog:
 #   20251031 - Add support for Nitrado and Official server save formats
+#            - Fix for if mods library is missing
 #   20251019 - Add support for displaying the name of the mods installed
 #            - Assist user with troubleshooting by displaying the log on failure to start
 #            - Add backup/restore interface in management console
