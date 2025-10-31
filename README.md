@@ -34,6 +34,13 @@ This script will:
 * [Backups and Migrations](#backups-and-migrations)
 * [Accessing Files](#accessing-files)
 * [Common Issues and Troubleshooting](#common-issues-and-troubleshooting)
+  * [Server Memory](#server-memory)
+  * [Mod Partially Downloaded](#mod-partially-downloaded)
+  * [Wildcard Botched Steam](#wildcard-botched-steam)
+  * [Cannot See Server](#cannot-see-server-nat)
+  * [Cannot Connect to Server](#cannot-connect-to-server-nat)
+  * [Server Cannot Start on Proxmox](#server-cannot-start-on-proxmox)
+  * [Missing Player and Tribes after Import from Nitrado](#missing-player-and-tribes-after-import-from-nitrado)
 
 ---
 
@@ -66,6 +73,8 @@ Supports integration with Discord to send messages on start, stop, and restart e
 
 Supports fine-grained management of game configuration via [Beacon App](https://usebeacon.app/)
 thanks to their SFTP deployment feature.  [Read about using Beacon with this installer](docs/using-beacon.md).
+
+Imports from Nitrado server backups are SUPPORTED, including all player and tribe data.
 
 ## Requirements
 
@@ -587,6 +596,50 @@ The default Proxmox CPU type is `kvm64` which **does not** support this flag.
 
 Stop your virtual machine, edit the CPU type to be `host`, and start the guest.  Modern CPUs have this instruction set
 and setting it to use the host will 1) provide better performance and 2) expose this flag to the guest.
+
+### Missing Player and Tribes after Import from Nitrado
+
+**Problem**
+
+Maps can be imported from Nitrado but player and tribe data is missing
+
+**Details**
+
+Nitrado and official uses a non-default format for saving player and tribe data.
+Notably that data is all stored within the main map file.
+
+(Refer to [ARK Wiki on wiki.gg for more details](https://ark.wiki.gg/wiki/2023_official_server_save_files))
+
+**Fix**
+
+New server installs should say "y" when prompted if you plan on importing from Nitrado.
+This will configure the server to use the Nitrado-compatible save format.
+
+For existing installs, stop all maps and edit each one from the management interface.
+
+For each map, press `F` to edit flags and add the following flag:
+
+```
+-newsaveformat -usestore
+```
+
+Resulting output should resemble:
+
+```
+== Service Details ==
+
+Map:           Astraeos_WP
+Session:       BitsNBytes ubuntu Test (Astraeos)
+Port:          7707 (UDP)
+RCON:          27007 (TCP)
+Auto-Start:    No
+Status:        Stopped
+Players:       N/A
+Mods:          
+Cluster ID:    
+Other Options: 
+Other Flags:   -servergamelog -newsaveformat -usestore
+```
 
 
 ## Utilized libraries

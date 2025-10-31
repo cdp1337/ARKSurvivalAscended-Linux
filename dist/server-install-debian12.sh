@@ -28,6 +28,7 @@
 #   --force-reinstall - Force a reinstall of the game binaries, mods, and engine
 #
 # Changelog:
+#   20251031 - Add support for Nitrado and Official server save formats
 #   20251019 - Add support for displaying the name of the mods installed
 #            - Assist user with troubleshooting by displaying the log on failure to start
 #            - Add backup/restore interface in management console
@@ -668,6 +669,24 @@ if [ "$INSTALLTYPE" == "new" ]; then
 	fi
 fi
 
+# Support legacy vs newsave formats
+# https://ark.wiki.gg/wiki/2023_official_server_save_files
+# Legacy formats use individual files for each character whereas
+# "new" formats save all characters along with the map.
+echo ''
+NEWFORMAT=0
+if [ "$INSTALLTYPE" == "new" ]; then
+	echo "? Will you be migrating an existing Nitrado or Wildcard server? "
+	echo "(answering yes will enable the new save format)"
+	echo -n "> (y/N): "
+	read NEWFORMAT
+	if [ "$NEWFORMAT" == "y" -o "$NEWFORMAT" == "Y" ]; then
+		NEWFORMAT=1
+	else
+		NEWFORMAT=0
+	fi
+fi
+
 echo ''
 if [ "$WHITELIST" -eq 1 ]; then
 	echo "? DISABLE whitelist for players?"
@@ -865,6 +884,12 @@ else
     fi
 fi
 
+GAMEFLAGS="-servergamelog"
+# https://ark.wiki.gg/wiki/2023_official_server_save_files
+if [ $NEWFORMAT -eq 1 ]; then
+	GAMEFLAGS="$GAMEFLAGS -newsaveformat -usestore"
+fi
+
 # Install the systemd service files for ARK Survival Ascended Dedicated Server
 for MAP in $GAME_MAPS; do
 	# Different maps will have different settings, (to allow them to coexist on the same server)
@@ -972,7 +997,7 @@ EOF
 [Service]
 # Edit this line to adjust start parameters of the server
 # After modifying, please remember to run `sudo systemctl daemon-reload` to apply changes to the system.
-ExecStart=$PROTON_BIN run ArkAscendedServer.exe ${NAME}?listen?SessionName="${COMMUNITYNAME} (${DESC})"?RCONPort=${RCONPORT}?ServerAdminPassword=${ADMIN_PASS}?RCONEnabled=True -port=${GAMEPORT} -servergamelog ${MODS_LINE}
+ExecStart=$PROTON_BIN run ArkAscendedServer.exe ${NAME}?listen?SessionName="${COMMUNITYNAME} (${DESC})"?RCONPort=${RCONPORT}?ServerAdminPassword=${ADMIN_PASS}?RCONEnabled=True -port=${GAMEPORT} ${GAMEFLAGS} ${MODS_LINE}
 EOF
     fi
 
