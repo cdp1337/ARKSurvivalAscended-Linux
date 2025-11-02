@@ -28,8 +28,11 @@
 #   --force-reinstall - Force a reinstall of the game binaries, mods, and engine
 #
 # Changelog:
-#   20251031 - Add support for Nitrado and Official server save formats
+#   20251101 - Add support for Nitrado and Official server save formats
 #            - Fix for if mods library is missing
+#            - Add support for customizing all player messages
+#            - Add memory usage statistics to management console
+#            - Cleanup and simplify startup reporting
 #   20251019 - Add support for displaying the name of the mods installed
 #            - Assist user with troubleshooting by displaying the log on failure to start
 #            - Add backup/restore interface in management console
@@ -1198,7 +1201,7 @@ cat > $GAME_DIR/manage.py <<EOF
 import os
 import shutil
 import sys
-from time import sleep
+from time import sleep, time
 from typing import Union
 
 here = os.path.dirname(os.path.realpath(__file__))
@@ -1248,33 +1251,37 @@ def rlinput(prompt, prefill=''):
 		readline.set_startup_hook()
 
 
-def discord_message(message: str) -> str:
+def str_len(s: str) -> int:
 	"""
-	Get the user-defined message to be sent to Discord, or default if not configured.
-	:param message:
+	Regular len(s) but counts emoji as 2 characters
+	:param s:
 	:return:
 	"""
-	messages = {
-		'map_started': ':green_square: %s has started',
-		'maps_stopping': ':small_red_triangle_down: Shutting down: %s',
-		'map_stopping': ':small_red_triangle_down: %s shutting down',
-	}
-	if message in messages:
-		# Check if there is a configured value
-		configured_message = config['Discord'].get(message, '')
-		if configured_message == '':
-			# No configured message, use default.
-			message = messages[message]
+	length = 0
+	for c in s:
+		if ord(c) > 0xFFF:
+			length += 2
 		else:
-			message = configured_message
+			length += 1
+	return length
 
-	return message
+
+def str_ljust(s: str, length: int) -> str:
+	"""
+	Regular str.ljust() but counts emoji as 2 characters
+	:param s:
+	:param length:
+	:return:
+	"""
+	characters = len(s)
+	width = str_len(s)
+	return s.ljust(length - (width - characters))
 
 
 def discord_alert(message: str, parameters: list):
 	enabled = config['Discord'].get('enabled', '0') == '1'
 	webhook = config['Discord'].get('webhook', '')
-	message = discord_message(message)
+	message = Messages.get(message)
 
 	# Verify the number of '%s' replacements in the string
 	# This is important because this is a user-definable string, and users may forget to include '%s'.
@@ -1297,6 +1304,74 @@ def discord_alert(message: str, parameters: list):
 			print('Could not notify Discord: %s' % e)
 	else:
 		print('Would be sent to discord: ' + message)
+
+
+class Messages:
+	messages = {
+		'map_started': {
+			'title': 'Map Started (Discord)',
+			'default': ':green_square: %s has started'
+		},
+		'map_stopping': {
+			'title': 'Map Stopping (Discord)',
+			'default': ':small_red_triangle_down: %s shutting down'
+		},
+		'maps_stopping': {
+			'title': 'Maps Stopping (Discord)',
+			'default': ':small_red_triangle_down: Shutting down: %s'
+		},
+		'shutdown_5min': {
+			'title': 'Shutdown Warning 5 Minutes',
+			'default': 'Server is shutting down in 5 minutes'
+		},
+		'shutdown_4min': {
+			'title': 'Shutdown Warning 4 Minutes',
+			'default': 'Server is shutting down in 4 minutes'
+		},
+		'shutdown_3min': {
+			'title': 'Shutdown Warning 3 Minutes',
+			'default': 'Server is shutting down in 3 minutes'
+		},
+		'shutdown_2min': {
+			'title': 'Shutdown Warning 2 Minutes',
+			'default': 'Server is shutting down in 2 minutes'
+		},
+		'shutdown_1min': {
+			'title': 'Shutdown Warning 1 Minute',
+			'default': 'Server is shutting down in 1 minute'
+		},
+		'shutdown_30sec': {
+			'title': 'Shutdown Warning 30 Seconds',
+			'default': 'Server is shutting down in 30 seconds!'
+		},
+		'shutdown_now': {
+			'title': 'Shutdown Warning NOW',
+			'default': 'Server is shutting down NOW!'
+		},
+	}
+
+	@classmethod
+	def get(cls, msg: str) -> str:
+		"""
+		Get the user-defined message or default value if not configured
+
+		:param msg:
+		:return:
+		"""
+		if msg not in cls.messages:
+			# Message not defined; just return the input message key
+			return msg
+
+		legacy_discords = ('map_started', 'map_stopping', 'maps_stopping')
+
+		configured_message = config['Messages'].get(msg, '')
+		if configured_message == '':
+			# No configured message, check Discord legacy keys or use default.
+			if msg in legacy_discords:
+				# The management system prior to 2025.10.31 stored Discord messages in Discord.
+				configured_message = config['Discord'].get(msg, '')
+
+		return configured_message if configured_message != '' else cls.messages[msg]['default']
 
 
 class Services:
@@ -1435,17 +1510,8 @@ class Services:
 		try:
 			with Client('127.0.0.1', int(self.rcon), passwd=self.admin_password, timeout=2) as client:
 				return client.run(cmd).strip()
-		except ConnectionRefusedError:
-			print('⛔ RCON: Connection refused, server may not be available yet', file=sys.stderr)
-		except ConnectionResetError:
-			print('⛔ RCON: Connection reset, server may not be available yet', file=sys.stderr)
-		except SessionTimeout:
-			print('⛔ RCON: Session timeout, server may not be available yet', file=sys.stderr)
-		except TimeoutError:
-			print('⛔ RCON: Timeout, server may not be available yet', file=sys.stderr)
-		except WrongPassword:
-			print('⛔ RCON: Wrong password, password may have changed while server was still running, try restarting all maps', file=sys.stderr)
-		return None
+		except:
+			return None
 
 	def rcon_get_number_players(self) -> Union[None, int]:
 		"""
@@ -1570,6 +1636,69 @@ class Services:
 
 		return int(pid)
 
+	def get_game_pid(self) -> int:
+		"""
+		Get the primary game process PID of the actual game server, or 0 if not running
+		:return:
+		"""
+
+		# There's no quick way to get the game process PID from systemd,
+		# so use ps to find the process based on the map name
+		processes = subprocess.run([
+			'ps', 'axh', '-o', 'pid,cmd'
+		], stdout=subprocess.PIPE).stdout.decode().strip()
+		for line in processes.split('\n'):
+			pid, cmd = line.strip().split(' ', 1)
+			if cmd.startswith('ArkAscendedServer.exe %s?listen' % self.map):
+				return int(line.strip().split(' ')[0])
+		return 0
+
+	def get_memory_usage(self) -> str:
+		"""
+		Get the formatted memory usage of the service, or N/A if not running
+		:return:
+		"""
+
+		pid = self.get_game_pid()
+
+		if pid == 0:
+			return 'N/A'
+
+		mem = subprocess.run([
+			'ps', 'h', '-p', str(pid), '-o', 'rss'
+		], stdout=subprocess.PIPE).stdout.decode().strip()
+
+		if mem.isdigit():
+			mem = int(mem)
+			if mem >= 1024 * 1024:
+				mem_gb = mem / (1024 * 1024)
+				return '%.2f GB' % mem_gb
+			else:
+				mem_mb = mem // 1024
+				return '%.0f MB' % mem_mb
+		else:
+			return 'N/A'
+
+	def get_cpu_usage(self) -> str:
+		"""
+		Get the formatted CPU usage of the service, or N/A if not running
+		:return:
+		"""
+
+		pid = self.get_game_pid()
+
+		if pid == 0:
+			return 'N/A'
+
+		cpu = subprocess.run([
+			'ps', 'h', '-p', str(pid), '-o', '%cpu'
+		], stdout=subprocess.PIPE).stdout.decode().strip()
+
+		if cpu.replace('.', '', 1).isdigit():
+			return '%.0f%%' % float(cpu)
+		else:
+			return 'N/A'
+
 	def get_saved_location(self) -> str:
 		if self.map == 'BobsMissions_WP':
 			map = 'BobsMissions'
@@ -1627,13 +1756,14 @@ class Table:
 			'port': 'Port',
 			'rcon': 'RCON',
 			'enabled': 'Auto-Start',
-			'running': 'Service',
+			'running': 'Status',
 			'admin_password': 'Admin Password',
 			'players': 'Players',
 			'mods': 'Mods',
 			'cluster': 'Cluster ID',
 			'map_size': 'Map Size (MB)',
-			'player_profiles': 'Player Profiles'
+			'player_profiles': 'Player Profiles',
+			'memory': 'Mem',
 		}
 
 	def render(self, services: list):
@@ -1672,9 +1802,9 @@ class Table:
 				elif col == 'rcon':
 					row.append(service.rcon if service.rcon_enabled else 'N/A')
 				elif col == 'enabled':
-					row.append('Enabled' if service.is_enabled() else 'Disabled')
+					row.append('✅ Enabled' if service.is_enabled() else '❌ Disabled')
 				elif col == 'running':
-					row.append('Running' if service.is_running() else 'Stopped')
+					row.append('✅ Running' if service.is_running() else '❌ Stopped')
 				elif col == 'admin_password':
 					row.append(service.admin_password or '')
 				elif col == 'players':
@@ -1688,10 +1818,12 @@ class Table:
 					row.append(str(service.get_map_file_size()))
 				elif col == 'player_profiles':
 					row.append(str(service.get_num_player_profiles()))
+				elif col == 'memory':
+					row.append(service.get_memory_usage())
 				else:
 					row.append('???')
 
-				col_lengths[counter] = max(col_lengths[counter], len(row[-1]))
+				col_lengths[counter] = max(col_lengths[counter], str_len(row[-1]))
 				counter += 1
 			rows.append(row)
 
@@ -1713,7 +1845,7 @@ class Table:
 			counter = 0
 			vals = []
 			while counter < len(row):
-				vals.append(row[counter].ljust(col_lengths[counter]))
+				vals.append(str_ljust(row[counter], col_lengths[counter]))
 				counter += 1
 			print('| %s |' % ' | '.join(vals))
 
@@ -1770,7 +1902,7 @@ def _safe_stop_inner(services, time_message):
 				s.stop()
 			elif players > 0:
 				print('%s has %s players connected, sending warning' % (s.session, players))
-				s.rcon_message('Server is shutting down %s' % time_message)
+				s.rcon_message(time_message)
 				players_connected = True
 			else:
 				# RCON enabled, but no players connected.  GREAT!
@@ -1808,37 +1940,37 @@ def safe_stop(services):
 	elif len(maps) == 1:
 		discord_alert('map_stopping', [maps[0]])
 
-	players_connected = _safe_stop_inner(services, 'in 5 minutes')
+	players_connected = _safe_stop_inner(services, Messages.get('shutdown_5min'))
 
 	if players_connected:
 		print('Waiting a minute until the next warning (5 minutes remaining)')
 		sleep(60)
-		players_connected = _safe_stop_inner(services, 'in 4 minutes')
+		players_connected = _safe_stop_inner(services, Messages.get('shutdown_4min'))
 
 	if players_connected:
 		print('Waiting a minute until the next warning (4 minutes remaining)')
 		sleep(60)
-		players_connected = _safe_stop_inner(services, 'in 3 minutes')
+		players_connected = _safe_stop_inner(services, Messages.get('shutdown_3min'))
 
 	if players_connected:
 		print('Waiting a minute until the next warning (3 minutes remaining)')
 		sleep(60)
-		players_connected = _safe_stop_inner(services, 'in 2 minutes')
+		players_connected = _safe_stop_inner(services, Messages.get('shutdown_2min'))
 
 	if players_connected:
 		print('Waiting a minute until the next warning (2 minutes remaining)')
 		sleep(60)
-		players_connected = _safe_stop_inner(services, 'in 1 minute')
+		players_connected = _safe_stop_inner(services, Messages.get('shutdown_1min'))
 
 	if players_connected:
 		print('Waiting 30 seconds until the next warning (1 minute remaining)')
 		sleep(30)
-		players_connected = _safe_stop_inner(services, 'in 30 seconds')
+		players_connected = _safe_stop_inner(services, Messages.get('shutdown_30sec'))
 
 	if players_connected:
 		print('Last warning')
 		sleep(30)
-		_safe_stop_inner(services, 'NOW')
+		_safe_stop_inner(services, Messages.get('shutdown_now'))
 
 	for s in services:
 		if s.is_running():
@@ -1883,26 +2015,14 @@ def safe_start(services, ignore_enabled = False):
 		elif s.is_running():
 			print('%s already running' % s.session)
 		else:
+			start_timer = time()
 			print('Starting %s, please wait, may take a minute...' % s.session)
+			print('loading................')
 			s.start()
-			players_connected = None
-			last_line = ''
 			check_counter = 0
-			error = False
-			while check_counter < 120:
+			ready = False
+			while check_counter < 600:
 				check_counter += 1
-
-				# Print a log of output from the systemd service,
-				# provides minimal usefulness, but better than nothing.
-				line = subprocess.run([
-					'journalctl', '-n', '1', '-u', s.name
-				], stdout=subprocess.PIPE).stdout.decode().strip()
-				if line != last_line:
-					print(line)
-					last_line = line
-				elif check_counter % 30 == 0 and check_counter < 100:
-					print('Waiting about %s seconds...' % ((120 - check_counter) / 2))
-
 				# Watch the exit status of the service,
 				# if this changes to something other than 0, it indicates a game crash.
 				exec_status = int(subprocess.run([
@@ -1929,30 +2049,48 @@ def safe_start(services, ignore_enabled = False):
 					print('❗⛔❗ WARNING - Process has crashed!')
 					return
 
+				status_rcon = 'waiting'
+				if check_counter >= 120:
+					# After a bit of time, start checking if RCON is available.
+					# That is the indication that the server is ready.
+					if s.rcon_enabled:
+						players_connected = s.rcon_get_number_players()
+						if players_connected is None:
+							status_rcon = '❌'
+						else:
+							status_rcon = '✅'
+							ready = True
+					else:
+						# RCON is not enabled so we do not know when it's really available.
+						status_rcon = '???'
+						ready = True
+
+				# Clear the last line status output and provide a new dynamic update
+				seconds_elapsed = round(time() - start_timer)
+				since_minutes = str(seconds_elapsed // 60)
+				since_seconds = seconds_elapsed % 60
+				if since_seconds < 10:
+					since_seconds = '0' + str(since_seconds)
+				else:
+					since_seconds = str(since_seconds)
+				print(
+					'\033[1A\033[K Time: %s, CPU: %s, Memory: %s, RCON: %s' % (
+						since_minutes + ':' + since_seconds,
+						s.get_cpu_usage(),
+						s.get_memory_usage(),
+						status_rcon
+					)
+				)
+
+				if ready:
+					discord_alert('map_started', [s.session])
+					break
+
 				sleep(0.5)
 
-			if s.rcon_enabled:
-				retry = 0
-				print('Waiting for RCON to be available (up to about 2 minutes)...')
-				while retry < 20:
-					retry += 1
-					players_connected = s.rcon_get_number_players()
-					if players_connected is None:
-						if retry % 5 == 0:
-							print('Still waiting...')
-						sleep(3)
-					else:
-						print('RCON Connected!')
-						break
-
-			if s.rcon_enabled:
-				if players_connected is None:
-					print('❗⛔❗ WARNING - Service tried to start, but unable to retrieve any data from RCON.')
-					print('Please manually check if the game is available.')
-				else:
-					discord_alert('map_started', [s.session])
-			else:
-				discord_alert('map_started', [s.session])
+			if not ready:
+				print_error_log()
+				print('❗⛔❗ WARNING - Service did not become ready in time, please check logs!')
 
 
 def save_config():
@@ -2275,15 +2413,12 @@ def menu_discord():
 				options.append('[E]nable')
 
 			options.append('[C]hange Discord webhook URL')
-			options.append('configure [M]essages')
 			options.append('[B]ack')
 			print(' | '.join(options))
 			opt = input(': ').lower()
 
 			if opt == 'b':
 				return
-			elif opt == 'm':
-				menu_discord_messages()
 			elif opt == 'c':
 				print('do so by adding a Webhook (Discord -> Settings -> Integrations -> Webhooks -> Create Webhook)')
 				print('and pasting the generated URL here.')
@@ -2301,41 +2436,37 @@ def menu_discord():
 				print('Invalid option')
 
 
-def menu_discord_messages():
+def menu_messages():
+	messages = []
+	for key in Messages.messages:
+		messages.append((key, Messages.messages[key]['title']))
+
 	while True:
-		header('Discord Messages')
-		print('The following messages will be sent to Discord when certain events occur.')
+		header('Player Messages')
+		print('The following messages will be sent to players when certain events occur.')
 		print('')
-		print('| 1 | Map Started   | ' + discord_message('map_started'))
-		print('| 2 | Maps Stopping | ' + discord_message('map_stopping'))
-		print('| 3 | Map Stopping  | ' + discord_message('maps_stopping'))
+		counter = 0
+		for key, title in messages:
+			counter += 1
+			print('| %s | %s | %s' % (str(counter).ljust(2), title.ljust(28), Messages.get(key)))
+
 		print('')
-		opt = input('[1-3] change message | [B]ack: ').lower()
+		opt = input('[1-%s] change message | [B]ack: ' % counter).lower()
 		key = None
 		val = ''
 
 		if opt == 'b':
 			return
-		elif opt == '1':
-			key = 'map_started'
+		elif 1 <= int(opt) <= counter:
+			key = messages[int(opt)-1][0]
 			print('')
 			print('Edit the message, left/right works to move cursor.  Blank to use default.')
-			val = rlinput('Map Started: ', discord_message(key)).strip()
-		elif opt == '2':
-			key = 'map_stopping'
-			print('')
-			print('Edit the message, left/right works to move cursor.  Blank to use default.')
-			val = rlinput('Maps Stopping: ', discord_message(key)).strip()
-		elif opt == '3':
-			key = 'maps_stopping'
-			print('')
-			print('Edit the message, left/right works to move cursor.  Blank to use default.')
-			val = rlinput('Map Stopping: ', discord_message(key)).strip()
+			val = rlinput('%s: ' % messages[int(opt)-1][1], Messages.get(key)).strip()
 		else:
 			print('Invalid option')
 
 		if key is not None:
-			config['Discord'][key] = val.replace('%', '%%')
+			config['Messages'][key] = val.replace('%', '%%')
 			save_config()
 
 
@@ -2421,14 +2552,14 @@ def menu_main():
 				running = True
 		header('Welcome to the ARK Survival Ascended Linux Server Manager')
 		print('Find an issue? https://github.com/cdp1337/ARKSurvivalAscended-Linux/issues')
-		print('Want to help support this project? https://ko-fi.com/Q5Q013RM9Q')
+		print('Want to help support this project? https://ko-fi.com/bitsandbytes')
 		print('')
-		table = Table(['num', 'map', 'session', 'port', 'rcon', 'enabled', 'running', 'players'])
+		table = Table(['num', 'map', 'session', 'port', 'rcon', 'enabled', 'running', 'memory', 'players'])
 		table.render(services)
 
 		print('')
 		print('1-%s to manage individual map settings' % len(services))
-		print('Configure: [M]ods | [C]luster | [A]dmin password/RCON | re[N]ame | [D]iscord integration')
+		print('Configure: [M]ods | [C]luster | [A]dmin password/RCON | re[N]ame | [D]iscord integration | [P]layer messages')
 		print('Control: [S]tart all | s[T]op all | [R]estart all | [U]pdate')
 		if running:
 			print('Manage Data: (please stop all maps to manage game data)')
@@ -2458,6 +2589,8 @@ def menu_main():
 				if val != '':
 					for s in services:
 						s.rename(val)
+		elif opt == 'p':
+			menu_messages()
 		elif opt == 'q':
 			stay = False
 		elif opt == 'r':
@@ -2484,6 +2617,8 @@ config = configparser.ConfigParser()
 config.read(os.path.join(here, '.settings.ini'))
 if 'Discord' not in config.sections():
 	config['Discord'] = {}
+if 'Messages' not in config.sections():
+	config['Messages'] = {}
 
 services = []
 services_path = os.path.join(here, 'services')

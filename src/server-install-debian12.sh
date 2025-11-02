@@ -28,8 +28,11 @@
 #   OPT_FORCE_REINSTALL=--force-reinstall - Force a reinstall of the game binaries, mods, and engine
 #
 # Changelog:
-#   20251031 - Add support for Nitrado and Official server save formats
+#   20251101 - Add support for Nitrado and Official server save formats
 #            - Fix for if mods library is missing
+#            - Add support for customizing all player messages
+#            - Add memory usage statistics to management console
+#            - Cleanup and simplify startup reporting
 #   20251019 - Add support for displaying the name of the mods installed
 #            - Assist user with troubleshooting by displaying the log on failure to start
 #            - Add backup/restore interface in management console

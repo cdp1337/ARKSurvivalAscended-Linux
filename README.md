@@ -2,7 +2,7 @@
 
 Help fund the project
 
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/Q5Q013RM9Q)
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/bitsandbytes)
 
 Wanna chat?  [hit up our Discord](https://discord.gg/jyFsweECPb) or see [what other projects I'm up to](https://bitsnbytes.dev/authors/cdp1337.html)
 
@@ -177,17 +177,20 @@ Once installed, run `sudo /home/steam/ArkSurvivalAscended/manage.py` to access t
 ```
 == Welcome to the ARK Survival Ascended Linux Server Manager ==
 
-| # | Map              | Session                    | Port | RCON  | Auto-Start | Service | Players |
-| 1 | ScorchedEarth_WP | VN Test Boxes (Scorched)   | 7704 | 27004 | Enabled    | Stopped | N/A     |
-| 2 | TheIsland_WP     | VN Test Boxes (Island)     | 7701 | 27001 | Disabled   | Stopped | N/A     |
-| 3 | TheCenter_WP     | VN Test Boxes (TheCenter)  | 7705 | 27005 | Disabled   | Stopped | N/A     |
-| 4 | Astraeos_WP      | VN Test Boxes (Astraeos)   | 7707 | 27007 | Disabled   | Stopped | N/A     |
-| 5 | Aberration_WP    | VN Test Boxes (Aberration) | 7702 | 27002 | Disabled   | Stopped | N/A     |
-| 6 | Extinction_WP    | VN Test Boxes (Extinction) | 7706 | 27006 | Disabled   | Stopped | N/A     |
-| 7 | BobsMissions_WP  | VN Test Boxes (Club)       | 7703 | 27003 | Disabled   | Stopped | N/A     |
+| # | Map              | Session                      | Port | RCON  | Auto-Start  | Status     | Mem     | Players |
+|---|------------------|------------------------------|------|-------|-------------|------------|---------|---------|
+| 1 | Extinction_WP    | BitsnBytes Test (Extinction) | 7706 | 27006 | ❌ Disabled  | ✅ Running  | 5.68 GB | 0       |
+| 2 | Astraeos_WP      | BitsnBytes Test (Astraeos)   | 7707 | 27007 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |
+| 3 | ScorchedEarth_WP | BitsnBytes Test (Scorched)   | 7704 | 27004 | ❌ Disabled  | ✅ Running  | 5.90 GB | 0       |
+| 4 | TheCenter_WP     | BitsnBytes Test (TheCenter)  | 7705 | 27005 | ❌ Disabled  | ✅ Running  | 2.01 GB | N/A     |
+| 5 | Aberration_WP    | BitsnBytes Test (Aberration) | 7702 | 27002 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |
+| 6 | TheIsland_WP     | BitsnBytes Test (Island)     | 7701 | 27001 | ❌ Disabled  | ✅ Running  | 9.77 GB | 0       |
+| 7 | BobsMissions_WP  | BitsnBytes Test (Club)       | 7703 | 27003 | ❌ Disabled  | ✅ Running  | 1.57 GB | 0       |
+| 8 | Valguero_WP      | BitsnBytes Test (Valguero)   | 7709 | 27009 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |
+| 9 | Ragnarok_WP      | BitsnBytes Test (Ragnarok)   | 7708 | 27008 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |     
 
-1-7 to manage individual map settings
-Configure: [M]ods | [C]luster | [A]dmin password/RCON | re[N]ame | [D]iscord integration
+1-9 to manage individual map settings
+Configure: [M]ods | [C]luster | [A]dmin password/RCON | re[N]ame | [D]iscord integration | [P]layer messages
 Control: [S]tart all | s[T]op all | [R]estart all | [U]pdate
 Manage Data: [B]ackup/Restore | [W]ipe User Data
 or [Q]uit to exit
