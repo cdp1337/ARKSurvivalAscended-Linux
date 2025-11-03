@@ -33,6 +33,7 @@
 #   20251102 - Add support for uninstalling the server and all data
 #            - Refactor how options are handled in the management console
 #            - Add support for backup/start/stop maps as arguments to the management console
+#            - Add support for custom modded maps
 #   20251101 - Add support for Nitrado and Official server save formats
 #            - Fix for if mods library is missing
 #            - Add support for customizing all player messages
@@ -898,7 +899,7 @@ if [ $OPT_INSTALL_CUSTOM_MAP -eq 1 ]; then
 		CUSTOM_MAP_DESC="${CUSTOM_MAP_NAME}"
 	fi
 
-	CUSTOM_MAP_MAP="ark-$(echo "$CUSTOM_MAP_NAME" | tr '[:upper:]' '[:lower:]')"
+	CUSTOM_MAP_MAP="ark-$(echo "$CUSTOM_MAP_DESC" | tr '[:upper:]' '[:lower:]')"
 
 	if [ -e "$GAME_DIR/services" ]; then
 		C=$(ls "$GAME_DIR/services" -1 | wc -l)

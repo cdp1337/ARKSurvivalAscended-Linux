@@ -32,6 +32,7 @@ This script will:
 * [Directory Structure](#directory-structure)
 * [Managing your Server (Easy Method)](#managing-your-server-easy-method)
 * [Backups and Migrations](#backups-and-migrations)
+* [Installing Modded Maps](#installing-modded-maps)
 * [Accessing Files](#accessing-files)
 * [Common Issues and Troubleshooting](#common-issues-and-troubleshooting)
   * [Server Memory](#server-memory)
@@ -62,6 +63,8 @@ Sets up multiple maps on a single install, and **all of them can run at the same
 If your single server cannot run all maps, this script supports multiple servers
 sharing the same `cluster` directory via NFS to allow players to jump between maps,
 even if they are on different physical servers.
+
+In addition to the base maps, modded maps are supported too!
 
 ![Discord Logo](images/discord-logo.webp)
 
@@ -119,6 +122,9 @@ sudo /home/steam/ArkSurvivalAscended/installer.sh --force-reinstall
 # Completely uninstall the game server and all player data
 # This WILL wipe all save data!!!
 sudo /home/steam/ArkSurvivalAscended/installer.sh --uninstall
+
+# Install a modded map, you will be asked for the Mod ID and map name in the installer.
+sudo /home/steam/ArkSurvivalAscended/installer.sh --install-custom-map
 ```
 
 Re-running the installation script on an existing server **is safe** and will **not** overwrite 
@@ -421,6 +427,53 @@ sudo /home/steam/ArkSurvivalAscended/restore.sh /home/steam/ArkSurvivalAscended/
 Feel free to read through [some advanced usages](docs/advanced-usage.md) for more information on
 how things work behind the scenes.
 
+## Installing Modded Maps
+
+Once your base server is installed, you can install additional maps and use them with the built-in management console.
+
+```bash
+sudo /home/steam/ArkSurvivalAscended/installer.sh --install-custom-map
+
+# Will provide:
+Checking Github for updates...
+================================================================================
+         	  ARK Survival Ascended *unofficial* Installer v20251102
+
+
+Using legacy save format for existing installation
+
+? Enable whitelist for players?
+> (y/N): 
+
+? Enable multi-server cluster support? (Maps spread across different servers)
+> (y/N): 
+
+Please enter the Mod ID of the custom map to install.
+This is also called 'Project ID' on Curseforge.
+> : 965379
+
+Please enter the Map Name to install.
+This is usually listed on the Curseforge description page.
+> : Amissa_WP
+```
+
+Once installed, the new map will appear in the management console
+and can be started/stopped/managed like any other map.
+
+```
+| #  | Map              | Session                      | Port | RCON  | Auto-Start  | Status     | Mem     | Players |
+|----|------------------|------------------------------|------|-------|-------------|------------|---------|---------|
+| 1  | Extinction_WP    | BitsNBytes Test (Extinction) | 7706 | 27006 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |
+| 2  | Astraeos_WP      | BitsNBytes Test (Astraeos)   | 7707 | 27007 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |
+| 3  | ScorchedEarth_WP | BitsNBytes Test (Scorched)   | 7704 | 27004 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |
+| 4  | TheCenter_WP     | BitsNBytes Test (TheCenter)  | 7705 | 27005 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |
+| 5  | Aberration_WP    | BitsNBytes Test (Aberration) | 7702 | 27002 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |
+| 6  | TheIsland_WP     | BitsNBytes Test (Island)     | 7701 | 27001 | ✅ Enabled   | ✅ Running  | 9.66 GB | 0       |
+| 7  | BobsMissions_WP  | BitsNBytes Test (Club)       | 7703 | 27003 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |
+| 8  | Valguero_WP      | BitsNBytes Test (Valguero)   | 7709 | 27009 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |
+| 9  | Ragnarok_WP      | BitsNBytes Test (Ragnarok)   | 7708 | 27008 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |
+| 10 | Amissa_WP        | BitsNBytes Test (Amissa)     | 7801 | 27101 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |
+```
 
 ## Accessing Files
 
