@@ -596,7 +596,7 @@ function random_password() {
 # Allow for auto-update checks
 if [ -n "$(which curl)" -a "${0:0:8}" != "/dev/fd/" ]; then
 	echo "Checking Github for updates..."
-	GITHUB_VERSION="$(curl -m 4 -I https://github.com/cdp1337/ARKSurvivalAscended-Linux/releases/latest 2>&1 | egrep '^location' | sed 's:.*/::')"
+	GITHUB_VERSION="$(curl -s -L 'https://api.github.com/repos/cdp1337/ARKSurvivalAscended-Linux/releases?per_page=1&page=1' | grep 'tag_name' | sed 's:.* "\(v[0-9]*\)",:\1:')"
 	if [ -n "$GITHUB_VERSION" ]; then
 		if [ "$GITHUB_VERSION" != "$INSTALLER_VERSION" ]; then
 			echo "A new version of the installer is available!"
@@ -715,8 +715,9 @@ if [ $OPT_UNINSTALL -eq 1 ]; then
 		systemctl disable $SERVICE
 		[ -h "$GAME_DIR/services/${SERVICE}.conf" ] && unlink "$GAME_DIR/services/${SERVICE}.conf"
 		[ -e "/etc/systemd/system/${SERVICE}.service" ] && rm "/etc/systemd/system/${SERVICE}.service"
-		[ -e "/etc/systemd/system/${SERVICE}.service.d/override.conf" ] && rm "/etc/systemd/system/${SERVICE}.service.d/override.conf"
+		[ -e "/etc/systemd/system/${SERVICE}.service.d" ] && rm -r "/etc/systemd/system/${SERVICE}.service.d"
 	done
+	[ -e "/etc/systemd/system/ark-updater.service" ] && rm "/etc/systemd/system/ark-updater.service"
 	[ -e "$GAME_DIR/services" ] && rm "$GAME_DIR/services" -r
 
 	echo "Removing application data"
