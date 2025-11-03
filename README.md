@@ -7,6 +7,8 @@ Help fund the project
 Wanna chat?  [hit up our Discord](https://discord.gg/jyFsweECPb) or see [what other projects I'm up to](https://bitsnbytes.dev/authors/cdp1337.html)
 
 
+[![Installer in action](docs/ark-ascended-installer.gif)](docs/ark-ascended-installer.mp4)
+
 ## What does it do?
 
 This script will:
