@@ -27,6 +27,7 @@
 #   OPT_RESET_PROTON=--reset-proton - Reset proton directories back to default
 #   OPT_FORCE_REINSTALL=--force-reinstall - Force a reinstall of the game binaries, mods, and engine
 #   OPT_UNINSTALL=--uninstall - Uninstall the game server
+#   OPT_INSTALL_CUSTOM_MAP=--install-custom-map - Install a custom map (in addition to the defaults)
 #
 # Changelog:
 #   20251102 - Add support for uninstalling the server and all data
@@ -89,11 +90,15 @@ PROTON_BIN="/opt/script-collection/GE-Proton${PROTON_VERSION}/proton"
 STEAM_ID="2430930"
 # List of game maps currently available
 GAME_MAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter ark-extinction ark-astraeos ark-ragnarok ark-valguero"
+# How many base maps are installed by default (needed for the custom map logic)
+BASE_MAP_COUNT=9
 # Range of game ports to enable in the firewall
 PORT_GAME_START=7701
 PORT_GAME_END=7709
 PORT_RCON_START=27001
 PORT_RCON_END=27009
+PORT_CUSTOM_GAME=7801
+PORT_CUSTOM_RCON=27101
 
 # compile:argparse
 # scriptlet:_common/require_root.sh
@@ -270,6 +275,11 @@ if [ "$INSTALLTYPE" == "new" ]; then
 	if [ "$COMMUNITYNAME" == "" ]; then
 		COMMUNITYNAME="My Awesome ARK Server"
 	fi
+elif [ -e "$GAME_DIR/services/ark-island.conf" ]; then
+	# To support custom maps, load the existing community name from the island map service file.
+	COMMUNITYNAME="$(egrep '^ExecStart' services/ark-island.conf | sed 's:.*SessionName="\([^"]*\) (.*:\1:')"
+else
+	COMMUNITYNAME="My Awesome ARK Server"
 fi
 
 # Support legacy vs newsave formats
@@ -277,7 +287,6 @@ fi
 # Legacy formats use individual files for each character whereas
 # "new" formats save all characters along with the map.
 echo ''
-NEWFORMAT=0
 if [ "$INSTALLTYPE" == "new" ]; then
 	echo "? Will you be migrating an existing Nitrado or Wildcard server? "
 	echo "(answering yes will enable the new save format)"
@@ -288,6 +297,17 @@ if [ "$INSTALLTYPE" == "new" ]; then
 	else
 		NEWFORMAT=0
 	fi
+elif [ -e "$GAME_DIR/services/ark-island.conf" ]; then
+	if grep -q '-newsaveformat' "$GAME_DIR/services/ark-island.conf"; then
+		echo "Using new save format for existing installation"
+		NEWFORMAT=1
+	else
+		echo "Using legacy save format for existing installation"
+		NEWFORMAT=0
+	fi
+else
+	echo "Using legacy save format for existing installation"
+	NEWFORMAT=0
 fi
 
 echo ''
@@ -363,6 +383,51 @@ else
 	fi
 fi
 
+if [ $OPT_INSTALL_CUSTOM_MAP -eq 1 ]; then
+	echo ''
+	echo "Please enter the Mod ID of the custom map to install."
+	echo "This is also called 'Project ID' on Curseforge."
+	echo -n "> : "
+	read CUSTOM_MAP_ID
+
+	if [ -z "$CUSTOM_MAP_ID" ]; then
+		echo "No Mod ID specified, cannot continue with custom map installation."
+		exit 1
+	fi
+
+	echo ''
+	echo "Please enter the Map Name to install."
+	echo "This is usually listed on the Curseforge description page."
+	echo -n "> : "
+	read CUSTOM_MAP_NAME
+
+	if [ -z "$CUSTOM_MAP_NAME" ]; then
+		echo "No Map Name specified, cannot continue with custom map installation."
+		exit 1
+	fi
+
+	# Custom maps usually end in "_WP", so trim that for the description if it's set.
+	if [ "${CUSTOM_MAP_NAME:${#CUSTOM_MAP_NAME}-3}" == "_WP" ]; then
+		CUSTOM_MAP_DESC="${CUSTOM_MAP_NAME:0:${#CUSTOM_MAP_NAME}-3}"
+	else
+		CUSTOM_MAP_DESC="${CUSTOM_MAP_NAME}"
+	fi
+
+	CUSTOM_MAP_MAP="ark-$(echo "$CUSTOM_MAP_NAME" | tr '[:upper:]' '[:lower:]')"
+
+	if [ -e "$GAME_DIR/services" ]; then
+		C=$(ls "$GAME_DIR/services" -1 | wc -l)
+		let "CUSTOM_MAP_PORT=$C-$BASE_MAP_COUNT+$PORT_CUSTOM_GAME"
+		let "CUSTOM_RCON_PORT=$C-$BASE_MAP_COUNT+$PORT_CUSTOM_RCON"
+	else
+		CUSTOM_MAP_PORT=$PORT_CUSTOM_GAME
+		CUSTOM_RCON_PORT=$PORT_CUSTOM_RCON
+	fi
+
+	# Add the custom map to the list of maps to install
+	GAME_MAPS="$GAME_MAPS CUSTOM"
+fi
+
 
 ############################################
 ## Dependency Installation and Setup
@@ -412,6 +477,10 @@ install_proton "$PROTON_VERSION"
 ## Release 2023.10.31 - Issue #8
 # Preserve customizations to service file
 for MAP in $GAME_MAPS; do
+	if [ "$MAP" == "CUSTOM" ]; then
+		MAP="$CUSTOM_MAP_MAP"
+	fi
+
 	# Ensure the override directory exists for the admin modifications to the CLI arguments.
 	[ -e /etc/systemd/system/${MAP}.service.d ] || mkdir -p /etc/systemd/system/${MAP}.service.d
 
@@ -483,7 +552,11 @@ if [ $OPT_FORCE_REINSTALL -eq 1 ]; then
 fi
 
 # Admin pass, used on new installs and shared across all maps
-ADMIN_PASS="$(random_password)"
+if [ -e "$GAME_DIR/services/ark-island.conf" ]; then
+	ADMIN_PASS="$(grep -Eo 'ServerAdminPassword=[^? ]*' "$GAME_DIR/services/ark-island.conf" | sed 's:ServerAdminPassword=::')"
+else
+	ADMIN_PASS="$(random_password)"
+fi
 
 # Install ARK Survival Ascended Dedicated
 if [ $RUNNING -eq 1 ]; then
@@ -562,6 +635,13 @@ for MAP in $GAME_MAPS; do
 		MODS=""
 		GAMEPORT=7709
 		RCONPORT=27009
+	elif [ "$MAP" == "CUSTOM" ]; then
+		MAP="$CUSTOM_MAP_MAP"
+		DESC="$CUSTOM_MAP_DESC"
+		NAME="$CUSTOM_MAP_NAME"
+		MODS="$CUSTOM_MAP_ID"
+		GAMEPORT=$CUSTOM_MAP_PORT
+		RCONPORT=$CUSTOM_RCON_PORT
 	fi
 
 	if [ "$MODS" != "" ]; then
@@ -735,6 +815,10 @@ if [ "$MULTISERVER" -eq 1 -a "$ISPRIMARY" -eq 1 ]; then
 		firewall_allow --port "111,2049" --udp --zone internal --source $IP/32
 	done
 fi
+if [ $OPT_INSTALL_CUSTOM_MAP -eq 1 ]; then
+	firewall_allow --port "$CUSTOM_MAP_PORT" --udp
+	firewall_allow --port "$CUSTOM_RCON_PORT" --tcp
+fi
 
 
 ############################################
@@ -783,6 +867,9 @@ fi
 # Create some helpful links for the user.
 [ -e "$GAME_DIR/services" ] || sudo -u $GAME_USER mkdir -p "$GAME_DIR/services"
 for MAP in $GAME_MAPS; do
+	if [ "$MAP" == "CUSTOM" ]; then
+		MAP="$CUSTOM_MAP_MAP"
+	fi
 	[ -h "$GAME_DIR/services/${MAP}.conf" ] || sudo -u $GAME_USER ln -s /etc/systemd/system/${MAP}.service.d/override.conf "$GAME_DIR/services/${MAP}.conf"
 done
 [ -h "$GAME_DIR/GameUserSettings.ini" ] || sudo -u $GAME_USER ln -s $GAME_DIR/AppFiles/ShooterGame/Saved/Config/WindowsServer/GameUserSettings.ini "$GAME_DIR/GameUserSettings.ini"

@@ -10,7 +10,8 @@
         "syntax": [
             "--reset-proton - Reset proton directories back to default",
             "--force-reinstall - Force a reinstall of the game binaries, mods, and engine",
-            "--uninstall - Uninstall the game server"
+            "--uninstall - Uninstall the game server",
+            "--install-custom-map - Install a custom map (in addition to the defaults)"
         ],
         "default_timeout": "600",
         "shell": "shell",
