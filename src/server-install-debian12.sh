@@ -74,7 +74,7 @@
 ## Parameter Configuration
 ############################################
 
-INSTALLER_VERSION="v20251101"
+INSTALLER_VERSION="v20251102"
 # https://github.com/GloriousEggroll/proton-ge-custom
 PROTON_VERSION="9-22"
 GAME="ArkSurvivalAscended"
