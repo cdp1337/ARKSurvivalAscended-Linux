@@ -9,7 +9,8 @@
         "name": "Install ARK Survival Ascended Dedicated Server",
         "syntax": [
             "--reset-proton - Reset proton directories back to default",
-            "--force-reinstall - Force a reinstall of the game binaries, mods, and engine"
+            "--force-reinstall - Force a reinstall of the game binaries, mods, and engine",
+            "--uninstall - Uninstall the game server"
         ],
         "default_timeout": "600",
         "shell": "shell",

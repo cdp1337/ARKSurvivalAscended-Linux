@@ -26,8 +26,12 @@
 # Syntax:
 #   OPT_RESET_PROTON=--reset-proton - Reset proton directories back to default
 #   OPT_FORCE_REINSTALL=--force-reinstall - Force a reinstall of the game binaries, mods, and engine
+#   OPT_UNINSTALL=--uninstall - Uninstall the game server
 #
 # Changelog:
+#   20251102 - Add support for uninstalling the server and all data
+#            - Refactor how options are handled in the management console
+#            - Add support for backup/start/stop maps as arguments to the management console
 #   20251101 - Add support for Nitrado and Official server save formats
 #            - Fix for if mods library is missing
 #            - Add support for customizing all player messages
@@ -140,12 +144,17 @@ for MAP in $GAME_MAPS; do
 done
 
 if [ $RUNNING -eq 1 -a $OPT_RESET_PROTON -eq 1 ]; then
-	echo "Game server is still running, force reinstallation CAN NOT PROCEED"
+	echo "Game server is still running, proton reset CAN NOT PROCEED"
 	exit 1
 fi
 
 if [ $RUNNING -eq 1 -a $OPT_FORCE_REINSTALL -eq 1 ]; then
 	echo "Game server is still running, force reinstallation CAN NOT PROCEED"
+	exit 1
+fi
+
+if [ $RUNNING -eq 1 -a $OPT_UNINSTALL -eq 1 ]; then
+	echo "Game server is still running, uninstallation CAN NOT PROCEED"
 	exit 1
 fi
 
@@ -175,14 +184,84 @@ else
 fi
 
 
+echo "================================================================================"
+echo "         	  ARK Survival Ascended *unofficial* Installer $INSTALLER_VERSION"
+echo ""
+
+
+############################################
+## Uninstallation
+############################################
+if [ $OPT_UNINSTALL -eq 1 ]; then
+	echo "? This will remove all game binary content"
+	echo -n "> (y/N): "
+	read CONFIRM
+	if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
+		exit
+	fi
+
+	echo "? This will remove all player and map data"
+	echo -n "> (y/N): "
+	read CONFIRM
+	if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
+		exit
+	fi
+
+	echo "? This will remove all service registration files"
+	echo -n "> (y/N): "
+	read CONFIRM
+	if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
+		exit
+	fi
+
+	if [ -e "$GAME_DIR/backup.sh" ]; then
+		echo "? Would you like to perform a backup before everything is wiped?"
+		echo -n "> (y/N): "
+		read CONFIRM
+		if [ "$CONFIRM" == "y" -o "$CONFIRM" == "Y" ]; then
+			$GAME_DIR/backup.sh
+		fi
+	fi
+
+	echo "Removing proton prefixes"
+	[ -e "$GAME_DIR/prefixes" ] && rm "$GAME_DIR/prefixes" -r
+
+	echo "Removing service files"
+	ls -1 "$GAME_DIR/services" | while read SERVICE; do
+		SERVICE="${SERVICE:0:-5}"
+		systemctl disable $SERVICE
+		[ -h "$GAME_DIR/services/${SERVICE}.conf" ] && unlink "$GAME_DIR/services/${SERVICE}.conf"
+		[ -e "/etc/systemd/system/${SERVICE}.service" ] && rm "/etc/systemd/system/${SERVICE}.service"
+		[ -e "/etc/systemd/system/${SERVICE}.service.d/override.conf" ] && rm "/etc/systemd/system/${SERVICE}.service.d/override.conf"
+	done
+	[ -e "$GAME_DIR/services" ] && rm "$GAME_DIR/services" -r
+
+	echo "Removing application data"
+	[ -e "$GAME_DIR/AppFiles" ] && rm -r "$GAME_DIR/AppFiles"
+
+	echo "Removing management system"
+	[ -h "$GAME_DIR/admins.txt" ] && unlink "$GAME_DIR/admins.txt"
+	[ -h "$GAME_DIR/Game.ini" ] && unlink "$GAME_DIR/Game.ini"
+	[ -h "$GAME_DIR/GameUserSettings.ini" ] && unlink "$GAME_DIR/GameUserSettings.ini"
+	[ -h "$GAME_DIR/PlayersJoinNoCheckList.txt" ] && unlink "$GAME_DIR/PlayersJoinNoCheckList.txt"
+	[ -h "$GAME_DIR/ShooterGame.log" ] && unlink "$GAME_DIR/ShooterGame.log"
+	[ -e "$GAME_DIR/manage.py" ] && rm "$GAME_DIR/manage.py"
+	[ -e "$GAME_DIR/backup.sh" ] && rm "$GAME_DIR/backup.sh"
+	[ -e "$GAME_DIR/restore.sh" ] && rm "$GAME_DIR/restore.sh"
+	[ -e "$GAME_DIR/start_all.sh" ] && rm "$GAME_DIR/start_all.sh"
+	[ -e "$GAME_DIR/stop_all.sh" ] && rm "$GAME_DIR/stop_all.sh"
+	[ -e "$GAME_DIR/update.sh" ] && rm "$GAME_DIR/update.sh"
+	[ -e "$GAME_DIR/.venv" ] && rm "$GAME_DIR/.venv" -r
+
+	exit
+fi
+
+
 ############################################
 ## User Prompts (pre setup)
 ############################################
 
 # Ask the user some information before installing.
-echo "================================================================================"
-echo "         	  ARK Survival Ascended *unofficial* Installer $INSTALLER_VERSION"
-echo ""
 if [ "$INSTALLTYPE" == "new" ]; then
 	echo "? What is the community name of the server? (e.g. My Awesome ARK Server)"
 	echo -n "> "
@@ -354,6 +433,18 @@ done
 
 
 ############################################
+## Installer Save (for uninstalling/upgrading/etc)
+############################################
+
+if [ "${0:0:8}" == "/dev/fd/" ]; then
+	# Script was dynamically loaded, save a copy for future reference
+	echo "Saving installer script for future reference..."
+	wget -O "$GAME_DIR/installer.sh" "https://raw.githubusercontent.com/cdp1337/ARKSurvivalAscended-Linux/refs/tags/${INSTALLER_VERSION}/dist/server-install-debian12.sh"
+	chmod +x "$GAME_DIR/installer.sh"
+fi
+
+
+############################################
 ## Game Installation
 ############################################
 
@@ -364,18 +455,18 @@ if [ $OPT_FORCE_REINSTALL -eq 1 ]; then
 	if [ -e "$GAME_DIR/AppFiles/Engine" ]; then
 		echo "Removing Engine..."
 		rm -fr "$GAME_DIR/AppFiles/Engine"
-    fi
+	fi
 
-    echo "Removing Manifest files..."
-    rm -f "$GAME_DIR/AppFiles/Manifest_DebugFiles_Win64.txt"
-    rm -f "$GAME_DIR/AppFiles/Manifest_NonUFSFiles_Win64.txt"
-    rm -f "$GAME_DIR/AppFiles/Manifest_UFSFiles_Win64.txt"
+	echo "Removing Manifest files..."
+	rm -f "$GAME_DIR/AppFiles/Manifest_DebugFiles_Win64.txt"
+	rm -f "$GAME_DIR/AppFiles/Manifest_NonUFSFiles_Win64.txt"
+	rm -f "$GAME_DIR/AppFiles/Manifest_UFSFiles_Win64.txt"
 
 	if [ -e "$GAME_DIR/AppFiles/ShooterGame/Binaries" ]; then
 		echo "Removing ShooterGame binaries..."
 		rm -fr "$GAME_DIR/AppFiles/ShooterGame/Binaries"
-    fi
-    if [ -e "$GAME_DIR/AppFiles/ShooterGame/Content" ]; then
+	fi
+	if [ -e "$GAME_DIR/AppFiles/ShooterGame/Content" ]; then
 		echo "Removing ShooterGame content..."
 		rm -fr "$GAME_DIR/AppFiles/ShooterGame/Content"
 	fi
@@ -387,7 +478,7 @@ if [ $OPT_FORCE_REINSTALL -eq 1 ]; then
 	if [ -e "$GAME_DIR/AppFiles/steamapps" ]; then
 		echo "Removing Steam meta files..."
 		rm -fr "$GAME_DIR/AppFiles/steamapps"
-    fi
+	fi
 fi
 
 # Admin pass, used on new installs and shared across all maps
@@ -532,19 +623,21 @@ systemctl daemon-reload
 systemctl enable ark-updater
 
 
+# As of v2025.11.02 this script has been ported to the management console.
 # Create start/stop helpers for all maps
-cat > $GAME_DIR/start_all.sh <<EOF
-# script:start_all.sh
-EOF
-chown $GAME_USER:$GAME_USER $GAME_DIR/start_all.sh
-chmod +x $GAME_DIR/start_all.sh
+#cat > $GAME_DIR/start_all.sh <<EOF
+## script:start_all.sh
+#EOF
+#chown $GAME_USER:$GAME_USER $GAME_DIR/start_all.sh
+#chmod +x $GAME_DIR/start_all.sh
 
 
-cat > $GAME_DIR/stop_all.sh <<EOF
-# script:stop_all.sh
-EOF
-chown $GAME_USER:$GAME_USER $GAME_DIR/stop_all.sh
-chmod +x $GAME_DIR/stop_all.sh
+# As of v2025.11.02 this script has been ported to the management console.
+#cat > $GAME_DIR/stop_all.sh <<EOF
+## script:stop_all.sh
+#EOF
+#chown $GAME_USER:$GAME_USER $GAME_DIR/stop_all.sh
+#chmod +x $GAME_DIR/stop_all.sh
 
 
 # Install a management script

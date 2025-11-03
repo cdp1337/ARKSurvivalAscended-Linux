@@ -51,7 +51,7 @@ By default, any enabled game map will **automatically start at boot**!
 
 A management console (manage.py) is included for managing all maps in the cluster.
 
-Scripts start_all, stop_all, update, backup, and restore are included
+Scripts for starting all, stopping all, updating, backing up user data, and restoring user data are included
 for administration tasks.
 
 Sets up multiple maps on a single install, and **all of them can run at the same time**
@@ -103,18 +103,20 @@ Quick note for Debian users; you need sudo installed to run the above command.
 
 ### Advanced Usage
 
-Download the script and retain for later management use.
+As of v2025.11.02, the installation script will be saved in `/home/steam/ArkSurvivalAscended/`.
+This script can be used to fix proton, force a reinstall, or uninstall the game completely.
 
 ```bash
-wget https://raw.githubusercontent.com/cdp1337/ARKSurvivalAscended-Linux/main/dist/server-install-debian12.sh
-chmod +x server-install-debian12.sh
-
 # Reset and rebuild proton directories (if the prefix gets corrupted somehow)
-sudo ./server-install-debian12.sh --reset-proton
+sudo /home/steam/ArkSurvivalAscended/installer.sh --reset-proton
 
 # Force reinstall game binaries, (useful after a major update when Wildcard breaks the build)
 # This will NOT remove your save data!
-sudo ./server-install-debian12.sh --force-reinstall
+sudo /home/steam/ArkSurvivalAscended/installer.sh --force-reinstall
+
+# Completely uninstall the game server and all player data
+# This WILL wipe all save data!!!
+sudo /home/steam/ArkSurvivalAscended/installer.sh --uninstall
 ```
 
 Re-running the installation script on an existing server **is safe** and will **not** overwrite 
@@ -393,9 +395,13 @@ You can use your native archive manager to view these files, or 7-zip, winrar, e
 
 (As of v2025.10.19 this functionality is also available within the management interface)
 
+As of v2025.11.02, running the `--backup` option on the management console will safely stop any running map
+prior to initiating a backup, followed by starting any `enabled` maps after the backup is complete.
+
 ```bash
-./backup.sh 
-Created backup /home/steam/ArkSurvivalAscended/backups/ArkSurvivalAscended-2025-05-05_13-04.tgz
+sudo /home/steam/ArkSurvivalAscended/manage.py --backup
+
+# Created backup /home/steam/ArkSurvivalAscended/backups/ArkSurvivalAscended-2025-05-05_13-04.tgz
 ```
 
 To migrate this game data to another server running this system, you can copy that tarball to
@@ -403,10 +409,11 @@ To migrate this game data to another server running this system, you can copy th
 and run:
 
 ```bash
-./restore.sh backups/ArkSurvivalAscended-2025-05-05_09-05.tgz 
-Extracting backups/ArkSurvivalAscended-2025-05-05_09-05.tgz
-Restoring service files
-Ensuring permissions
+sudo /home/steam/ArkSurvivalAscended/restore.sh /home/steam/ArkSurvivalAscended/backups/ArkSurvivalAscended-2025-05-05_09-05.tgz
+ 
+# Extracting backups/ArkSurvivalAscended-2025-05-05_09-05.tgz
+# Restoring service files
+# Ensuring permissions
 ```
 
 Feel free to read through [some advanced usages](docs/advanced-usage.md) for more information on

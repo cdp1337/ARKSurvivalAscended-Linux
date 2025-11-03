@@ -26,8 +26,12 @@
 # Syntax:
 #   --reset-proton - Reset proton directories back to default
 #   --force-reinstall - Force a reinstall of the game binaries, mods, and engine
+#   --uninstall - Uninstall the game server
 #
 # Changelog:
+#   20251102 - Add support for uninstalling the server and all data
+#            - Refactor how options are handled in the management console
+#            - Add support for backup/start/stop maps as arguments to the management console
 #   20251101 - Add support for Nitrado and Official server save formats
 #            - Fix for if mods library is missing
 #            - Add support for customizing all player messages
@@ -94,10 +98,12 @@ PORT_RCON_END=27009
 # Parse arguments
 OPT_RESET_PROTON=0
 OPT_FORCE_REINSTALL=0
+OPT_UNINSTALL=0
 while [ "$#" -gt 0 ]; do
 	case "$1" in
 		--reset-proton) OPT_RESET_PROTON=1; shift 1;;
 		--force-reinstall) OPT_FORCE_REINSTALL=1; shift 1;;
+		--uninstall) OPT_UNINSTALL=1; shift 1;;
 	esac
 done
 
@@ -621,12 +627,17 @@ for MAP in $GAME_MAPS; do
 done
 
 if [ $RUNNING -eq 1 -a $OPT_RESET_PROTON -eq 1 ]; then
-	echo "Game server is still running, force reinstallation CAN NOT PROCEED"
+	echo "Game server is still running, proton reset CAN NOT PROCEED"
 	exit 1
 fi
 
 if [ $RUNNING -eq 1 -a $OPT_FORCE_REINSTALL -eq 1 ]; then
 	echo "Game server is still running, force reinstallation CAN NOT PROCEED"
+	exit 1
+fi
+
+if [ $RUNNING -eq 1 -a $OPT_UNINSTALL -eq 1 ]; then
+	echo "Game server is still running, uninstallation CAN NOT PROCEED"
 	exit 1
 fi
 
@@ -656,14 +667,84 @@ else
 fi
 
 
+echo "================================================================================"
+echo "         	  ARK Survival Ascended *unofficial* Installer $INSTALLER_VERSION"
+echo ""
+
+
+############################################
+## Uninstallation
+############################################
+if [ $OPT_UNINSTALL -eq 1 ]; then
+	echo "? This will remove all game binary content"
+	echo -n "> (y/N): "
+	read CONFIRM
+	if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
+		exit
+	fi
+
+	echo "? This will remove all player and map data"
+	echo -n "> (y/N): "
+	read CONFIRM
+	if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
+		exit
+	fi
+
+	echo "? This will remove all service registration files"
+	echo -n "> (y/N): "
+	read CONFIRM
+	if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
+		exit
+	fi
+
+	if [ -e "$GAME_DIR/backup.sh" ]; then
+		echo "? Would you like to perform a backup before everything is wiped?"
+		echo -n "> (y/N): "
+		read CONFIRM
+		if [ "$CONFIRM" == "y" -o "$CONFIRM" == "Y" ]; then
+			$GAME_DIR/backup.sh
+		fi
+	fi
+
+	echo "Removing proton prefixes"
+	[ -e "$GAME_DIR/prefixes" ] && rm "$GAME_DIR/prefixes" -r
+
+	echo "Removing service files"
+	ls -1 "$GAME_DIR/services" | while read SERVICE; do
+		SERVICE="${SERVICE:0:-5}"
+		systemctl disable $SERVICE
+		[ -h "$GAME_DIR/services/${SERVICE}.conf" ] && unlink "$GAME_DIR/services/${SERVICE}.conf"
+		[ -e "/etc/systemd/system/${SERVICE}.service" ] && rm "/etc/systemd/system/${SERVICE}.service"
+		[ -e "/etc/systemd/system/${SERVICE}.service.d/override.conf" ] && rm "/etc/systemd/system/${SERVICE}.service.d/override.conf"
+	done
+	[ -e "$GAME_DIR/services" ] && rm "$GAME_DIR/services" -r
+
+	echo "Removing application data"
+	[ -e "$GAME_DIR/AppFiles" ] && rm -r "$GAME_DIR/AppFiles"
+
+	echo "Removing management system"
+	[ -h "$GAME_DIR/admins.txt" ] && unlink "$GAME_DIR/admins.txt"
+	[ -h "$GAME_DIR/Game.ini" ] && unlink "$GAME_DIR/Game.ini"
+	[ -h "$GAME_DIR/GameUserSettings.ini" ] && unlink "$GAME_DIR/GameUserSettings.ini"
+	[ -h "$GAME_DIR/PlayersJoinNoCheckList.txt" ] && unlink "$GAME_DIR/PlayersJoinNoCheckList.txt"
+	[ -h "$GAME_DIR/ShooterGame.log" ] && unlink "$GAME_DIR/ShooterGame.log"
+	[ -e "$GAME_DIR/manage.py" ] && rm "$GAME_DIR/manage.py"
+	[ -e "$GAME_DIR/backup.sh" ] && rm "$GAME_DIR/backup.sh"
+	[ -e "$GAME_DIR/restore.sh" ] && rm "$GAME_DIR/restore.sh"
+	[ -e "$GAME_DIR/start_all.sh" ] && rm "$GAME_DIR/start_all.sh"
+	[ -e "$GAME_DIR/stop_all.sh" ] && rm "$GAME_DIR/stop_all.sh"
+	[ -e "$GAME_DIR/update.sh" ] && rm "$GAME_DIR/update.sh"
+	[ -e "$GAME_DIR/.venv" ] && rm "$GAME_DIR/.venv" -r
+
+	exit
+fi
+
+
 ############################################
 ## User Prompts (pre setup)
 ############################################
 
 # Ask the user some information before installing.
-echo "================================================================================"
-echo "         	  ARK Survival Ascended *unofficial* Installer $INSTALLER_VERSION"
-echo ""
 if [ "$INSTALLTYPE" == "new" ]; then
 	echo "? What is the community name of the server? (e.g. My Awesome ARK Server)"
 	echo -n "> "
@@ -835,6 +916,18 @@ done
 
 
 ############################################
+## Installer Save (for uninstalling/upgrading/etc)
+############################################
+
+if [ "${0:0:8}" == "/dev/fd/" ]; then
+	# Script was dynamically loaded, save a copy for future reference
+	echo "Saving installer script for future reference..."
+	wget -O "$GAME_DIR/installer.sh" "https://raw.githubusercontent.com/cdp1337/ARKSurvivalAscended-Linux/refs/tags/${INSTALLER_VERSION}/dist/server-install-debian12.sh"
+	chmod +x "$GAME_DIR/installer.sh"
+fi
+
+
+############################################
 ## Game Installation
 ############################################
 
@@ -845,18 +938,18 @@ if [ $OPT_FORCE_REINSTALL -eq 1 ]; then
 	if [ -e "$GAME_DIR/AppFiles/Engine" ]; then
 		echo "Removing Engine..."
 		rm -fr "$GAME_DIR/AppFiles/Engine"
-    fi
+	fi
 
-    echo "Removing Manifest files..."
-    rm -f "$GAME_DIR/AppFiles/Manifest_DebugFiles_Win64.txt"
-    rm -f "$GAME_DIR/AppFiles/Manifest_NonUFSFiles_Win64.txt"
-    rm -f "$GAME_DIR/AppFiles/Manifest_UFSFiles_Win64.txt"
+	echo "Removing Manifest files..."
+	rm -f "$GAME_DIR/AppFiles/Manifest_DebugFiles_Win64.txt"
+	rm -f "$GAME_DIR/AppFiles/Manifest_NonUFSFiles_Win64.txt"
+	rm -f "$GAME_DIR/AppFiles/Manifest_UFSFiles_Win64.txt"
 
 	if [ -e "$GAME_DIR/AppFiles/ShooterGame/Binaries" ]; then
 		echo "Removing ShooterGame binaries..."
 		rm -fr "$GAME_DIR/AppFiles/ShooterGame/Binaries"
-    fi
-    if [ -e "$GAME_DIR/AppFiles/ShooterGame/Content" ]; then
+	fi
+	if [ -e "$GAME_DIR/AppFiles/ShooterGame/Content" ]; then
 		echo "Removing ShooterGame content..."
 		rm -fr "$GAME_DIR/AppFiles/ShooterGame/Content"
 	fi
@@ -868,7 +961,7 @@ if [ $OPT_FORCE_REINSTALL -eq 1 ]; then
 	if [ -e "$GAME_DIR/AppFiles/steamapps" ]; then
 		echo "Removing Steam meta files..."
 		rm -fr "$GAME_DIR/AppFiles/steamapps"
-    fi
+	fi
 fi
 
 # Admin pass, used on new installs and shared across all maps
@@ -1105,91 +1198,21 @@ systemctl daemon-reload
 systemctl enable ark-updater
 
 
+# As of v2025.11.02 this script has been ported to the management console.
 # Create start/stop helpers for all maps
-cat > $GAME_DIR/start_all.sh <<EOF
-#!/bin/bash
-#
-# Start all ARK server maps that are enabled
-# DYNAMICALLY GENERATED FILE! Edit at your own risk
-
-# List of all maps available on this platform
-GAME_MAPS="$GAME_MAPS"
-GAME_USER="$GAME_USER"
-GAME_DIR="$GAME_DIR"
-STEAM_ID="$STEAM_ID"
-
-function start_game {
-	echo "Starting game instance \$1..."
-	sudo systemctl start \$1
-	echo "Waiting 30 seconds for threads to start"
-	for i in {0..9}; do
-		sleep 3
-		echo -n '.'
-	done
-	# Check status real quick
-	sudo systemctl status \$1 | grep Active
-}
-
-function update_game {
-	echo "Running game update"
-	sudo -u \$GAME_USER /usr/games/steamcmd +force_install_dir \$GAME_DIR/AppFiles +login anonymous +app_update \$STEAM_ID validate +quit
-	if [ \$? -ne 0 ]; then
-		echo "Game update failed, not starting"
-		exit 1
-	fi
-}
-
-RUNNING=0
-for MAP in \$GAME_MAPS; do
-	if [ "\$(systemctl is-active \$MAP)" == "active" ]; then
-		RUNNING=1
-	fi
-done
-if [ \$RUNNING -eq 0 ]; then
-	update_game
-else
-	echo "Game server is already running, not updating"
-fi
-
-for MAP in \$GAME_MAPS; do
-	if [ "\$(systemctl is-enabled \$MAP)" == "enabled" -a "\$(systemctl is-active \$MAP)" == "inactive" ]; then
-		start_game \$MAP
-	fi
-done
-EOF
-chown $GAME_USER:$GAME_USER $GAME_DIR/start_all.sh
-chmod +x $GAME_DIR/start_all.sh
+#cat > $GAME_DIR/start_all.sh <<EOF
+## script:start_all.sh
+#EOF
+#chown $GAME_USER:$GAME_USER $GAME_DIR/start_all.sh
+#chmod +x $GAME_DIR/start_all.sh
 
 
-cat > $GAME_DIR/stop_all.sh <<EOF
-#!/bin/bash
-#
-# Stop all ARK server maps that are enabled
-# DYNAMICALLY GENERATED FILE! Edit at your own risk
-
-# List of all maps available on this platform
-GAME_MAPS="$GAME_MAPS"
-
-function stop_game {
-	echo "Stopping game instance \$1..."
-	sudo systemctl stop \$1
-	echo "Waiting 10 seconds for threads to settle"
-	for i in {0..9}; do
-		echo -n '.'
-		sleep 1
-	done
-	# Check status real quick
-	sudo systemctl status \$1 | grep Active
-}
-
-for MAP in \$GAME_MAPS; do
-	if [ "\$(systemctl is-enabled \$MAP)" == "enabled" -a "\$(systemctl is-active \$MAP)" == "active" ]; then
-		stop_game \$MAP
-	fi
-done
-EOF
-chown $GAME_USER:$GAME_USER $GAME_DIR/stop_all.sh
-chmod +x $GAME_DIR/stop_all.sh
+# As of v2025.11.02 this script has been ported to the management console.
+#cat > $GAME_DIR/stop_all.sh <<EOF
+## script:stop_all.sh
+#EOF
+#chown $GAME_USER:$GAME_USER $GAME_DIR/stop_all.sh
+#chmod +x $GAME_DIR/stop_all.sh
 
 
 # Install a management script
@@ -1402,27 +1425,21 @@ class Services:
 				self.runner = extracted_keys.group('runner')
 				self.map = extracted_keys.group('map').strip()
 				self.session = extracted_keys.group('session')
-				self.rcon = None
-				self.rcon_enabled = None
-				self.admin_password = None
 				self.port = None
 				self.mods = []
 				self.cluster_id = None
 				self.other_options = ''
 				self.other_flags = ''
+				self.options = {}
 
 				options = extracted_keys.group('options').split('?')
 				flags = extracted_keys.group('flags').split(' ')
 
 				for option in options:
-					if option.startswith('RCONPort='):
-						self.rcon = option[9:]
-					elif option.startswith('RCONEnabled='):
-						self.rcon_enabled = option[12:] == 'True'
-					elif option.startswith('ServerAdminPassword='):
-						self.admin_password = option[20:]
-					else:
-						self.other_options += option + '?'
+					if '=' in option:
+						# Split each option and flag into their respective variables
+						opt_key, opt_val = option.split('=', 1)
+						self.options[opt_key] = opt_val
 
 				for flag in flags:
 					if flag.startswith('-port='):
@@ -1437,16 +1454,6 @@ class Services:
 					else:
 						self.other_flags += flag + ' '
 
-				# Try to load some info from ini if necessary
-				ini_file = os.path.join(here, 'AppFiles', 'ShooterGame', 'Saved', 'Config', 'WindowsServer', 'GameUserSettings.ini')
-				if os.path.exists(ini_file):
-					with open(ini_file, 'r') as ini:
-						for line in ini.readlines():
-							if self.admin_password is None and line.startswith('ServerAdminPassword='):
-								self.admin_password = line[20:].strip()
-							if self.rcon_enabled is None and line.startswith('RCONEnabled='):
-								self.rcon_enabled = line[12:].strip() == 'True'
-
 	def save(self):
 		"""
 		Save the service definition back to the service file
@@ -1456,15 +1463,12 @@ class Services:
 		options = '?'.join([
 			self.map,
 			'listen',
-			'SessionName="%s"' % self.session,
-			'RCONPort=%s' % self.rcon
+			'SessionName="%s"' % self.session
 		])
-		if self.admin_password:
-			options += '?ServerAdminPassword=%s' % self.admin_password
-		if self.rcon_enabled is not None:
-			options += '?RCONEnabled=%s' % ('True' if self.rcon_enabled else 'False')
-		if self.other_options:
-			options += '?' + self.other_options
+
+		for key, val in self.options.items():
+			if val != '':
+				options += '?%s=%s' % (key, val)
 
 		# Strip excessive question marks
 		options = options.replace('????', '?')
@@ -1503,12 +1507,14 @@ class Services:
 			# If service is not running, don't even try to connect.
 			return None
 
-		if not self.admin_password:
-			# No admin password set, unable to retrieve any data
+		if not self.is_rcon_available():
+			# RCON is not available due to settings
 			return None
 
 		try:
-			with Client('127.0.0.1', int(self.rcon), passwd=self.admin_password, timeout=2) as client:
+			port = int(self.get_option('RCONPort', only_override=True))
+			pswd = self.get_option('ServerAdminPassword')
+			with Client('127.0.0.1', port, passwd=pswd, timeout=2) as client:
 				return client.run(cmd).strip()
 		except:
 			return None
@@ -1575,6 +1581,17 @@ class Services:
 			['systemctl', 'is-active', self.name],
 			stdout=subprocess.PIPE
 		).stdout.decode().strip() == 'active'
+
+	def is_rcon_available(self) -> bool:
+		"""
+		Check if RCON is enabled for this service
+		:return:
+		"""
+		return (
+			self.get_option('RCONEnabled') == 'True' and
+			self.get_option('RCONPort', only_override=True) != '' and
+			self.get_option('ServerAdminPassword') != ''
+		)
 
 	def enable(self):
 		"""
@@ -1738,6 +1755,57 @@ class Services:
 		else:
 			return 0
 
+	def get_option(self, key: str, only_override: bool = False) -> str:
+		"""
+		Get a specific configuration option for this service,
+		from either the service definition or the shared settings.
+		:param key: Option key to retrieve
+		:param only_override: Set to True to only check the service definition
+		:return:
+		"""
+		if key in self.options:
+			return self.options[key]
+		elif not only_override and shared_settings is not None:
+			return shared_settings['ServerSettings'].get(key, '')
+		else:
+			return ''
+
+	def get_options(self) -> str:
+		"""
+		Get all local-defined options as a formatted string
+		:return:
+		"""
+		opts = []
+		for key, val in self.options.items():
+			# Hide system options
+			if key in ('RCONEnabled', 'RCONPort', 'ServerAdminPassword'):
+				continue
+			if val != '':
+				opts.append('%s=%s' % (key, val))
+
+		return '?'.join(opts)
+
+	def set_options(self, opts: str):
+		"""
+		Set all local-defined options from a formatted string
+		:param opts:
+		:return:
+		"""
+		# Preserve system options
+		options = {}
+		for key in ('RCONEnabled', 'RCONPort', 'ServerAdminPassword'):
+			val = self.get_option(key, True)
+			if val != '':
+				options[key] = val
+
+		self.options = options
+		opts = opts.split('?')
+		for option in opts:
+			if '=' in option:
+				# Split each option and flag into their respective variables
+				opt_key, opt_val = option.split('=', 1)
+				self.options[opt_key] = opt_val
+
 
 class Table:
 	"""
@@ -1800,13 +1868,13 @@ class Table:
 				elif col == 'port':
 					row.append(service.port)
 				elif col == 'rcon':
-					row.append(service.rcon if service.rcon_enabled else 'N/A')
+					row.append(service.get_option('RCONPort', True) if service.is_rcon_available() else 'N/A')
 				elif col == 'enabled':
 					row.append('✅ Enabled' if service.is_enabled() else '❌ Disabled')
 				elif col == 'running':
 					row.append('✅ Running' if service.is_running() else '❌ Stopped')
 				elif col == 'admin_password':
-					row.append(service.admin_password or '')
+					row.append(service.get_option('ServerAdminPassword'))
 				elif col == 'players':
 					v = service.rcon_get_number_players()
 					row.append(str(v) if v is not None else 'N/A')
@@ -2053,7 +2121,7 @@ def safe_start(services, ignore_enabled = False):
 				if check_counter >= 120:
 					# After a bit of time, start checking if RCON is available.
 					# That is the indication that the server is ready.
-					if s.rcon_enabled:
+					if s.is_rcon_available():
 						players_connected = s.rcon_get_number_players()
 						if players_connected is None:
 							status_rcon = '❌'
@@ -2131,24 +2199,46 @@ def menu_service(service):
 
 		header('Service Details')
 		running = service.is_running()
-		if service.rcon_enabled and running:
+		if service.is_rcon_available() and running:
 			players = service.rcon_get_number_players()
 			if players is None:
 				players = 'N/A (unable to retrieve player count)'
 		else:
 			players = 'N/A'
 
-		print('Map:           %s' % service.map)
-		print('Session:       %s' % service.session)
-		print('Port:          %s (UDP)' % service.port)
-		print('RCON:          %s (TCP)' % service.rcon)
-		print('Auto-Start:    %s' % ('Yes' if service.is_enabled() else 'No'))
-		print('Status:        %s' % ('Running' if running else 'Stopped'))
-		print('Players:       %s' % players)
-		print('Mods:          %s' % '\n               '.join(service.get_mod_names()))
-		print('Cluster ID:    %s' % (service.cluster_id or ''))
-		print('Other Options: %s' % service.other_options)
-		print('Other Flags:   %s' % service.other_flags)
+		# Retrieve the WAN IP of this instance; can be useful for direct access.
+		req = request.Request('http://wan.eval.bz', headers={'User-Agent': 'ARK-Ascended-Management'}, method='GET')
+		try:
+			with request.urlopen(req) as resp:
+				wan = resp.read().decode('utf-8')
+		except urlerror.HTTPError:
+			wan = 'N/A'
+		except urlerror.URLError:
+			wan = 'N/A'
+		except json.JSONDecodeError:
+			wan = 'N/A'
+
+		print('Map:         %s' % service.map)
+		print('Session:     %s' % service.session)
+		print('WAN IP:      %s' % wan)
+		print('Port:        %s (UDP)' % service.port)
+		print('RCON:        %s (TCP)' % service.get_option('RCONPort', True))
+		print('Auto-Start:  %s' % ('Yes' if service.is_enabled() else 'No'))
+		print('Status:      %s' % ('Running' if running else 'Stopped'))
+		print('Players:     %s' % players)
+		print('Mods:        %s' % '\n             '.join(service.get_mod_names()))
+		print('Cluster ID:  %s' % (service.cluster_id or ''))
+		print('Options:     %s' % service.get_options())
+		print('Flags:       %s' % service.other_flags)
+		if running:
+			print('Memory:      %s' % service.get_memory_usage())
+			print('CPU:         %s' % service.get_cpu_usage())
+			print('Map Size:    %s MB' % service.get_map_file_size())
+			connect_pw = service.get_option('ServerPassword')
+			if connect_pw == '':
+				print('Connect Cmd: open %s:%s' % (wan, service.port))
+			else:
+				print('Connect Cmd: open %s:%s?%s' % (wan, service.port, connect_pw))
 		print('')
 
 		# Check for common recent issues with the server
@@ -2212,8 +2302,10 @@ def menu_service(service):
 			service.other_flags = val
 			service.save()
 		elif opt == 'o':
-			val = rlinput('Enter new options: ', service.other_options).strip()
-			service.other_options = val.strip('?')
+			print('')
+			print('Enter options for this map seperated by a question mark (?).')
+			val = rlinput('Enter new options: ', service.get_options()).strip()
+			service.set_options(val)
 			service.save()
 		elif opt == 's':
 			safe_start([service], True)
@@ -2339,18 +2431,18 @@ def menu_admin_password():
 			return
 		elif opt == 'e' and not running:
 			for s in services:
-				s.rcon_enabled = True
+				s.options['RCONEnabled'] = 'True'
 				s.save()
 		elif opt == 'd' and not running:
 			print('WARNING - disabling RCON will prevent clean shutdowns!')
 			for s in services:
-				s.rcon_enabled = False
+				s.options['RCONEnabled'] = 'False'
 				s.save()
 		elif opt == 'c' and not running:
 			val = input('Enter new password: ').strip()
 			if val:
 				for s in services:
-					s.admin_password = val.replace('"', '').replace(' ', '')
+					s.options['ServerAdminPassword'] = val.replace('"', '').replace(' ', '')
 					s.save()
 		else:
 			print('Invalid option')
@@ -2620,13 +2712,34 @@ if 'Discord' not in config.sections():
 if 'Messages' not in config.sections():
 	config['Messages'] = {}
 
+shared_settings = None
+shared_path = os.path.join(here, 'AppFiles', 'ShooterGame', 'Saved', 'Config', 'WindowsServer', 'GameUserSettings.ini')
+if os.path.exists(shared_path):
+	shared_settings = configparser.ConfigParser(strict=False)
+	shared_settings.read(shared_path)
+	if 'ServerSettings' not in shared_settings.sections():
+		shared_settings['ServerSettings'] = {}
+
 services = []
 services_path = os.path.join(here, 'services')
 for f in os.listdir(services_path):
 	if f.endswith('.conf'):
 		services.append(Services(os.path.join(services_path, f)))
 
-menu_main()
+
+if '--stop-all' in sys.argv:
+	safe_stop(services)
+elif '--backup' in sys.argv:
+	# Stop all services prior to backup
+	safe_stop(services)
+	# Run the backup procedure
+	subprocess.run([os.path.join(here, 'backup.sh')], stderr=sys.stderr, stdout=sys.stdout)
+	# Start all enabled service
+	safe_start(services)
+elif '--start-all' in sys.argv:
+	safe_start(services)
+else:
+	menu_main()
 EOF
 chown $GAME_USER:$GAME_USER $GAME_DIR/manage.py
 chmod +x $GAME_DIR/manage.py
