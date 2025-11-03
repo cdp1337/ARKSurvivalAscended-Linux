@@ -277,7 +277,7 @@ if [ "$INSTALLTYPE" == "new" ]; then
 	fi
 elif [ -e "$GAME_DIR/services/ark-island.conf" ]; then
 	# To support custom maps, load the existing community name from the island map service file.
-	COMMUNITYNAME="$(egrep '^ExecStart' services/ark-island.conf | sed 's:.*SessionName="\([^"]*\) (.*:\1:')"
+	COMMUNITYNAME="$(egrep '^ExecStart' "$GAME_DIR/services/ark-island.conf" | sed 's:.*SessionName="\([^"]*\) (.*:\1:')"
 else
 	COMMUNITYNAME="My Awesome ARK Server"
 fi
