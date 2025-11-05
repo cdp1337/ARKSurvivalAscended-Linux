@@ -109,6 +109,7 @@ PORT_CUSTOM_RCON=27101
 # scriptlet:ufw/install.sh
 # scriptlet:_common/firewall_allow.sh
 # scriptlet:_common/random_password.sh
+# scriptlet:io_github_lsferreira42/lib_ini.sh
 
 
 
@@ -281,6 +282,28 @@ elif [ -e "$GAME_DIR/services/ark-island.conf" ]; then
 	COMMUNITYNAME="$(egrep '^ExecStart' "$GAME_DIR/services/ark-island.conf" | sed 's:.*SessionName="\([^"]*\) (.*:\1:')"
 else
 	COMMUNITYNAME="My Awesome ARK Server"
+fi
+
+if [ "$INSTALLTYPE" == "new" ]; then
+	echo "? Include map names in instance name? e.g. My Awesome ARK Server (Island)"
+	echo -n "> (Y/n): "
+	read JOINEDSESSIONNAME
+	if [ "$JOINEDSESSIONNAME" == "n" -o "$JOINEDSESSIONNAME" == "N" ]; then
+		JOINEDSESSIONNAME=0
+	else
+		JOINEDSESSIONNAME=1
+	fi
+elif [ -e "$GAME_DIR/.settings.ini" ]; then
+	# Detect if it's set in the manager settings file
+	JOINEDSESSIONNAME=$(ini_get_or_default "$GAME_DIR/.settings.ini" "Manager" "JoinedSessionName" "True")
+	if [ "$JOINEDSESSIONNAME" == "True" ]; then
+		JOINEDSESSIONNAME=1
+	else
+		JOINEDSESSIONNAME=0
+	fi
+else
+	# Existing install but no settings defined, default to legacy behaviour
+	JOINEDSESSIONNAME=1
 fi
 
 # Support legacy vs newsave formats
@@ -463,6 +486,13 @@ fi
 chown -R $GAME_USER:$GAME_USER "/home/$GAME_USER/.ssh"
 chmod 700 "/home/$GAME_USER/.ssh"
 chmod 600 "/home/$GAME_USER/.ssh/authorized_keys"
+
+# Save the preferences for the manager
+if [ "$JOINEDSESSIONNAME" == "1" ]; then
+	ini_write "$GAME_DIR/.settings.ini" "Manager" "JoinedSessionName" "True"
+else
+	ini_write "$GAME_DIR/.settings.ini" "Manager" "JoinedSessionName" "False"
+fi
 
 # Preliminary requirements
 apt install -y curl wget sudo python3-venv
@@ -667,6 +697,12 @@ for MAP in $GAME_MAPS; do
 		MODS_LINE="-mods=$MODS"
 	else
 		MODS_LINE=""
+	fi
+
+	if [ "$JOINEDSESSIONNAME" == "1" ]; then
+		SESSIONNAME="${COMMUNITYNAME} (${DESC})"
+	else
+		SESSIONNAME="${COMMUNITYNAME}"
 	fi
 
 

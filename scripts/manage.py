@@ -327,16 +327,26 @@ class Services:
 		"""
 		self._rcon_cmd('ServerChat %s' % message)
 
+	def get_map_description(self) -> str:
+		if self.map == 'BobsMissions_WP':
+			return 'Club'
+		elif self.map.endswith('_WP'):
+			return self.map[:-3]
+		else:
+			return self.map
+
 	def rename(self, new_name):
 		"""
 		Rename the session name
 		:param new_name:
 		:return:
 		"""
-		if '(' in self.session:
-			self.session = new_name.replace('"', '') + ' ' + self.session[self.session.index('('):]
-		else:
-			self.session = new_name.replace('"', '')
+		new_name = new_name.replace('"', '')
+		if config['Manager'].get('JoinedSessionName', 'True') == 'True':
+			# Add the map description to the session name if enabled (default option)
+			new_name = new_name + ' (' + self.get_map_description() + ')'
+
+		self.session = new_name
 		self.save()
 
 	def is_enabled(self) -> bool:
@@ -1490,6 +1500,8 @@ if 'Discord' not in config.sections():
 	config['Discord'] = {}
 if 'Messages' not in config.sections():
 	config['Messages'] = {}
+if 'Manager' not in config.sections():
+	config['Manager'] = {}
 
 shared_settings = None
 shared_path = os.path.join(here, 'AppFiles', 'ShooterGame', 'Saved', 'Config', 'WindowsServer', 'GameUserSettings.ini')
