@@ -30,6 +30,9 @@
 #   --install-custom-map - Install a custom map (in addition to the defaults)
 #
 # Changelog:
+#   20251105 - Fix broken Steam library in update 74.24
+#            - Add support for skipping firewall installation
+#            - Add support for using completely custom session names
 #   20251102 - Add support for uninstalling the server and all data
 #            - Refactor how options are handled in the management console
 #            - Add support for backup/start/stop maps as arguments to the management console
@@ -74,7 +77,7 @@
 ## Parameter Configuration
 ############################################
 
-INSTALLER_VERSION="v20251102"
+INSTALLER_VERSION="v20251105"
 # https://github.com/GloriousEggroll/proton-ge-custom
 PROTON_VERSION="9-22"
 GAME="ArkSurvivalAscended"
@@ -2016,6 +2019,20 @@ else
     	echo "Could not install ARK Survival Ascended Dedicated Server, exiting" >&2
     	exit 1
     fi
+
+    # Version 74.24 released on Nov 4th 2025 with the comment "Fixed a crash" introduces a serious bug
+	# that causes the game to segfault when attempting to load the Steam API.
+	# Being Wildcard, they don't actually provide any reason as to why they're using the Steam API for an Epic game,
+	# but it seems to work without the Steam library available.
+	#
+	# In the logs you will see:
+	# Initializing Steam Subsystem for server validation.
+	# Steam Subsystem initialized: FAILED
+	#
+	if [ -e "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/steamclient64.dll" ]; then
+		echo "Removing broken Steam library to prevent segfault"
+		rm -f "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/steamclient64.dll"
+	fi
 fi
 
 GAMEFLAGS="-servergamelog"
@@ -2212,6 +2229,21 @@ function update_game {
 	else
 		/usr/games/steamcmd +force_install_dir \$GAME_DIR/AppFiles +login anonymous +app_update \$STEAM_ID validate +quit
 	fi
+
+	# Version 74.24 released on Nov 4th 2025 with the comment "Fixed a crash" introduces a serious bug
+	# that causes the game to segfault when attempting to load the Steam API.
+	# Being Wildcard, they don't actually provide any reason as to why they're using the Steam API for an Epic game,
+	# but it seems to work without the Steam library available.
+	#
+	# In the logs you will see:
+	# Initializing Steam Subsystem for server validation.
+	# Steam Subsystem initialized: FAILED
+	#
+	if [ -e "\$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/steamclient64.dll" ]; then
+		echo "Removing broken Steam library to prevent segfault"
+		rm -f "\$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/steamclient64.dll"
+	fi
+
 
 	if [ \$? -ne 0 ]; then
 		echo "Game update failed!" >&2

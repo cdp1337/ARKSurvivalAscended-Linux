@@ -28,6 +28,21 @@ function update_game {
 		/usr/games/steamcmd +force_install_dir $GAME_DIR/AppFiles +login anonymous +app_update $STEAM_ID validate +quit
 	fi
 
+	# Version 74.24 released on Nov 4th 2025 with the comment "Fixed a crash" introduces a serious bug
+	# that causes the game to segfault when attempting to load the Steam API.
+	# Being Wildcard, they don't actually provide any reason as to why they're using the Steam API for an Epic game,
+	# but it seems to work without the Steam library available.
+	#
+	# In the logs you will see:
+	# Initializing Steam Subsystem for server validation.
+	# Steam Subsystem initialized: FAILED
+	#
+	if [ -e "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/steamclient64.dll" ]; then
+		echo "Removing broken Steam library to prevent segfault"
+		rm -f "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/steamclient64.dll"
+	fi
+
+
 	if [ $? -ne 0 ]; then
 		echo "Game update failed!" >&2
 		exit 1
