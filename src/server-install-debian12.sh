@@ -384,6 +384,22 @@ else
 	fi
 fi
 
+if [ "$INSTALLTYPE" == "new" ]; then
+	echo ''
+	echo "? Enable system firewall (UFW by default)?"
+	echo -n "> (Y/n): "
+	read FIREWALL
+	if [ "$FIREWALL" == "n" -o "$FIREWALL" == "N" ]; then
+		FIREWALL=0
+	else
+		FIREWALL=1
+	fi
+else
+	# Existing installations will either have UFW installed or not.
+	# Don't change after the first install.
+	FIREWALL=0
+fi
+
 if [ $OPT_INSTALL_CUSTOM_MAP -eq 1 ]; then
 	echo ''
 	echo "Please enter the Mod ID of the custom map to install."
@@ -451,9 +467,11 @@ chmod 600 "/home/$GAME_USER/.ssh/authorized_keys"
 # Preliminary requirements
 apt install -y curl wget sudo python3-venv
 
-if [ "$(get_enabled_firewall)" == "none" ]; then
-	# No firewall installed, go ahead and install UFW
-	install_ufw
+if [ "$FIREWALL" == "1" ]; then
+	if [ "$(get_enabled_firewall)" == "none" ]; then
+		# No firewall installed, go ahead and install UFW
+		install_ufw
+	fi
 fi
 
 if [ "$MULTISERVER" -eq 1 ]; then
