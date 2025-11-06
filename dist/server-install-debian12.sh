@@ -83,6 +83,7 @@ PROTON_VERSION="10-25"
 GAME="ArkSurvivalAscended"
 GAME_USER="steam"
 GAME_DIR="/home/$GAME_USER/$GAME"
+REPO="cdp1337/ARKSurvivalAscended-Linux"
 # Force installation directory for game
 # steam produces varying results, sometimes in ~/.local/share/Steam, other times in ~/Steam
 STEAM_DIR="/home/$GAME_USER/.local/share/Steam"
@@ -125,6 +126,41 @@ if [ $(id -u) -ne 0 ]; then
 	exit 1
 fi
 ##
+# Simple download utility function
+#
+# Uses either cURL or wget based on which is available
+#
+# Returns 0 on success, 1 on failure
+function download() {
+	local SOURCE="$1"
+	local DESTINATION="$2"
+
+	if [ -z "$SOURCE" ] || [ -z "$DESTINATION" ]; then
+		echo "download: Missing required parameters!" >&2
+		return 1
+	fi
+
+	if [ -n "$(which curl)" ]; then
+		if curl -sL "$SOURCE" -o "$DESTINATION"; then
+			return 0
+		else
+			echo "download: curl failed to download $SOURCE" >&2
+			return 1
+		fi
+	elif [ -n "$(which wget)" ]; then
+		if wget -q "$SOURCE" -O "$DESTINATION"; then
+			return 0
+		else
+			echo "download: wget failed to download $SOURCE" >&2
+			return 1
+		fi
+	else
+		echo "download: Neither curl nor wget is installed, cannot download!" >&2
+		return 1
+	fi
+}
+
+##
 # Install Glorious Eggroll's Proton fork on a requested version
 #
 # https://github.com/GloriousEggroll/proton-ge-custom
@@ -147,8 +183,12 @@ function install_proton() {
 
 	# Grab Proton from Glorious Eggroll
 	if [ ! -e "/opt/script-collection/$PROTON_TGZ" ]; then
-		wget "$PROTON_URL" -O "/opt/script-collection/$PROTON_TGZ"
+		if ! download "$PROTON_URL" "/opt/script-collection/$PROTON_TGZ"; then
+			echo "install_proton: Cannot download Proton from ${PROTON_URL}!" >&2
+			return 1
+		fi
 	fi
+
 	# Extract GE Proton into /opt
 	if [ ! -e "/opt/script-collection/$PROTON_NAME" ]; then
 		tar -x -C /opt/script-collection/ -f "/opt/script-collection/$PROTON_TGZ"
@@ -1511,6 +1551,32 @@ if [ -n "${INI_MODULES_DIR:-}" ] && [ -d "${INI_MODULES_DIR}" ]; then
 fi
 
 
+##
+# Update the installer from Github
+#
+function ark_update_installer() {
+	local REPO="$1"
+	local GITHUB_VERSION="$2"
+	local TARGET="$3"
+
+	if [ -z "$REPO" ] || [ -z "$GITHUB_VERSION" ] || [ -z "$TARGET" ]; then
+		echo "update_installer: Missing required parameters!" >&2
+		return 1
+	fi
+
+	TMP="$(mktemp)"
+	local GITHUB_SOURCE="https://raw.githubusercontent.com/${REPO}/refs/tags/${GITHUB_VERSION}/dist/server-install-debian12.sh"
+	if download "$GITHUB_SOURCE" "$TMP"; then
+		echo "Downloaded new installer version $GITHUB_VERSION from github.com/${REPO}"
+		mv "$TMP" "$TARGET"
+		chmod +x "$TARGET"
+
+		return 0
+	else
+		echo "update_installer: Failed to download installer version ${GITHUB_VERSION} from github.com/${REPO}" >&2
+		return 1
+	fi
+}
 
 
 ############################################
@@ -1518,20 +1584,25 @@ fi
 ############################################
 
 # Allow for auto-update checks
-if [ -n "$(which curl)" -a "${0:0:8}" != "/dev/fd/" ]; then
+if [ -n "$REPO" -a -n "$(which curl)" -a "${0:0:8}" != "/dev/fd/" ]; then
+	# Repo is enabled, curl is available, and the script was NOT dynamically loaded
+	# Check if there's an updated version available on Github
 	echo "Checking Github for updates..."
-	GITHUB_VERSION="$(curl -s -L 'https://api.github.com/repos/cdp1337/ARKSurvivalAscended-Linux/releases?per_page=1&page=1' | grep 'tag_name' | sed 's:.* "\(v[0-9]*\)",:\1:')"
+	GITHUB_VERSION="$(curl -s -L "https://api.github.com/repos/$REPO/releases?per_page=1&page=1" | grep 'tag_name' | sed 's:.* "\(v[0-9]*\)",:\1:')"
 	if [ -n "$GITHUB_VERSION" ]; then
 		if [ "$GITHUB_VERSION" != "$INSTALLER_VERSION" ]; then
 			echo "A new version of the installer is available!"
 			read -p "Do you want to update the installer? (y/N): " -t 10 UPDATE
 			case "$UPDATE" in
 				[yY]*)
-					curl -L https://raw.githubusercontent.com/cdp1337/ARKSurvivalAscended-Linux/refs/tags/${GITHUB_VERSION}/dist/server-install-debian12.sh \
-						-o "$0"
-					chmod +x "$0"
-					exec "$0" "${@}"
-					exit 0
+					if ark_update_installer "$REPO" "$GITHUB_VERSION" "$0"; then
+						echo "Relaunching installer ${GITHUB_VERSION}"
+						exec "$0" "${@}"
+						exit 0
+					else
+						echo "Failed to download updated installer from $GITHUB_SOURCE" >&2
+						echo "Resuming with existing installer" >&2
+					fi
 					;;
 				*)
 					echo "Skipping update";;
@@ -1623,9 +1694,9 @@ if [ $OPT_UNINSTALL -eq 1 ]; then
 
 	if [ -e "$GAME_DIR/backup.sh" ]; then
 		echo "? Would you like to perform a backup before everything is wiped?"
-		echo -n "> (y/N): "
+		echo -n "> (Y/n): "
 		read CONFIRM
-		if [ "$CONFIRM" == "y" -o "$CONFIRM" == "Y" ]; then
+		if [ "$CONFIRM" != "n" -a "$CONFIRM" != "N" ]; then
 			$GAME_DIR/backup.sh
 		fi
 	fi
@@ -1756,8 +1827,12 @@ else
 fi
 
 echo ''
+echo 'Multi-server support is provided via NFS by default,'
+echo 'but other file synchronization are possible if you prefer a custom solution.'
+echo ''
+echo 'This ONLY affects the default NFS, (do not enable if you are using a custom solution like VirtIO-FS or Gluster).'
 if [ "$MULTISERVER" -eq 1 ]; then
-	echo "? DISABLE multi-server cluster support? (Maps spread across different servers)"
+	echo "? DISABLE multi-server NFS cluster support? (Maps spread across different servers)"
 	echo -n "> (y/N): "
 	read MULTISERVER
 	if [ "$MULTISERVER" == "y" -o "$MULTISERVER" == "Y" ]; then
@@ -1773,7 +1848,7 @@ if [ "$MULTISERVER" -eq 1 ]; then
 		read SECONDARYIPS
 	fi
 else
-	echo "? Enable multi-server cluster support? (Maps spread across different servers)"
+	echo "? Enable multi-server NFS cluster support? (Maps spread across different servers)"
 	echo -n "> (y/N): "
 	read MULTISERVER
 	if [ "$MULTISERVER" == "y" -o "$MULTISERVER" == "Y" ]; then
@@ -1900,7 +1975,7 @@ else
 fi
 
 # Preliminary requirements
-apt install -y curl wget sudo python3-venv
+apt install -y curl sudo python3-venv
 
 if [ "$FIREWALL" == "1" ]; then
 	if [ "$(get_enabled_firewall)" == "none" ]; then
@@ -1960,11 +2035,10 @@ done
 ## Installer Save (for uninstalling/upgrading/etc)
 ############################################
 
-if [ "${0:0:8}" == "/dev/fd/" ]; then
+if [ -n "$REPO" -a "${0:0:8}" == "/dev/fd/" ]; then
 	# Script was dynamically loaded, save a copy for future reference
 	echo "Saving installer script for future reference..."
-	wget -O "$GAME_DIR/installer.sh" "https://raw.githubusercontent.com/cdp1337/ARKSurvivalAscended-Linux/refs/tags/${INSTALLER_VERSION}/dist/server-install-debian12.sh"
-	chmod +x "$GAME_DIR/installer.sh"
+	ark_update_installer "$REPO" "$INSTALLER_VERSION" "$GAME_DIR/installer.sh"
 fi
 
 
@@ -3793,12 +3867,16 @@ def menu_wipe():
 			print('Invalid option!')
 			return
 
-		print('Removing %s...' % path)
 		print('Are you sure you want to proceed? This action cannot be undone! type DELETE to confirm.')
 		confirm = input(': ')
 		if confirm == 'DELETE':
-			if os.path.exists(path):
-				shutil.rmtree(path)
+			# Instead of doing a simple shutil.rmtree, manually walk through the target directory
+			# and delete individual files.  This avoids issues with symlinks that may exist in the SavedArks folder.
+			for root, dir, files in os.walk(path, followlinks=True):
+				for f in files:
+					file_path = os.path.join(root, f)
+					print('Removing %s...' % file_path)
+					os.remove(file_path)
 		else:
 			print('Wipe operation cancelled.')
 

@@ -1,5 +1,7 @@
-scriptlets/
+scriptlets/*
+!scriptlets/_local
 .idea/sshConfigs.xml
 .idea/webServers.xml
 .idea/deployment.xml
 .idea/copilot*.xml
+.venv/

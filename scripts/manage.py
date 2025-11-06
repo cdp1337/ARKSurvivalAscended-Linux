@@ -1484,12 +1484,16 @@ def menu_wipe():
 			print('Invalid option!')
 			return
 
-		print('Removing %s...' % path)
 		print('Are you sure you want to proceed? This action cannot be undone! type DELETE to confirm.')
 		confirm = input(': ')
 		if confirm == 'DELETE':
-			if os.path.exists(path):
-				shutil.rmtree(path)
+			# Instead of doing a simple shutil.rmtree, manually walk through the target directory
+			# and delete individual files.  This avoids issues with symlinks that may exist in the SavedArks folder.
+			for root, dir, files in os.walk(path, followlinks=True):
+				for f in files:
+					file_path = os.path.join(root, f)
+					print('Removing %s...' % file_path)
+					os.remove(file_path)
 		else:
 			print('Wipe operation cancelled.')
 
