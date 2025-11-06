@@ -84,6 +84,8 @@ GAME="ArkSurvivalAscended"
 GAME_USER="steam"
 GAME_DIR="/home/$GAME_USER/$GAME"
 REPO="cdp1337/ARKSurvivalAscended-Linux"
+DISCORD="https://discord.gg/jyFsweECPb"
+FUNDING="https://ko-fi.com/bitsandbytes"
 # Force installation directory for game
 # steam produces varying results, sometimes in ~/.local/share/Steam, other times in ~/Steam
 STEAM_DIR="/home/$GAME_USER/.local/share/Steam"
@@ -4264,9 +4266,15 @@ fi
 echo "Admin list:            $GAME_DIR/admin.txt"
 echo ''
 echo ''
-echo 'Wanna stop by and chat? https://discord.gg/jyFsweECPb'
-echo 'Have an issue or feature request? https://github.com/cdp1337/ARKSurvivalAscended-Linux/issues'
-echo 'Help support this and other projects? https://ko-fi.com/bitsandbytes'
+if [ -n "$DISCORD" ]; then
+	echo "Wanna stop by and chat? ${DISCORD}"
+fi
+if [ -n "$REPO" ]; then
+	echo "Have an issue or feature request? https://github.com/${REPO}/issues"
+fi
+if [ -n "$FUNDING" ]; then
+	echo "Help support this and other projects? ${FUNDING}"
+fi
 echo ''
 echo ''
 echo '! IMPORTANT !'
