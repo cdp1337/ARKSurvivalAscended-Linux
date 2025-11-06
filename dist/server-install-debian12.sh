@@ -77,9 +77,9 @@
 ## Parameter Configuration
 ############################################
 
-INSTALLER_VERSION="v20251105"
+INSTALLER_VERSION="v20251105~DEV"
 # https://github.com/GloriousEggroll/proton-ge-custom
-PROTON_VERSION="9-22"
+PROTON_VERSION="10-25"
 GAME="ArkSurvivalAscended"
 GAME_USER="steam"
 GAME_DIR="/home/$GAME_USER/$GAME"
@@ -1886,6 +1886,11 @@ fi
 chown -R $GAME_USER:$GAME_USER "/home/$GAME_USER/.ssh"
 chmod 700 "/home/$GAME_USER/.ssh"
 chmod 600 "/home/$GAME_USER/.ssh/authorized_keys"
+
+# Ensure target directory exists and is writable by the target user
+# This generally isn't needed when using defaults, but is helpful if the GAME_DIR location is changed.
+[ -d "$GAME_DIR" ] || mkdir -p "$GAME_DIR"
+chown -R $GAME_USER:$GAME_USER "$GAME_DIR"
 
 # Save the preferences for the manager
 if [ "$JOINEDSESSIONNAME" == "1" ]; then
