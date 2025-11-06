@@ -1529,5 +1529,10 @@ elif '--backup' in sys.argv:
 	safe_start(services)
 elif '--start-all' in sys.argv:
 	safe_start(services)
+elif '--is-running' in sys.argv:
+	for s in services:
+		if s.is_running():
+			sys.exit(0)
+	sys.exit(1)
 else:
 	menu_main()

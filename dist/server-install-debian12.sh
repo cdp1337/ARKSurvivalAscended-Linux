@@ -2209,7 +2209,6 @@ cat > $GAME_DIR/update.sh <<EOF
 # DYNAMICALLY GENERATED FILE! Edit at your own risk
 
 # List of all maps available on this platform
-GAME_MAPS="$GAME_MAPS"
 GAME_USER="$GAME_USER"
 GAME_DIR="$GAME_DIR"
 STEAM_ID="$STEAM_ID"
@@ -2251,28 +2250,12 @@ function update_game {
 	fi
 }
 
-# Check if any maps are running; do not update an actively running server.
-RUNNING=0
-for MAP in \$GAME_MAPS; do
-	if [ "\$(systemctl is-active \$MAP)" == "active" ]; then
-		echo "WARNING - \$MAP is still running"
-		RUNNING=1
-	fi
-done
-
-if [ \$RUNNING -eq 1 ]; then
-	echo "At least one map is still running, do you still want to run updates? (y/N): "
-	read UP
-	if [ "\$UP" == "y" -o "\$UP" == "Y" ]; then
-		RUNNING=0
-	fi
+if \$GAME_DIR/manage.py --is-running; then
+	echo "Game server is running, not updating"
+	exit 0
 fi
 
-if [ \$RUNNING -eq 0 ]; then
-	update_game
-else
-	echo "Game server is already running, not updating"
-fi
+update_game
 EOF
 chown $GAME_USER:$GAME_USER $GAME_DIR/update.sh
 chmod +x $GAME_DIR/update.sh
@@ -2281,20 +2264,38 @@ systemctl enable ark-updater
 
 
 # As of v2025.11.02 this script has been ported to the management console.
-# Create start/stop helpers for all maps
-#cat > $GAME_DIR/start_all.sh <<EOF
-## script:start_all.sh
-#EOF
-#chown $GAME_USER:$GAME_USER $GAME_DIR/start_all.sh
-#chmod +x $GAME_DIR/start_all.sh
+# If it exists however, replace it with the necessary call to preserve backwards compatibility.
+if [ -e "$GAME_DIR/start_all.sh" ]; then
+	cat > $GAME_DIR/start_all.sh <<EOF
+#!/bin/bash
+#
+# Start all ARK server maps that are enabled
+# DYNAMICALLY GENERATED FILE! Edit at your own risk
+GAME_DIR="$GAME_DIR"
+
+\$GAME_DIR/update.sh
+\$GAME_DIR/manage.py --start-all
+EOF
+    chown $GAME_USER:$GAME_USER $GAME_DIR/start_all.sh
+    chmod +x $GAME_DIR/start_all.sh
+fi
 
 
 # As of v2025.11.02 this script has been ported to the management console.
-#cat > $GAME_DIR/stop_all.sh <<EOF
-## script:stop_all.sh
-#EOF
-#chown $GAME_USER:$GAME_USER $GAME_DIR/stop_all.sh
-#chmod +x $GAME_DIR/stop_all.sh
+# If it exists however, replace it with the necessary call to preserve backwards compatibility.
+if [ -e "$GAME_DIR/stop_all.sh" ]; then
+	cat > $GAME_DIR/stop_all.sh <<EOF
+#!/bin/bash
+#
+# Stop all ARK server maps that are enabled
+# DYNAMICALLY GENERATED FILE! Edit at your own risk
+GAME_DIR="$GAME_DIR"
+
+\$GAME_DIR/manage.py --stop-all
+EOF
+	chown $GAME_USER:$GAME_USER $GAME_DIR/stop_all.sh
+	chmod +x $GAME_DIR/stop_all.sh
+fi
 
 
 # Install a management script
@@ -3832,6 +3833,11 @@ elif '--backup' in sys.argv:
 	safe_start(services)
 elif '--start-all' in sys.argv:
 	safe_start(services)
+elif '--is-running' in sys.argv:
+	for s in services:
+		if s.is_running():
+			sys.exit(0)
+	sys.exit(1)
 else:
 	menu_main()
 EOF

@@ -777,20 +777,25 @@ systemctl enable ark-updater
 
 
 # As of v2025.11.02 this script has been ported to the management console.
-# Create start/stop helpers for all maps
-#cat > $GAME_DIR/start_all.sh <<EOF
-## script:start_all.sh
-#EOF
-#chown $GAME_USER:$GAME_USER $GAME_DIR/start_all.sh
-#chmod +x $GAME_DIR/start_all.sh
+# If it exists however, replace it with the necessary call to preserve backwards compatibility.
+if [ -e "$GAME_DIR/start_all.sh" ]; then
+	cat > $GAME_DIR/start_all.sh <<EOF
+# script:start_all.sh
+EOF
+    chown $GAME_USER:$GAME_USER $GAME_DIR/start_all.sh
+    chmod +x $GAME_DIR/start_all.sh
+fi
 
 
 # As of v2025.11.02 this script has been ported to the management console.
-#cat > $GAME_DIR/stop_all.sh <<EOF
-## script:stop_all.sh
-#EOF
-#chown $GAME_USER:$GAME_USER $GAME_DIR/stop_all.sh
-#chmod +x $GAME_DIR/stop_all.sh
+# If it exists however, replace it with the necessary call to preserve backwards compatibility.
+if [ -e "$GAME_DIR/stop_all.sh" ]; then
+	cat > $GAME_DIR/stop_all.sh <<EOF
+# script:stop_all.sh
+EOF
+	chown $GAME_USER:$GAME_USER $GAME_DIR/stop_all.sh
+	chmod +x $GAME_DIR/stop_all.sh
+fi
 
 
 # Install a management script

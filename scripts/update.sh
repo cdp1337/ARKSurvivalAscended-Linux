@@ -6,7 +6,6 @@
 
 # List of all maps available on this platform
 # compile:noescape
-GAME_MAPS="$GAME_MAPS"
 GAME_USER="$GAME_USER"
 GAME_DIR="$GAME_DIR"
 STEAM_ID="$STEAM_ID"
@@ -49,25 +48,9 @@ function update_game {
 	fi
 }
 
-# Check if any maps are running; do not update an actively running server.
-RUNNING=0
-for MAP in $GAME_MAPS; do
-	if [ "$(systemctl is-active $MAP)" == "active" ]; then
-		echo "WARNING - $MAP is still running"
-		RUNNING=1
-	fi
-done
-
-if [ $RUNNING -eq 1 ]; then
-	echo "At least one map is still running, do you still want to run updates? (y/N): "
-	read UP
-	if [ "$UP" == "y" -o "$UP" == "Y" ]; then
-		RUNNING=0
-	fi
+if $GAME_DIR/manage.py --is-running; then
+	echo "Game server is running, not updating"
+	exit 0
 fi
 
-if [ $RUNNING -eq 0 ]; then
-	update_game
-else
-	echo "Game server is already running, not updating"
-fi
+update_game
