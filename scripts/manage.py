@@ -195,15 +195,15 @@ class Services:
 				# Extract out all the various info from the start line
 				extracted_keys = re.match(
 					(r'ExecStart=(?P<runner>[^ ]*) run ArkAscendedServer.exe' 
-					 r'(?P<map>[^/?]*)\?listen\?SessionName="(?P<session>[^"]*)"'
-					 r'\?(?P<options>[^ ]*) (?P<flags>.*)'
+					 r'(?P<map>[^/?]*)\?listen\?(?P<args>.*)'
 					),
 					line
 				)
 
 				self.runner = extracted_keys.group('runner')
 				self.map = extracted_keys.group('map').strip()
-				self.session = extracted_keys.group('session')
+				args = extracted_keys.group('args') + ' '
+				self.session = None
 				self.port = None
 				self.mods = []
 				self.cluster_id = None
@@ -211,27 +211,68 @@ class Services:
 				self.other_flags = ''
 				self.options = {}
 
-				options = extracted_keys.group('options').split('?')
-				flags = extracted_keys.group('flags').split(' ')
+				# Use a tokenizer to parse options and flags
+				options_done = False
+				quote = None
+				param = ''
+				for c in args:
+					if quote is None and c in ['"', "'"]:
+						quote = c
+						continue
+					if quote is not None and c == quote:
+						quote = None
+						continue
 
-				for option in options:
-					if '=' in option:
-						# Split each option and flag into their respective variables
-						opt_key, opt_val = option.split('=', 1)
-						self.options[opt_key] = opt_val
-
-				for flag in flags:
-					if flag.startswith('-port='):
-						self.port = flag[6:]
-					elif flag.startswith('-mods='):
-						if ',' in flag:
-							self.mods += flag[6:].split(',')
+					if not options_done and quote is None and c in ['?', ' ']:
+						# '?' separates options
+						if '=' in param:
+							opt_key, opt_val = param.split('=', 1)
+							if opt_key == 'SessionName':
+								self.session = opt_val
+							else:
+								self.options[opt_key] = opt_val
 						else:
-							self.mods.append(flag[6:])
-					elif flag.startswith('-clusterid='):
-						self.cluster_id = flag[11:]
-					else:
-						self.other_flags += flag + ' '
+							self.options[param] = ''
+						param = ''
+						if c == ' ':
+							options_done = True
+						continue
+
+					if options_done and quote is None and c == '-':
+						# Tack can be safely ignored
+						continue
+
+					if options_done and c == ' ':
+						# ' ' separates flags
+						if param == '':
+							continue
+
+						if '=' in param:
+							opt_key, opt_val = param.split('=', 1)
+						else:
+							opt_key = param
+							opt_val = ''
+
+						if opt_key.lower() == 'port':
+							self.port = opt_val
+						elif opt_key.lower() == 'mods':
+							if ',' in opt_val:
+								self.mods += opt_val.split(',')
+							else:
+								self.mods.append(opt_val)
+						elif opt_key.lower() == 'clusterid':
+							self.cluster_id = opt_val
+						else:
+							self.other_flags += '-' + param + ' '
+
+						param = ''
+						continue
+
+					# Default behaviour; just append the character
+					param += c
+
+				self.other_flags = self.other_flags.strip()
+
 
 	def save(self):
 		"""
@@ -246,7 +287,11 @@ class Services:
 		])
 
 		for key, val in self.options.items():
-			if val != '':
+			if val == '':
+				options += '?%s' % key
+			elif '?' in val or "'" in val or ' ' in val:
+				options += '?%s="%s"' % (key, val)
+			else:
 				options += '?%s=%s' % (key, val)
 
 		# Strip excessive question marks
@@ -569,7 +614,11 @@ class Services:
 			# Hide system options
 			if key in ('RCONEnabled', 'RCONPort', 'ServerAdminPassword'):
 				continue
-			if val != '':
+			if val == '':
+				opts.append(key)
+			elif '?' in val or "'" in val or ' ' in val:
+				opts.append('%s="%s"' % (key, val))
+			else:
 				opts.append('%s=%s' % (key, val))
 
 		return '?'.join(opts)
@@ -587,13 +636,34 @@ class Services:
 			if val != '':
 				options[key] = val
 
+		param = ''
+		quote = None
+		opts += '?'
+		for c in opts:
+			if quote is None and c in ['"', "'"]:
+				quote = c
+				continue
+
+			if quote is not None and c == quote:
+				quote = None
+				continue
+
+			if quote is None and c == '?':
+				if param == '':
+					continue
+
+				if '=' in param:
+					opt_key, opt_val = param.split('=', 1)
+					options[opt_key] = opt_val
+				else:
+					options[param] = ''
+
+				param = ''
+				continue
+
+			param += c
+
 		self.options = options
-		opts = opts.split('?')
-		for option in opts:
-			if '=' in option:
-				# Split each option and flag into their respective variables
-				opt_key, opt_val = option.split('=', 1)
-				self.options[opt_key] = opt_val
 
 
 class Table:
