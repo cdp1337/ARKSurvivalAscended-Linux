@@ -79,13 +79,13 @@
 
 INSTALLER_VERSION="v20251105"
 # https://github.com/GloriousEggroll/proton-ge-custom
-PROTON_VERSION="9-22"
+PROTON_VERSION="10-25"
 GAME="ArkSurvivalAscended"
 GAME_USER="steam"
-GAME_DIR="/home/$GAME_USER/$GAME"
+GAME_DIR="/opt/$GAME"
 # Force installation directory for game
 # steam produces varying results, sometimes in ~/.local/share/Steam, other times in ~/Steam
-STEAM_DIR="/home/$GAME_USER/.local/share/Steam"
+STEAM_DIR="/opt/Steam"
 # Specific "filesystem" directory for installed version of Proton
 GAME_COMPAT_DIR="/opt/script-collection/GE-Proton${PROTON_VERSION}/files/share/default_pfx"
 # Binary path for Proton
@@ -1684,8 +1684,10 @@ else
 	COMMUNITYNAME="My Awesome ARK Server"
 fi
 
-if [ "$INSTALLTYPE" == "new" ]; then
-	echo "? Include map names in instance name? e.g. My Awesome ARK Server (Island)"
+if [[ $COMMUNITYNAME == *"{}"* ]]; then
+	JOINEDSESSIONNAME=0
+elif [ "$INSTALLTYPE" == "new" ]; then
+	echo "? Append map names to instance name? e.g. My Awesome ARK Server (Island)"
 	echo -n "> (Y/n): "
 	read JOINEDSESSIONNAME
 	if [ "$JOINEDSESSIONNAME" == "n" -o "$JOINEDSESSIONNAME" == "N" ]; then
@@ -1757,7 +1759,7 @@ fi
 
 echo ''
 if [ "$MULTISERVER" -eq 1 ]; then
-	echo "? DISABLE multi-server cluster support? (Maps spread across different servers)"
+	echo "? DISABLE multi-server cluster support? (Maps spread across different servers via NFS. Y when using Virtiofs)"
 	echo -n "> (y/N): "
 	read MULTISERVER
 	if [ "$MULTISERVER" == "y" -o "$MULTISERVER" == "Y" ]; then
@@ -1773,7 +1775,7 @@ if [ "$MULTISERVER" -eq 1 ]; then
 		read SECONDARYIPS
 	fi
 else
-	echo "? Enable multi-server cluster support? (Maps spread across different servers)"
+	echo "? Enable multi-server cluster support? (Maps spread across different servers via NFS. N when using Virtiofs)"
 	echo -n "> (y/N): "
 	read MULTISERVER
 	if [ "$MULTISERVER" == "y" -o "$MULTISERVER" == "Y" ]; then
@@ -2012,11 +2014,12 @@ if [ $RUNNING -eq 1 ]; then
 	echo "WARNING - One or more game servers are currently running, this script will not update the game files."
 	echo "Skipping steam update"
 else
+	sudo chown steam:steam $GAME_DIR
 	sudo -u $GAME_USER /usr/games/steamcmd +force_install_dir $GAME_DIR/AppFiles +login anonymous +app_update $STEAM_ID validate +quit
     # STAGING / TESTING - skip ark because it's huge; AppID 90 is Team Fortress 1 (a tiny server useful for testing)
     #sudo -u $GAME_USER /usr/games/steamcmd +force_install_dir $GAME_DIR/AppFiles +login anonymous +app_update 90 validate +quit
     if [ $? -ne 0 ]; then
-    	echo "Could not install ARK Survival Ascended Dedicated Server, exiting" >&2
+    	echo "Could not install ARK Survival Ascended Dedicated Server at $GAME_DIR, exiting" >&2
     	exit 1
     fi
 
@@ -2118,6 +2121,8 @@ for MAP in $GAME_MAPS; do
 	else
 		SESSIONNAME="${COMMUNITYNAME}"
 	fi
+
+	SESSIONNAME="${SESSIONNAME//\{\}/${DESC}}"
 
 
 	# Install system service file to be loaded by systemd
@@ -3712,7 +3717,7 @@ def menu_wipe():
 		if opt.isdigit() and 1 <= int(opt) <= len(services):
 			path = services[int(opt)-1].get_saved_location()
 		elif opt == 'a':
-			path = os.path.join(here, 'AppFiles', 'ShooterGame', 'Saved', 'SavedArks')
+			path = os.path.join(here, 'AppFiles', 'ShooterGame', 'Saved', 'SavedArks') #BUG: if using a symlink, removes the link but not the contents.
 		else:
 			print('Invalid option!')
 			return
@@ -4099,6 +4104,7 @@ echo "Game files:            $GAME_DIR/AppFiles/"
 echo "Runtime configuration: $GAME_DIR/services/"
 echo "Game log:              $GAME_DIR/ShooterGame.log"
 echo "Game user settings:    $GAME_DIR/GameUserSettings.ini"
+echo "Virtiofs users will need to reforge symlinks manually."
 if [ "$WHITELIST" -eq 1 ]; then
 	echo "Whitelist:             $GAME_DIR/PlayersJoinNoCheckList.txt"
 fi
