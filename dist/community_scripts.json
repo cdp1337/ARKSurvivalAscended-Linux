@@ -11,7 +11,8 @@
             "--reset-proton - Reset proton directories back to default",
             "--force-reinstall - Force a reinstall of the game binaries, mods, and engine",
             "--uninstall - Uninstall the game server",
-            "--install-custom-map - Install a custom map (in addition to the defaults)"
+            "--install-custom-map - Install a custom map (in addition to the defaults)",
+            "--dir=<path> - Use a custom installation directory instead of the default"
         ],
         "default_timeout": "600",
         "shell": "shell",

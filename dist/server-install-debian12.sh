@@ -2,6 +2,8 @@
 #
 # Install ARK Survival Ascended Dedicated Server
 #
+# Installs ARK Survival Ascended Dedicated Server on Debian/Ubuntu systems
+#
 # Uses Glorious Eggroll's build of Proton
 # Please ensure to run this script as root (or at least with sudo)
 #
@@ -28,6 +30,7 @@
 #   --force-reinstall - Force a reinstall of the game binaries, mods, and engine
 #   --uninstall - Uninstall the game server
 #   --install-custom-map - Install a custom map (in addition to the defaults)
+#   --dir=<path> - Use a custom installation directory instead of the default
 #
 # Changelog:
 #   20251105 - Fix broken Steam library in update 74.24
@@ -107,17 +110,41 @@ PORT_RCON_END=27009
 PORT_CUSTOM_GAME=7801
 PORT_CUSTOM_RCON=27101
 
+function usage() {
+  cat >&2 <<EOD
+Usage: $0 [options]
+
+Options:
+    --reset-proton - Reset proton directories back to default
+    --force-reinstall - Force a reinstall of the game binaries, mods, and engine
+    --uninstall - Uninstall the game server
+    --install-custom-map - Install a custom map (in addition to the defaults)
+    --dir=<path> - Use a custom installation directory instead of the default
+
+Installs ARK Survival Ascended Dedicated Server on Debian/Ubuntu systems
+
+Uses Glorious Eggroll's build of Proton
+Please ensure to run this script as root (or at least with sudo)
+
+@LICENSE AGPLv3
+EOD
+  exit 1
+}
+
 # Parse arguments
 OPT_RESET_PROTON=0
 OPT_FORCE_REINSTALL=0
 OPT_UNINSTALL=0
 OPT_INSTALL_CUSTOM_MAP=0
+OPT_OVERRIDE_DIR=""
 while [ "$#" -gt 0 ]; do
 	case "$1" in
 		--reset-proton) OPT_RESET_PROTON=1; shift 1;;
 		--force-reinstall) OPT_FORCE_REINSTALL=1; shift 1;;
 		--uninstall) OPT_UNINSTALL=1; shift 1;;
 		--install-custom-map) OPT_INSTALL_CUSTOM_MAP=1; shift 1;;
+		--dir=*) OPT_OVERRIDE_DIR="${1#*=}"; shift 1;;
+		-h|--help) usage;;
 	esac
 done
 
@@ -1638,11 +1665,29 @@ if [ $RUNNING -eq 1 -a $OPT_UNINSTALL -eq 1 ]; then
 	exit 1
 fi
 
+echo "================================================================================"
+echo "         	  ARK Survival Ascended *unofficial* Installer $INSTALLER_VERSION"
+echo ""
+
 # Determine if this is a new installation or an upgrade (/repair)
 if [ -e /etc/systemd/system/ark-island.service ]; then
 	INSTALLTYPE="upgrade"
 else
 	INSTALLTYPE="new"
+	echo "No existing installation detected, proceeding with new installation"
+fi
+
+if [ -n "$OPT_OVERRIDE_DIR" ]; then
+	# User requested to change the install dir!
+	# This changes the GAME_DIR from the default location to wherever the user requested.
+	GAME_DIR="$OPT_OVERRIDE_DIR"
+	echo "Using ${GAME_DIR} as the installation directory based on explicit argument"
+elif [ "$INSTALLTYPE" == "upgrade" ]; then
+	# Check for existing installation directory based on service file
+	GAME_DIR="$(egrep '^WorkingDirectory' /etc/systemd/system/ark-island.service | sed 's:.*=\(.*\)/AppFiles/ShooterGame/.*:\1:')"
+	echo "Detected installation directory of ${GAME_DIR} based on service registration"
+else
+	echo "Using default installation directory of ${GAME_DIR}"
 fi
 
 if [ -e "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/PlayersJoinNoCheckList.txt" ]; then
@@ -1663,10 +1708,6 @@ else
 	ISPRIMARY=0
 fi
 
-
-echo "================================================================================"
-echo "         	  ARK Survival Ascended *unofficial* Installer $INSTALLER_VERSION"
-echo ""
 
 
 ############################################
