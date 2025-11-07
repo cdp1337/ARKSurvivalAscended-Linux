@@ -33,6 +33,11 @@
 #   --dir=<path> - Use a custom installation directory instead of the default
 #
 # Changelog:
+#   202511XX - Support custom installation directory
+#            - Add support for some custom usecases of the installer
+#            - Bump Proton to 10.25
+#            - Fix for more flexible support for game options
+#            - Backport 74.24 Steam fix into legacy start/stop scripts
 #   20251105 - Fix broken Steam library in update 74.24
 #            - Add support for skipping firewall installation
 #            - Add support for using completely custom session names
