@@ -15,6 +15,7 @@
     - "--install-custom-map - Install a custom map (in addition to the defaults)"
     - "--dir=<path> - Use a custom installation directory instead of the default"
     - "--non-interactive - Run the installer in non-interactive mode (useful for scripted installs)"
+    - "--skip-firewall - Skip installing/configuring the firewall"
   image: https://files.eval.bz/warlock/ark_460x215.jpg
   icon: https://files.eval.bz/warlock/ark-128x128.png
   thumbnail: https://files.eval.bz/warlock/ark_460x215.jpg

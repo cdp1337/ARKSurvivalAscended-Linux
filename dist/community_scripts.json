@@ -13,7 +13,8 @@
             "--uninstall - Uninstall the game server",
             "--install-custom-map - Install a custom map (in addition to the defaults)",
             "--dir=<path> - Use a custom installation directory instead of the default",
-            "--non-interactive - Run the installer in non-interactive mode (useful for scripted installs)"
+            "--non-interactive - Run the installer in non-interactive mode (useful for scripted installs)",
+            "--skip-firewall - Skip installing/configuring the firewall"
         ],
         "default_timeout": "600",
         "shell": "shell",
