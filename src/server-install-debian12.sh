@@ -12,6 +12,10 @@
 # @SOURCE  https://github.com/cdp1337/ARKSurvivalAscended-Linux
 # @CATEGORY Game Server
 # @TRMM-TIMEOUT 600
+# @WARLOCK-TITLE ARK Survival Ascended
+# @WARLOCK-IMAGE https://files.eval.bz/warlock/ark_460x215.jpg
+# @WARLOCK-ICON https://files.eval.bz/warlock/ark-128x128.png
+# @WARLOCK-THUMBNAIL https://files.eval.bz/warlock/ark_460x215.jpg
 #
 # F*** Nitrado
 #
@@ -31,6 +35,8 @@
 #   OPT_UNINSTALL=--uninstall - Uninstall the game server
 #   OPT_INSTALL_CUSTOM_MAP=--install-custom-map - Install a custom map (in addition to the defaults)
 #   OPT_OVERRIDE_DIR=--dir=<path> - Use a custom installation directory instead of the default
+#   OPT_NONINTERACTIVE=--non-interactive - Run the installer in non-interactive mode (useful for scripted installs)
+#   OPT_SKIP_FIREWALL=--skip-firewall - Skip installing/configuring the firewall
 #
 # Changelog:
 #   202511XX - Support custom installation directory
@@ -194,7 +200,11 @@ echo ""
 if [ -e /etc/systemd/system/ark-island.service ]; then
 	INSTALLTYPE="upgrade"
 else
-	INSTALLTYPE="new"
+	if [ $OPT_NONINTERACTIVE -eq 1 ]; then
+		INSTALLTYPE="unattended"
+	else
+		INSTALLTYPE="new"
+	fi
 	echo "No existing installation detected, proceeding with new installation"
 fi
 
@@ -235,33 +245,48 @@ fi
 ## Uninstallation
 ############################################
 if [ $OPT_UNINSTALL -eq 1 ]; then
-	echo "? This will remove all game binary content"
-	echo -n "> (y/N): "
-	read CONFIRM
-	if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
-		exit
+	if [ $OPT_NONINTERACTIVE -eq 1 ]; then
+		echo "Non-interactive uninstall selected, proceeding without confirmation"
+	else
+		echo "WARNING - You have chosen to uninstall ARK Survival Ascended Dedicated Server"
+		echo "This process will remove ALL game data, including player data, maps, and binaries."
+		echo "This action is IRREVERSIBLE."
+		echo ''
+
+		echo "? This will remove all game binary content"
+		echo -n "> (y/N): "
+		read CONFIRM
+		if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
+			exit
+		fi
+
+		echo "? This will remove all player and map data"
+		echo -n "> (y/N): "
+		read CONFIRM
+		if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
+			exit
+		fi
+
+		echo "? This will remove all service registration files"
+		echo -n "> (y/N): "
+		read CONFIRM
+		if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
+			exit
+		fi
 	fi
 
-	echo "? This will remove all player and map data"
-	echo -n "> (y/N): "
-	read CONFIRM
-	if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
-		exit
-	fi
-
-	echo "? This will remove all service registration files"
-	echo -n "> (y/N): "
-	read CONFIRM
-	if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
-		exit
-	fi
 
 	if [ -e "$GAME_DIR/backup.sh" ]; then
-		echo "? Would you like to perform a backup before everything is wiped?"
-		echo -n "> (Y/n): "
-		read CONFIRM
-		if [ "$CONFIRM" != "n" -a "$CONFIRM" != "N" ]; then
+		if [ $OPT_NONINTERACTIVE -eq 1 ]; then
+			# Non-interactive mode, always backup if possible
 			$GAME_DIR/backup.sh
+		else
+			echo "? Would you like to perform a backup before everything is wiped?"
+			echo -n "> (Y/n): "
+			read CONFIRM
+			if [ "$CONFIRM" != "n" -a "$CONFIRM" != "N" ]; then
+				$GAME_DIR/backup.sh
+			fi
 		fi
 	fi
 
@@ -369,92 +394,101 @@ else
 	NEWFORMAT=0
 fi
 
-echo ''
-if [ "$WHITELIST" -eq 1 ]; then
-	echo "? DISABLE whitelist for players?"
-	echo -n "> (y/N): "
-	read WHITELIST
-	if [ "$WHITELIST" == "y" -o "$WHITELIST" == "Y" ]; then
-		WHITELIST=0
-	else
-		WHITELIST=1
-	fi
-else
-	echo "? Enable whitelist for players?"
-	echo -n "> (y/N): "
-	read WHITELIST
-	if [ "$WHITELIST" == "y" -o "$WHITELIST" == "Y" ]; then
-		WHITELIST=1
-	else
-		WHITELIST=0
-	fi
-fi
-
-echo ''
-echo 'Multi-server support is provided via NFS by default,'
-echo 'but other file synchronization are possible if you prefer a custom solution.'
-echo ''
-echo 'This ONLY affects the default NFS, (do not enable if you are using a custom solution like VirtIO-FS or Gluster).'
-if [ "$MULTISERVER" -eq 1 ]; then
-	echo "? DISABLE multi-server NFS cluster support? (Maps spread across different servers)"
-	echo -n "> (y/N): "
-	read MULTISERVER
-	if [ "$MULTISERVER" == "y" -o "$MULTISERVER" == "Y" ]; then
-		MULTISERVER=0
-	else
-		MULTISERVER=1
-	fi
-
-	if [ "$MULTISERVER" -eq 1 -a "$ISPRIMARY" -eq 1 ]; then
-		echo ''
-		echo "? Add more secondary IPs to the cluster? (Separate different IPs with spaces, enter to just skip)"
-		echo -n "> "
-		read SECONDARYIPS
-	fi
-else
-	echo "? Enable multi-server NFS cluster support? (Maps spread across different servers)"
-	echo -n "> (y/N): "
-	read MULTISERVER
-	if [ "$MULTISERVER" == "y" -o "$MULTISERVER" == "Y" ]; then
-		MULTISERVER=1
-	else
-		MULTISERVER=0
-	fi
-
-	if [ "$MULTISERVER" -eq 1 ]; then
-		echo ''
-		echo "? Is this the first (primary) server?"
+if [ $OPT_NONINTERACTIVE -eq 0 ]; then
+	echo ''
+	if [ "$WHITELIST" -eq 1 ]; then
+		echo "? DISABLE whitelist for players?"
 		echo -n "> (y/N): "
-		read ISPRIMARY
-		if [ "$ISPRIMARY" == "y" -o "$ISPRIMARY" == "Y" ]; then
-			ISPRIMARY=1
+		read WHITELIST
+		if [ "$WHITELIST" == "y" -o "$WHITELIST" == "Y" ]; then
+			WHITELIST=0
 		else
-			ISPRIMARY=0
+			WHITELIST=1
+		fi
+	else
+		echo "? Enable whitelist for players?"
+		echo -n "> (y/N): "
+		read WHITELIST
+		if [ "$WHITELIST" == "y" -o "$WHITELIST" == "Y" ]; then
+			WHITELIST=1
+		else
+			WHITELIST=0
+		fi
+	fi
+
+	echo ''
+	echo 'Multi-server support is provided via NFS by default,'
+	echo 'but other file synchronization are possible if you prefer a custom solution.'
+	echo ''
+	echo 'This ONLY affects the default NFS, (do not enable if you are using a custom solution like VirtIO-FS or Gluster).'
+	if [ "$MULTISERVER" -eq 1 ]; then
+		echo "? DISABLE multi-server NFS cluster support? (Maps spread across different servers)"
+		echo -n "> (y/N): "
+		read MULTISERVER
+		if [ "$MULTISERVER" == "y" -o "$MULTISERVER" == "Y" ]; then
+			MULTISERVER=0
+		else
+			MULTISERVER=1
 		fi
 
-		if [ "$ISPRIMARY" -eq 1 ]; then
+		if [ "$MULTISERVER" -eq 1 -a "$ISPRIMARY" -eq 1 ]; then
 			echo ''
-			echo "? What are the IPs of the secondary servers? (Separate different IPs with spaces)"
+			echo "? Add more secondary IPs to the cluster? (Separate different IPs with spaces, enter to just skip)"
 			echo -n "> "
 			read SECONDARYIPS
+		fi
+	else
+		echo "? Enable multi-server NFS cluster support? (Maps spread across different servers)"
+		echo -n "> (y/N): "
+		read MULTISERVER
+		if [ "$MULTISERVER" == "y" -o "$MULTISERVER" == "Y" ]; then
+			MULTISERVER=1
 		else
+			MULTISERVER=0
+		fi
+
+		if [ "$MULTISERVER" -eq 1 ]; then
 			echo ''
-			echo "? What is the IP of the primary server?"
-			echo -n "> "
-			read PRIMARYIP
+			echo "? Is this the first (primary) server?"
+			echo -n "> (y/N): "
+			read ISPRIMARY
+			if [ "$ISPRIMARY" == "y" -o "$ISPRIMARY" == "Y" ]; then
+				ISPRIMARY=1
+			else
+				ISPRIMARY=0
+			fi
+
+			if [ "$ISPRIMARY" -eq 1 ]; then
+				echo ''
+				echo "? What are the IPs of the secondary servers? (Separate different IPs with spaces)"
+				echo -n "> "
+				read SECONDARYIPS
+			else
+				echo ''
+				echo "? What is the IP of the primary server?"
+				echo -n "> "
+				read PRIMARYIP
+			fi
 		fi
 	fi
 fi
 
 if [ "$INSTALLTYPE" == "new" ]; then
-	echo ''
-	echo "? Enable system firewall (UFW by default)?"
-	echo -n "> (Y/n): "
-	read FIREWALL
-	if [ "$FIREWALL" == "n" -o "$FIREWALL" == "N" ]; then
+	if [ $OPT_SKIP_FIREWALL -eq 1 ]; then
 		FIREWALL=0
-	else
+	elif [ $OPT_NONINTERACTIVE -eq 1 ]; then
+		# Non-interactive mode, enable firewall by default
 		FIREWALL=1
+	else
+		echo ''
+		echo "? Enable system firewall (UFW by default)?"
+		echo -n "> (Y/n): "
+		read FIREWALL
+		if [ "$FIREWALL" == "n" -o "$FIREWALL" == "N" ]; then
+			FIREWALL=0
+		else
+			FIREWALL=1
+		fi
 	fi
 else
 	# Existing installations will either have UFW installed or not.

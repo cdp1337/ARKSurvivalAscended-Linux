@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import argparse
 import os
 import shutil
 import sys
@@ -1592,21 +1592,117 @@ for f in os.listdir(services_path):
 		services.append(Services(os.path.join(services_path, f)))
 
 
-if '--stop-all' in sys.argv:
+parser = argparse.ArgumentParser('manage.py')
+parser.add_argument(
+	'--service',
+	help='Specify the service instance to manage (default: ALL)',
+	type=str,
+	default='ALL'
+)
+#parser.add_argument(
+#	'--pre-stop',
+#	help='Send notifications to game players and Discord and save the world',
+#	action='store_true'
+#)
+parser.add_argument(
+	'--stop', '--stop-all',
+	help='Stop the game server',
+	action='store_true'
+)
+parser.add_argument(
+	'--start', '--start-all',
+	help='Start the game server',
+	action='store_true'
+)
+parser.add_argument(
+	'--restart',
+	help='Restart the game server',
+	action='store_true'
+)
+#parser.add_argument(
+#	'--monitor',
+#	help='Monitor the game server status in real time',
+#	action='store_true'
+#)
+parser.add_argument(
+	'--backup',
+	help='Backup the game server files',
+	action='store_true'
+)
+#parser.add_argument(
+#	'--restore',
+#	help='Restore the game server files from a backup archive',
+#	type=str,
+#	default=''
+#)
+#parser.add_argument(
+#	'--check-update',
+#	help='Check for game updates via SteamCMD and report the status',
+#	action='store_true'
+#)
+parser.add_argument(
+	'--get-services',
+	help='List the available service instances for this game',
+	action='store_true'
+)
+parser.add_argument(
+	'--is-running',
+	help='Check if any game service is currently running (exit code 0 = yes, 1 = no)',
+	action='store_true'
+)
+args = parser.parse_args()
+
+if args.service != 'ALL':
+	# User opted to manage only a single game instance
+	service_to_manage = None
+	for s in services:
+		if s.name == args.service:
+			service_to_manage = s
+			break
+
+	if service_to_manage is None:
+		print('Service instance %s not found!' % args.service, file=sys.stderr)
+		sys.exit(1)
+	services = [service_to_manage]
+
+if args.stop:
 	safe_stop(services)
-elif '--backup' in sys.argv:
+elif args.backup:
 	# Stop all services prior to backup
 	safe_stop(services)
 	# Run the backup procedure
 	subprocess.run([os.path.join(here, 'backup.sh')], stderr=sys.stderr, stdout=sys.stdout)
 	# Start all enabled service
 	safe_start(services)
-elif '--start-all' in sys.argv:
+elif args.start:
 	safe_start(services)
-elif '--is-running' in sys.argv:
+elif args.restart:
+	safe_stop(services)
+	safe_start(services)
+elif args.is_running:
+	exit_code = 1
 	for s in services:
 		if s.is_running():
-			sys.exit(0)
-	sys.exit(1)
+			print('%s is running' % s.session)
+			exit_code = 0
+	sys.exit(exit_code)
+elif args.get_services:
+	stats = {}
+	for s in services:
+		svc_stats = {
+			'service': s.name,
+			'name': s.session,
+			'ip': 'N/A',
+			'port': s.port,
+			'status': 'running' if s.is_running() else 'stopped',
+			'player_count': s.rcon_get_number_players(),
+			'max_players': s.get_option('MaxPlayers') or 70,
+			'memory_usage': s.get_memory_usage(),
+			'cpu_usage': s.get_cpu_usage(),
+			'game_pid': s.get_game_pid(),
+			'service_pid': s.get_pid()
+		}
+		stats[s.name] = svc_stats
+	print(json.dumps(stats))
 else:
 	menu_main()

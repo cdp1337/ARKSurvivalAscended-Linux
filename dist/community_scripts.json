@@ -1,7 +1,7 @@
 [
     {
         "$schema": "https://raw.githubusercontent.com/amidaware/community-scripts/main/community_scripts.schema.json",
-        "guid": "4c28dda0-3403-001b-f8ef-a4735f4ee2e8",
+        "guid": "0c2de651-ec30-d4ac-c53f-ebdb67398324",
         "filename": "server-install-debian12.sh",
         "args": [],
         "env": [],
@@ -12,7 +12,8 @@
             "--force-reinstall - Force a reinstall of the game binaries, mods, and engine",
             "--uninstall - Uninstall the game server",
             "--install-custom-map - Install a custom map (in addition to the defaults)",
-            "--dir=<path> - Use a custom installation directory instead of the default"
+            "--dir=<path> - Use a custom installation directory instead of the default",
+            "--non-interactive - Run the installer in non-interactive mode (useful for scripted installs)"
         ],
         "default_timeout": "600",
         "shell": "shell",

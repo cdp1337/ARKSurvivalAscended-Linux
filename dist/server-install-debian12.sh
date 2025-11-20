@@ -12,6 +12,10 @@
 # @SOURCE  https://github.com/cdp1337/ARKSurvivalAscended-Linux
 # @CATEGORY Game Server
 # @TRMM-TIMEOUT 600
+# @WARLOCK-TITLE ARK Survival Ascended
+# @WARLOCK-IMAGE https://files.eval.bz/warlock/ark_460x215.jpg
+# @WARLOCK-ICON https://files.eval.bz/warlock/ark-128x128.png
+# @WARLOCK-THUMBNAIL https://files.eval.bz/warlock/ark_460x215.jpg
 #
 # F*** Nitrado
 #
@@ -31,6 +35,7 @@
 #   --uninstall - Uninstall the game server
 #   --install-custom-map - Install a custom map (in addition to the defaults)
 #   --dir=<path> - Use a custom installation directory instead of the default
+#   --non-interactive - Run the installer in non-interactive mode (useful for scripted installs)
 #
 # Changelog:
 #   202511XX - Support custom installation directory
@@ -125,6 +130,7 @@ Options:
     --uninstall - Uninstall the game server
     --install-custom-map - Install a custom map (in addition to the defaults)
     --dir=<path> - Use a custom installation directory instead of the default
+    --non-interactive - Run the installer in non-interactive mode (useful for scripted installs)
 
 Installs ARK Survival Ascended Dedicated Server on Debian/Ubuntu systems
 
@@ -142,6 +148,7 @@ OPT_FORCE_REINSTALL=0
 OPT_UNINSTALL=0
 OPT_INSTALL_CUSTOM_MAP=0
 OPT_OVERRIDE_DIR=""
+OPT_NONINTERACTIVE=0
 while [ "$#" -gt 0 ]; do
 	case "$1" in
 		--reset-proton) OPT_RESET_PROTON=1; shift 1;;
@@ -149,6 +156,7 @@ while [ "$#" -gt 0 ]; do
 		--uninstall) OPT_UNINSTALL=1; shift 1;;
 		--install-custom-map) OPT_INSTALL_CUSTOM_MAP=1; shift 1;;
 		--dir=*) OPT_OVERRIDE_DIR="${1#*=}"; shift 1;;
+		--non-interactive) OPT_NONINTERACTIVE=1; shift 1;;
 		-h|--help) usage;;
 	esac
 done
@@ -1678,7 +1686,11 @@ echo ""
 if [ -e /etc/systemd/system/ark-island.service ]; then
 	INSTALLTYPE="upgrade"
 else
-	INSTALLTYPE="new"
+	if [ $OPT_NONINTERACTIVE -eq 1 ]; then
+		INSTALLTYPE="unattended"
+	else
+		INSTALLTYPE="new"
+	fi
 	echo "No existing installation detected, proceeding with new installation"
 fi
 
@@ -1719,33 +1731,48 @@ fi
 ## Uninstallation
 ############################################
 if [ $OPT_UNINSTALL -eq 1 ]; then
-	echo "? This will remove all game binary content"
-	echo -n "> (y/N): "
-	read CONFIRM
-	if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
-		exit
+	if [ $OPT_NONINTERACTIVE -eq 1 ]; then
+		echo "Non-interactive uninstall selected, proceeding without confirmation"
+	else
+		echo "WARNING - You have chosen to uninstall ARK Survival Ascended Dedicated Server"
+		echo "This process will remove ALL game data, including player data, maps, and binaries."
+		echo "This action is IRREVERSIBLE."
+		echo ''
+
+		echo "? This will remove all game binary content"
+		echo -n "> (y/N): "
+		read CONFIRM
+		if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
+			exit
+		fi
+
+		echo "? This will remove all player and map data"
+		echo -n "> (y/N): "
+		read CONFIRM
+		if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
+			exit
+		fi
+
+		echo "? This will remove all service registration files"
+		echo -n "> (y/N): "
+		read CONFIRM
+		if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
+			exit
+		fi
 	fi
 
-	echo "? This will remove all player and map data"
-	echo -n "> (y/N): "
-	read CONFIRM
-	if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
-		exit
-	fi
-
-	echo "? This will remove all service registration files"
-	echo -n "> (y/N): "
-	read CONFIRM
-	if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
-		exit
-	fi
 
 	if [ -e "$GAME_DIR/backup.sh" ]; then
-		echo "? Would you like to perform a backup before everything is wiped?"
-		echo -n "> (Y/n): "
-		read CONFIRM
-		if [ "$CONFIRM" != "n" -a "$CONFIRM" != "N" ]; then
+		if [ $OPT_NONINTERACTIVE -eq 1 ]; then
+			# Non-interactive mode, always backup if possible
 			$GAME_DIR/backup.sh
+		else
+			echo "? Would you like to perform a backup before everything is wiped?"
+			echo -n "> (Y/n): "
+			read CONFIRM
+			if [ "$CONFIRM" != "n" -a "$CONFIRM" != "N" ]; then
+				$GAME_DIR/backup.sh
+			fi
 		fi
 	fi
 
@@ -2430,7 +2457,7 @@ sudo -u $GAME_USER python3 -m venv $GAME_DIR/.venv
 sudo -u $GAME_USER $GAME_DIR/.venv/bin/pip install rcon
 cat > $GAME_DIR/manage.py <<EOF
 #!/usr/bin/env python3
-
+import argparse
 import os
 import shutil
 import sys
@@ -4023,22 +4050,118 @@ for f in os.listdir(services_path):
 		services.append(Services(os.path.join(services_path, f)))
 
 
-if '--stop-all' in sys.argv:
+parser = argparse.ArgumentParser('manage.py')
+parser.add_argument(
+	'--service',
+	help='Specify the service instance to manage (default: ALL)',
+	type=str,
+	default='ALL'
+)
+#parser.add_argument(
+#	'--pre-stop',
+#	help='Send notifications to game players and Discord and save the world',
+#	action='store_true'
+#)
+parser.add_argument(
+	'--stop', '--stop-all',
+	help='Stop the game server',
+	action='store_true'
+)
+parser.add_argument(
+	'--start', '--start-all',
+	help='Start the game server',
+	action='store_true'
+)
+parser.add_argument(
+	'--restart',
+	help='Restart the game server',
+	action='store_true'
+)
+#parser.add_argument(
+#	'--monitor',
+#	help='Monitor the game server status in real time',
+#	action='store_true'
+#)
+parser.add_argument(
+	'--backup',
+	help='Backup the game server files',
+	action='store_true'
+)
+#parser.add_argument(
+#	'--restore',
+#	help='Restore the game server files from a backup archive',
+#	type=str,
+#	default=''
+#)
+#parser.add_argument(
+#	'--check-update',
+#	help='Check for game updates via SteamCMD and report the status',
+#	action='store_true'
+#)
+parser.add_argument(
+	'--get-services',
+	help='List the available service instances for this game',
+	action='store_true'
+)
+parser.add_argument(
+	'--is-running',
+	help='Check if any game service is currently running (exit code 0 = yes, 1 = no)',
+	action='store_true'
+)
+args = parser.parse_args()
+
+if args.service != 'ALL':
+	# User opted to manage only a single game instance
+	service_to_manage = None
+	for s in services:
+		if s.name == args.service:
+			service_to_manage = s
+			break
+
+	if service_to_manage is None:
+		print('Service instance %s not found!' % args.service, file=sys.stderr)
+		sys.exit(1)
+	services = [service_to_manage]
+
+if args.stop:
 	safe_stop(services)
-elif '--backup' in sys.argv:
+elif args.backup:
 	# Stop all services prior to backup
 	safe_stop(services)
 	# Run the backup procedure
 	subprocess.run([os.path.join(here, 'backup.sh')], stderr=sys.stderr, stdout=sys.stdout)
 	# Start all enabled service
 	safe_start(services)
-elif '--start-all' in sys.argv:
+elif args.start:
 	safe_start(services)
-elif '--is-running' in sys.argv:
+elif args.restart:
+	safe_stop(services)
+	safe_start(services)
+elif args.is_running:
+	exit_code = 1
 	for s in services:
 		if s.is_running():
-			sys.exit(0)
-	sys.exit(1)
+			print('%s is running' % s.session)
+			exit_code = 0
+	sys.exit(exit_code)
+elif args.get_services:
+	stats = {}
+	for s in services:
+		svc_stats = {
+			'service': s.name,
+			'name': s.session,
+			'ip': 'N/A',
+			'port': s.port,
+			'status': 'running' if s.is_running() else 'stopped',
+			'player_count': s.rcon_get_number_players(),
+			'max_players': s.get_option('MaxPlayers') or 70,
+			'memory_usage': s.get_memory_usage(),
+			'cpu_usage': s.get_cpu_usage(),
+			'game_pid': s.get_game_pid(),
+			'service_pid': s.get_pid()
+		}
+		stats[s.name] = svc_stats
+	print(json.dumps(stats))
 else:
 	menu_main()
 EOF

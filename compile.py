@@ -13,9 +13,14 @@ import urllib.request
 
 class Script:
 	def __init__(self, file: str, type: str):
+		self.repo = None
 		self.file = file
 		self.type = type
 		self.title = None
+		self.warlock_title = None
+		self.warlock_image = None
+		self.warlock_icon = None
+		self.warlock_thumbnail = None
 		self.readme = None
 		self.author = None
 		self.guid = None
@@ -131,6 +136,18 @@ class Script:
 					elif '@TRMM-TIMEOUT' in line:
 						parse_description = False
 						self.trmm_timeout = int(line[15:].strip())
+					elif '@WARLOCK-TITLE' in line:
+						parse_description = False
+						self.warlock_title = line[16:].strip()
+					elif '@WARLOCK-IMAGE' in line:
+						parse_description = False
+						self.warlock_image = line[16:].strip()
+					elif '@WARLOCK-ICON' in line:
+						parse_description = False
+						self.warlock_icon = line[15:].strip()
+					elif '@WARLOCK-THUMBNAIL' in line:
+						parse_description = False
+						self.warlock_thumbnail = line[20:].strip()
 					elif re.match(r'^(# |\.|)trmm arguments(:|)$', line.lower().strip()):
 						parse_description = False
 						header_section = 'trmm_args'
@@ -365,7 +382,10 @@ class Script:
 		hashedValueEven = hashedValueOdd = 3074457345618258791
 		KnuthMultiValue = 3074457345618258799
 		i = 1
-		for char in self.file.replace('\\', '/'):
+		hash_str = self.file.replace('\\', '/')
+		if self.repo is not None:
+			hash_str = self.repo + '/' + hash_str
+		for char in hash_str:
 			i += 1
 			if i % 2 == 0:
 				hashedValueEven = (hashedValueEven + ord(char)) * KnuthMultiValue
@@ -585,9 +605,24 @@ scripts = []
 #pprint(s.asdict())
 #exit(1)
 
-# Parse and company any script files
+# Determine source repository URL
+source_type = 'UNKNOWN'
+source_repo = 'UNKNOWN/TODO'
+repo_url = 'UNKNOWN'
+if os.path.exists('.git/config'):
+	with open('.git/config', 'r') as f:
+		for line in f:
+			if line.strip().startswith('url = '):
+				repo_url = line.strip()[6:]
+				if 'github.com' in repo_url:
+					source_type = 'github'
+					source_repo = repo_url.strip()[repo_url.index('github.com') + 11:-4]
+				break
+
+# Parse and compile any script files
 for file in glob('src/**/*.sh', recursive=True):
 	script = Script(file, 'shell')
+	script.repo = repo_url
 	# Parse the source
 	script.parse()
 	script.write()
@@ -684,3 +719,25 @@ with open('dist/community_scripts.json', 'w') as f:
 		data['filename'] = script.file[4:]
 		meta.append(data)
 	f.write(json.dumps(meta, indent=4))
+
+# Generate Warlock metafile
+with open('dist/warlock.yaml', 'w') as f:
+	for script in scripts:
+		if script.warlock_title is not None:
+			f.write('- guid: %s\n' % script.guid)
+			f.write('  title: %s\n' % script.warlock_title)
+			f.write('  source: %s\n' % source_type)
+			f.write('  repo: %s\n' % source_repo)
+			f.write('  installer: dist/%s\n' % script.file[4:])
+			f.write('  author: %s\n' % script.get_full_author())
+			f.write('  category: %s\n' % (script.category if script.category else 'Uncategorized'))
+			f.write('  supports:\n')
+			for support in script.supports_detailed:
+				f.write('    - "%s"\n' % support[1])
+			f.write('  syntax:\n')
+			for syntax in script.syntax:
+				f.write('    - "%s"\n' % syntax)
+			f.write('  image: %s\n' % (script.warlock_image if script.warlock_image else ''))
+			f.write('  icon: %s\n' % (script.warlock_icon if script.warlock_icon else ''))
+			f.write('  thumbnail: %s\n' % (script.warlock_thumbnail if script.warlock_thumbnail else ''))
+			f.write('\n')
