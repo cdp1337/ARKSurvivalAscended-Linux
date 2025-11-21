@@ -94,6 +94,7 @@
 INSTALLER_VERSION="v20251105~DEV"
 # https://github.com/GloriousEggroll/proton-ge-custom
 PROTON_VERSION="10-25"
+WARLOCK_GUID="0c2de651-ec30-d4ac-c53f-ebdb67398324"
 GAME="ArkSurvivalAscended"
 GAME_USER="steam"
 GAME_DIR="/home/$GAME_USER/$GAME"
@@ -320,6 +321,11 @@ if [ $OPT_UNINSTALL -eq 1 ]; then
 	[ -e "$GAME_DIR/stop_all.sh" ] && rm "$GAME_DIR/stop_all.sh"
 	[ -e "$GAME_DIR/update.sh" ] && rm "$GAME_DIR/update.sh"
 	[ -e "$GAME_DIR/.venv" ] && rm "$GAME_DIR/.venv" -r
+
+	if [ -n "$WARLOCK_GUID" ]; then
+		echo "Removing Warlock registration"
+		[ -e "/var/lib/warlock/$WARLOCK_GUID.app" ] && rm "/var/lib/warlock/$WARLOCK_GUID.app"
+	fi
 
 	exit
 fi
@@ -1012,6 +1018,11 @@ else
 		# Whitelist is not a symlink, (default), do nothing
 		echo "Whitelist already disabled"
 	fi
+fi
+
+# Register with Warlock
+if [ -n "$WARLOCK_GUID" ]; then
+	echo -n "$GAME_DIR" > "/var/lib/warlock/$WARLOCK_GUID.app"
 fi
 
 
