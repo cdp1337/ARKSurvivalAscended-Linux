@@ -13,9 +13,9 @@
 # @CATEGORY Game Server
 # @TRMM-TIMEOUT 600
 # @WARLOCK-TITLE ARK Survival Ascended
-# @WARLOCK-IMAGE https://files.eval.bz/warlock/ark_460x215.jpg
-# @WARLOCK-ICON https://files.eval.bz/warlock/ark-128x128.png
-# @WARLOCK-THUMBNAIL https://files.eval.bz/warlock/ark_460x215.jpg
+# @WARLOCK-IMAGE images/ark_460x215.webp
+# @WARLOCK-ICON images/ark-128x128.webp
+# @WARLOCK-THUMBNAIL images/asa-1920x1080.webp
 #
 # F*** Nitrado
 #
@@ -30,13 +30,15 @@
 #   None
 #
 # Syntax:
-#   --reset-proton - Reset proton directories back to default
-#   --force-reinstall - Force a reinstall of the game binaries, mods, and engine
-#   --uninstall - Uninstall the game server
-#   --install-custom-map - Install a custom map (in addition to the defaults)
-#   --dir=<path> - Use a custom installation directory instead of the default
-#   --non-interactive - Run the installer in non-interactive mode (useful for scripted installs)
-#   --skip-firewall - Skip installing/configuring the firewall
+#   --reset-proton  - Reset proton directories back to default
+#   --force-reinstall  - Force a reinstall of the game binaries, mods, and engine
+#   --uninstall  - Uninstall the game server
+#   --install-custom-map  - Install a custom map (in addition to the defaults)
+#   --custom-map-id=<int> - Mod ID of the custom map to install (use with --install-custom-map) OPTIONAL
+#   --custom-map-name=<string> - Map Name of the custom map to install, refer to Curseforge description page (use with --install-custom-map) OPTIONAL
+#   --dir=<string> - Use a custom installation directory instead of the default OPTIONAL
+#   --non-interactive  - Run the installer in non-interactive mode (useful for scripted installs)
+#   --skip-firewall  - Skip installing/configuring the firewall
 #
 # Changelog:
 #   202511XX - Support custom installation directory
@@ -127,13 +129,15 @@ function usage() {
 Usage: $0 [options]
 
 Options:
-    --reset-proton - Reset proton directories back to default
-    --force-reinstall - Force a reinstall of the game binaries, mods, and engine
-    --uninstall - Uninstall the game server
-    --install-custom-map - Install a custom map (in addition to the defaults)
-    --dir=<path> - Use a custom installation directory instead of the default
-    --non-interactive - Run the installer in non-interactive mode (useful for scripted installs)
-    --skip-firewall - Skip installing/configuring the firewall
+    --reset-proton  - Reset proton directories back to default
+    --force-reinstall  - Force a reinstall of the game binaries, mods, and engine
+    --uninstall  - Uninstall the game server
+    --install-custom-map  - Install a custom map (in addition to the defaults)
+    --custom-map-id=<int> - Mod ID of the custom map to install (use with --install-custom-map) OPTIONAL
+    --custom-map-name=<string> - Map Name of the custom map to install, refer to Curseforge description page (use with --install-custom-map) OPTIONAL
+    --dir=<string> - Use a custom installation directory instead of the default OPTIONAL
+    --non-interactive  - Run the installer in non-interactive mode (useful for scripted installs)
+    --skip-firewall  - Skip installing/configuring the firewall
 
 Installs ARK Survival Ascended Dedicated Server on Debian/Ubuntu systems
 
@@ -150,8 +154,10 @@ OPT_RESET_PROTON=0
 OPT_FORCE_REINSTALL=0
 OPT_UNINSTALL=0
 OPT_INSTALL_CUSTOM_MAP=0
+CUSTOM_MAP_ID=""
+CUSTOM_MAP_NAME=""
 OPT_OVERRIDE_DIR=""
-OPT_NONINTERACTIVE=0
+NONINTERACTIVE=0
 OPT_SKIP_FIREWALL=0
 while [ "$#" -gt 0 ]; do
 	case "$1" in
@@ -159,8 +165,22 @@ while [ "$#" -gt 0 ]; do
 		--force-reinstall) OPT_FORCE_REINSTALL=1; shift 1;;
 		--uninstall) OPT_UNINSTALL=1; shift 1;;
 		--install-custom-map) OPT_INSTALL_CUSTOM_MAP=1; shift 1;;
-		--dir=*) OPT_OVERRIDE_DIR="${1#*=}"; shift 1;;
-		--non-interactive) OPT_NONINTERACTIVE=1; shift 1;;
+		--custom-map-id=*)
+			CUSTOM_MAP_ID="${1#*=}";
+			[ "${CUSTOM_MAP_ID:0:1}" == "'" ] && [ "${CUSTOM_MAP_ID:0-1}" == "'" ] && CUSTOM_MAP_ID="${CUSTOM_MAP_ID:1:-1}"
+			[ "${CUSTOM_MAP_ID:0:1}" == '"' ] && [ "${CUSTOM_MAP_ID:0-1}" == '"' ] && CUSTOM_MAP_ID="${CUSTOM_MAP_ID:1:-1}"
+			shift 1;;
+		--custom-map-name=*)
+			CUSTOM_MAP_NAME="${1#*=}";
+			[ "${CUSTOM_MAP_NAME:0:1}" == "'" ] && [ "${CUSTOM_MAP_NAME:0-1}" == "'" ] && CUSTOM_MAP_NAME="${CUSTOM_MAP_NAME:1:-1}"
+			[ "${CUSTOM_MAP_NAME:0:1}" == '"' ] && [ "${CUSTOM_MAP_NAME:0-1}" == '"' ] && CUSTOM_MAP_NAME="${CUSTOM_MAP_NAME:1:-1}"
+			shift 1;;
+		--dir=*)
+			OPT_OVERRIDE_DIR="${1#*=}";
+			[ "${OPT_OVERRIDE_DIR:0:1}" == "'" ] && [ "${OPT_OVERRIDE_DIR:0-1}" == "'" ] && OPT_OVERRIDE_DIR="${OPT_OVERRIDE_DIR:1:-1}"
+			[ "${OPT_OVERRIDE_DIR:0:1}" == '"' ] && [ "${OPT_OVERRIDE_DIR:0-1}" == '"' ] && OPT_OVERRIDE_DIR="${OPT_OVERRIDE_DIR:1:-1}"
+			shift 1;;
+		--non-interactive) NONINTERACTIVE=1; shift 1;;
 		--skip-firewall) OPT_SKIP_FIREWALL=1; shift 1;;
 		-h|--help) usage;;
 	esac
@@ -177,25 +197,37 @@ fi
 #
 # Uses either cURL or wget based on which is available
 #
+# Downloads the file to a temp location initially, then moves it to the final destination
+# upon a successful download to avoid partial files.
+#
 # Returns 0 on success, 1 on failure
+#
+# CHANGELOG:
+#   2025.11.23 - Download to a temp location to verify download was successful
+#              - use which -s for cleaner checks
+#   2025.11.09 - Initial version
+#
 function download() {
 	local SOURCE="$1"
 	local DESTINATION="$2"
+	local TMP=$(mktemp)
 
 	if [ -z "$SOURCE" ] || [ -z "$DESTINATION" ]; then
 		echo "download: Missing required parameters!" >&2
 		return 1
 	fi
 
-	if [ -n "$(which curl)" ]; then
-		if curl -sL "$SOURCE" -o "$DESTINATION"; then
+	if which -s curl; then
+		if curl -fsL "$SOURCE" -o "$TMP"; then
+			mv $TMP "$DESTINATION"
 			return 0
 		else
 			echo "download: curl failed to download $SOURCE" >&2
 			return 1
 		fi
-	elif [ -n "$(which wget)" ]; then
-		if wget -q "$SOURCE" -O "$DESTINATION"; then
+	elif which -s wget; then
+		if wget -q "$SOURCE" -O "$TMP"; then
+			mv $TMP "$DESTINATION"
 			return 0
 		else
 			echo "download: wget failed to download $SOURCE" >&2
@@ -216,6 +248,11 @@ function download() {
 # with its pfx directory in /opt/script-collection/GE-Proton${VERSION}/files/share/default_pfx
 #
 # @arg $1 string Proton version to install
+#
+# CHANGELOG:
+#   2025.11.23 - Use download scriptlet for downloading
+#   2024.12.22 - Initial version
+#
 function install_proton() {
 	VERSION="${1:-9-21}"
 
@@ -259,10 +296,13 @@ function get_enabled_firewall() {
 ##
 # Get which firewall is available on the local system,
 # or "none" if none located
+#
+# CHANGELOG:
+#   2025.04.10 - Switch from "systemctl list-unit-files" to "which" to support older systems
 function get_available_firewall() {
-	if systemctl list-unit-files firewalld.service &>/dev/null; then
+	if which -s firewall-cmd; then
 		echo "firewalld"
-	elif systemctl list-unit-files ufw.service &>/dev/null; then
+	elif which -s ufw; then
 		echo "ufw"
 	elif systemctl list-unit-files iptables.service &>/dev/null; then
 		echo "iptables"
@@ -473,7 +513,7 @@ function install_steamcmd() {
 		fi
 
 		# Install steam repo
-		curl -s http://repo.steampowered.com/steam/archive/stable/steam.gpg > /usr/share/keyrings/steam.gpg
+		download http://repo.steampowered.com/steam/archive/stable/steam.gpg /usr/share/keyrings/steam.gpg
 		echo "deb [arch=amd64,i386 signed-by=/usr/share/keyrings/steam.gpg] http://repo.steampowered.com/steam/ stable steam" > /etc/apt/sources.list.d/steam.list
 
 		# By using this script, you agree to the Steam license agreement at https://store.steampowered.com/subscriber_agreement/
@@ -505,6 +545,10 @@ function install_steamcmd() {
 # @param $1..$N string
 #        Package, (or packages), to install.  Accepts multiple packages at once.
 #
+#
+# CHANGELOG:
+#   2025.04.10 - Set Debian frontend to noninteractive
+#
 function package_install (){
 	echo "package_install: Installing $*..."
 
@@ -517,7 +561,7 @@ function package_install (){
 	if [ "$TYPE_BSD" == 1 ]; then
 		pkg install -y $*
 	elif [ "$TYPE_DEBIAN" == 1 ]; then
-		apt-get -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" install -y $*
+		DEBIAN_FRONTEND="noninteractive" apt-get -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" install -y $*
 	elif [ "$TYPE_RHEL" == 1 ]; then
 		yum install -y $*
 	elif [ "$TYPE_ARCH" == 1 ]; then
@@ -561,9 +605,15 @@ function install_ufw() {
 #   --source <source>   Source IP to allow (default: any)
 #   --zone <zone>       Zone to allow (default: public)
 #   --tcp|--udp         Protocol to allow (default: tcp)
+#   --proto <tcp|udp>   Protocol to allow (alternative method)
 #   --comment <comment> (only UFW) Comment for the rule
 #
 # Specify multiple ports with `--port '#,#,#'` or a range `--port '#:#'`
+#
+# CHANGELOG:
+#   2025.11.23 - Use return codes instead of exit to allow the caller to handle errors
+#   2025.04.10 - Add "--proto" argument as alternative to "--tcp|--udp"
+#
 function firewall_allow() {
 	# Defaults and argument processing
 	local PORT=""
@@ -580,6 +630,10 @@ function firewall_allow() {
 				;;
 			--tcp|--udp)
 				PROTO=${1:2}
+				;;
+			--proto)
+				shift
+				PROTO=$1
 				;;
 			--source|--from)
 				shift
@@ -602,17 +656,17 @@ function firewall_allow() {
 
 	if [ "$PORT" == "" -a "$ZONE" != "trusted" ]; then
 		echo "firewall_allow: No port specified!" >&2
-		exit 1
+		return 2
 	fi
 
 	if [ "$PORT" != "" -a "$ZONE" == "trusted" ]; then
 		echo "firewall_allow: Trusted zones do not use ports!" >&2
-		exit 1
+		return 2
 	fi
 
 	if [ "$ZONE" == "trusted" -a "$SOURCE" == "any" ]; then
 		echo "firewall_allow: Trusted zones require a source!" >&2
-		exit 1
+		return 2
 	fi
 
 	if [ "$FIREWALL" == "ufw" ]; then
@@ -626,6 +680,7 @@ function firewall_allow() {
 			echo "firewall_allow/UFW: Allowing $PORT/$PROTO from $SOURCE..."
 			ufw allow from $SOURCE proto $PROTO to any port $PORT comment "$COMMENT"
 		fi
+		return 0
 	elif [ "$FIREWALL" == "firewalld" ]; then
 		if [ "$SOURCE" != "any" ]; then
 			# Firewalld uses Zones to specify sources
@@ -652,6 +707,7 @@ function firewall_allow() {
 		fi
 
 		firewall-cmd --reload
+		return 0
 	elif [ "$FIREWALL" == "iptables" ]; then
 		echo "firewall_allow/iptables: WARNING - iptables is untested"
 		# iptables doesn't natively support multiple ports, so we have to get creative
@@ -671,12 +727,14 @@ function firewall_allow() {
 			iptables -A INPUT -p $PROTO $DPORTS -s $SOURCE -j ACCEPT
 		fi
 		iptables-save > /etc/iptables/rules.v4
+		return 0
 	elif [ "$FIREWALL" == "none" ]; then
 		echo "firewall_allow: No firewall detected" >&2
+		return 1
 	else
 		echo "firewall_allow: Unsupported or unknown firewall" >&2
 		echo 'Please report this at https://github.com/cdp1337/ScriptsCollection/issues' >&2
-		exit 1
+		return 1
 	fi
 }
 ##
@@ -1623,7 +1681,169 @@ function ark_update_installer() {
 		echo "update_installer: Failed to download installer version ${GITHUB_VERSION} from github.com/${REPO}" >&2
 		return 1
 	fi
+}##
+# Determine if the current shell session is non-interactive.
+#
+# Checks NONINTERACTIVE, CI, DEBIAN_FRONTEND, TERM, and TTY status.
+#
+# Returns 0 (true) if non-interactive, 1 (false) if interactive.
+#
+# CHANGELOG:
+#   2025.11.23 - Initial version
+#
+function is_noninteractive() {
+	# explicit flags
+	case "${NONINTERACTIVE:-}${CI:-}" in
+		1*|true*|TRUE*|True*|*CI* ) return 0 ;;
+	esac
+
+	# debian frontend
+	if [ "${DEBIAN_FRONTEND:-}" = "noninteractive" ]; then
+		return 0
+	fi
+
+	# dumb terminal or no tty on stdin/stdout
+	if [ "${TERM:-}" = "dumb" ] || [ ! -t 0 ] || [ ! -t 1 ]; then
+		return 0
+	fi
+
+	return 1
 }
+
+##
+# Prompt user for a text response
+#
+# Arguments:
+#   --default="..."   Default text to use if no response is given
+#
+# Returns:
+#   text as entered by user
+#
+# CHANGELOG:
+#   2025.11.23 - Use is_noninteractive to handle non-interactive mode
+#   2025.01.01 - Initial version
+#
+function prompt_text() {
+	local DEFAULT=""
+	local PROMPT="Enter some text"
+	local RESPONSE=""
+
+	while [ $# -ge 1 ]; do
+		case $1 in
+			--default=*) DEFAULT="${1#*=}";;
+			*) PROMPT="$1";;
+		esac
+		shift
+	done
+
+	echo "$PROMPT" >&2
+	echo -n '> : ' >&2
+
+	if is_noninteractive; then
+		# In non-interactive mode, return the default value
+		echo $DEFAULT
+		return
+	fi
+
+	read RESPONSE
+	if [ "$RESPONSE" == "" ]; then
+		echo "$DEFAULT"
+	else
+		echo "$RESPONSE"
+	fi
+}
+
+##
+# Prompt user for a yes or no response
+#
+# Arguments:
+#   --invert            Invert the response (yes becomes 0, no becomes 1)
+#   --default-yes       Default to yes if no response is given
+#   --default-no        Default to no if no response is given
+#   -q                  Quiet mode (no output text after response)
+#
+# Returns:
+#   1 for yes, 0 for no (or inverted if --invert is set)
+#
+# CHANGELOG:
+#   2025.11.23 - Use is_noninteractive to handle non-interactive mode
+#   2025.11.09 - Add -q (quiet) option to suppress output after prompt (and use return value)
+#   2025.01.01 - Initial version
+#
+function prompt_yn() {
+	local TRUE=0 # Bash convention: 0 is success/true
+	local YES=1
+	local FALSE=1 # Bash convention: non-zero is failure/false
+	local NO=0
+	local DEFAULT="n"
+	local DEFAULT_CODE=1
+	local PROMPT="Yes or no?"
+	local RESPONSE=""
+	local QUIET=0
+
+	while [ $# -ge 1 ]; do
+		case $1 in
+			--invert) YES=0; NO=1 TRUE=1; FALSE=0;;
+			--default-yes) DEFAULT="y";;
+			--default-no) DEFAULT="n";;
+			-q) QUIET=1;;
+			*) PROMPT="$1";;
+		esac
+		shift
+	done
+
+	echo "$PROMPT" >&2
+	if [ "$DEFAULT" == "y" ]; then
+		DEFAULT="$YES"
+		DEFAULT_CODE=$TRUE
+		echo -n "> (Y/n): " >&2
+	else
+		DEFAULT="$NO"
+		DEFAULT_CODE=$FALSE
+		echo -n "> (y/N): " >&2
+	fi
+
+	if is_noninteractive; then
+		# In non-interactive mode, return the default value
+		if [ $QUIET -eq 0 ]; then
+			echo $DEFAULT
+		fi
+		return $DEFAULT_CODE
+	fi
+
+	read RESPONSE
+	case "$RESPONSE" in
+		[yY]*)
+			if [ $QUIET -eq 0 ]; then
+				echo $YES
+			fi
+			return $TRUE;;
+		[nN]*)
+			if [ $QUIET -eq 0 ]; then
+				echo $NO
+			fi
+			return $FALSE;;
+		*)
+			if [ $QUIET -eq 0 ]; then
+				echo $DEFAULT
+			fi
+			return $DEFAULT_CODE;;
+	esac
+}
+##
+# Print a header message
+#
+# CHANGELOG:
+#   2025.11.09 - Port from _common to bz_eval_tui
+#   2024.12.25 - Initial version
+#
+function print_header() {
+	local header="$1"
+	echo "================================================================================"
+	printf "%*s\n" $(((${#header}+80)/2)) "$header"
+    echo ""
+}
+
 
 
 ############################################
@@ -1691,11 +1911,7 @@ echo ""
 if [ -e /etc/systemd/system/ark-island.service ]; then
 	INSTALLTYPE="upgrade"
 else
-	if [ $OPT_NONINTERACTIVE -eq 1 ]; then
-		INSTALLTYPE="unattended"
-	else
-		INSTALLTYPE="new"
-	fi
+	INSTALLTYPE="new"
 	echo "No existing installation detected, proceeding with new installation"
 fi
 
@@ -1736,7 +1952,7 @@ fi
 ## Uninstallation
 ############################################
 if [ $OPT_UNINSTALL -eq 1 ]; then
-	if [ $OPT_NONINTERACTIVE -eq 1 ]; then
+	if [ $NONINTERACTIVE -eq 1 ]; then
 		echo "Non-interactive uninstall selected, proceeding without confirmation"
 	else
 		echo "WARNING - You have chosen to uninstall ARK Survival Ascended Dedicated Server"
@@ -1744,40 +1960,23 @@ if [ $OPT_UNINSTALL -eq 1 ]; then
 		echo "This action is IRREVERSIBLE."
 		echo ''
 
-		echo "? This will remove all game binary content"
-		echo -n "> (y/N): "
-		read CONFIRM
-		if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
+		if prompt_yn -q --invert --default-no "? This will remove all game binary content"; then
 			exit
 		fi
 
-		echo "? This will remove all player and map data"
-		echo -n "> (y/N): "
-		read CONFIRM
-		if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
+		if prompt_yn -q --invert --default-no "? This will remove all player and map data"; then
 			exit
 		fi
 
-		echo "? This will remove all service registration files"
-		echo -n "> (y/N): "
-		read CONFIRM
-		if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
+		if prompt_yn -q --invert --default-no "? This will remove all service registration files"; then
 			exit
 		fi
 	fi
 
 
 	if [ -e "$GAME_DIR/backup.sh" ]; then
-		if [ $OPT_NONINTERACTIVE -eq 1 ]; then
-			# Non-interactive mode, always backup if possible
+		if prompt_yn -q --default-yes "? Would you like to perform a backup before everything is wiped?"; then
 			$GAME_DIR/backup.sh
-		else
-			echo "? Would you like to perform a backup before everything is wiped?"
-			echo -n "> (Y/n): "
-			read CONFIRM
-			if [ "$CONFIRM" != "n" -a "$CONFIRM" != "N" ]; then
-				$GAME_DIR/backup.sh
-			fi
 		fi
 	fi
 
@@ -1827,12 +2026,7 @@ fi
 
 # Ask the user some information before installing.
 if [ "$INSTALLTYPE" == "new" ]; then
-	echo "? What is the community name of the server? (e.g. My Awesome ARK Server)"
-	echo -n "> "
-	read COMMUNITYNAME
-	if [ "$COMMUNITYNAME" == "" ]; then
-		COMMUNITYNAME="My Awesome ARK Server"
-	fi
+	COMMUNITYNAME="$(prompt_text --default="My Awesome ARK Server" "? What is the community name of the server?")"
 elif [ -e "$GAME_DIR/services/ark-island.conf" ]; then
 	# To support custom maps, load the existing community name from the island map service file.
 	COMMUNITYNAME="$(egrep '^ExecStart' "$GAME_DIR/services/ark-island.conf" | sed 's:.*SessionName="\([^"]*\) (.*:\1:')"
@@ -1841,14 +2035,7 @@ else
 fi
 
 if [ "$INSTALLTYPE" == "new" ]; then
-	echo "? Include map names in instance name? e.g. My Awesome ARK Server (Island)"
-	echo -n "> (Y/n): "
-	read JOINEDSESSIONNAME
-	if [ "$JOINEDSESSIONNAME" == "n" -o "$JOINEDSESSIONNAME" == "N" ]; then
-		JOINEDSESSIONNAME=0
-	else
-		JOINEDSESSIONNAME=1
-	fi
+	JOINEDSESSIONNAME=$(prompt_yn --default-yes "? Include map names in instance name? e.g. My Awesome ARK Server (Island)")
 elif [ -e "$GAME_DIR/.settings.ini" ]; then
 	# Detect if it's set in the manager settings file
 	JOINEDSESSIONNAME=$(ini_get_or_default "$GAME_DIR/.settings.ini" "Manager" "JoinedSessionName" "True")
@@ -1868,15 +2055,13 @@ fi
 # "new" formats save all characters along with the map.
 echo ''
 if [ "$INSTALLTYPE" == "new" ]; then
-	echo "? Will you be migrating an existing Nitrado or Wildcard server? "
-	echo "(answering yes will enable the new save format)"
-	echo -n "> (y/N): "
-	read NEWFORMAT
-	if [ "$NEWFORMAT" == "y" -o "$NEWFORMAT" == "Y" ]; then
-		NEWFORMAT=1
-	else
-		NEWFORMAT=0
-	fi
+	echo "Nitrado and official servers are using a new save format"
+	echo "which combines all player data into the map save files."
+	echo ""
+	echo "If you plan on migrating existing content from those servers,"
+	echo "it is highly recommended to use the new save format."
+
+	NEWFORMAT=$(prompt_yn --default-no "? Use new save format?")
 elif [ -e "$GAME_DIR/services/ark-island.conf" ]; then
 	if grep -q '-newsaveformat' "$GAME_DIR/services/ark-island.conf"; then
 		echo "Using new save format for existing installation"
@@ -1890,81 +2075,39 @@ else
 	NEWFORMAT=0
 fi
 
-if [ $OPT_NONINTERACTIVE -eq 0 ]; then
-	echo ''
-	if [ "$WHITELIST" -eq 1 ]; then
-		echo "? DISABLE whitelist for players?"
-		echo -n "> (y/N): "
-		read WHITELIST
-		if [ "$WHITELIST" == "y" -o "$WHITELIST" == "Y" ]; then
-			WHITELIST=0
-		else
-			WHITELIST=1
-		fi
-	else
-		echo "? Enable whitelist for players?"
-		echo -n "> (y/N): "
-		read WHITELIST
-		if [ "$WHITELIST" == "y" -o "$WHITELIST" == "Y" ]; then
-			WHITELIST=1
-		else
-			WHITELIST=0
-		fi
+
+echo ''
+if [ "$WHITELIST" -eq 1 ]; then
+	WHITELIST=$(prompt_yn --invert --default-no "? DISABLE whitelist for players?")
+else
+	WHITELIST=$(prompt_yn --default-no "? Enable whitelist for players?")
+fi
+
+echo ''
+echo 'Multi-server support is provided via NFS by default,'
+echo 'but other file synchronization are possible if you prefer a custom solution.'
+echo ''
+echo 'This ONLY affects the default NFS, (do not enable if you are using a custom solution like VirtIO-FS or Gluster).'
+if [ "$MULTISERVER" -eq 1 ]; then
+	MULTISERVER=$(prompt_yn --invert --default-no "? DISABLE multi-server NFS cluster support? (Maps spread across different servers)")
+
+	if [ "$MULTISERVER" -eq 1 ] && [ "$ISPRIMARY" -eq 1 ]; then
+		echo ''
+		SECONDARYIPS="$(prompt_text --default="" "? Add more secondary IPs to the cluster? (Separate different IPs with spaces, enter to just skip)")"
 	fi
+else
+	MULTISERVER=$(prompt_yn --default-no "? Enable multi-server NFS cluster support? (Maps spread across different servers)")
 
-	echo ''
-	echo 'Multi-server support is provided via NFS by default,'
-	echo 'but other file synchronization are possible if you prefer a custom solution.'
-	echo ''
-	echo 'This ONLY affects the default NFS, (do not enable if you are using a custom solution like VirtIO-FS or Gluster).'
 	if [ "$MULTISERVER" -eq 1 ]; then
-		echo "? DISABLE multi-server NFS cluster support? (Maps spread across different servers)"
-		echo -n "> (y/N): "
-		read MULTISERVER
-		if [ "$MULTISERVER" == "y" -o "$MULTISERVER" == "Y" ]; then
-			MULTISERVER=0
-		else
-			MULTISERVER=1
-		fi
+		echo ''
+		ISPRIMARY=$(prompt_yn --default-no "? Is this the first (primary) server?")
 
-		if [ "$MULTISERVER" -eq 1 -a "$ISPRIMARY" -eq 1 ]; then
+		if [ "$ISPRIMARY" -eq 1 ]; then
 			echo ''
-			echo "? Add more secondary IPs to the cluster? (Separate different IPs with spaces, enter to just skip)"
-			echo -n "> "
-			read SECONDARYIPS
-		fi
-	else
-		echo "? Enable multi-server NFS cluster support? (Maps spread across different servers)"
-		echo -n "> (y/N): "
-		read MULTISERVER
-		if [ "$MULTISERVER" == "y" -o "$MULTISERVER" == "Y" ]; then
-			MULTISERVER=1
+			SECONDARYIPS="$(prompt_text --default="" "? What are the IPs of the secondary servers? (Separate different IPs with spaces)")"
 		else
-			MULTISERVER=0
-		fi
-
-		if [ "$MULTISERVER" -eq 1 ]; then
 			echo ''
-			echo "? Is this the first (primary) server?"
-			echo -n "> (y/N): "
-			read ISPRIMARY
-			if [ "$ISPRIMARY" == "y" -o "$ISPRIMARY" == "Y" ]; then
-				ISPRIMARY=1
-			else
-				ISPRIMARY=0
-			fi
-
-			if [ "$ISPRIMARY" -eq 1 ]; then
-				echo ''
-				echo "? What are the IPs of the secondary servers? (Separate different IPs with spaces)"
-				echo -n "> "
-				read SECONDARYIPS
-			else
-				echo ''
-				echo "? What is the IP of the primary server?"
-				echo -n "> "
-				read PRIMARYIP
-			fi
+			PRIMARYIP="$(prompt_text --default="" "? What is the IP of the primary server?")"
 		fi
 	fi
 fi
@@ -1972,19 +2115,9 @@ fi
 if [ "$INSTALLTYPE" == "new" ]; then
 	if [ $OPT_SKIP_FIREWALL -eq 1 ]; then
 		FIREWALL=0
-	elif [ $OPT_NONINTERACTIVE -eq 1 ]; then
-		# Non-interactive mode, enable firewall by default
-		FIREWALL=1
 	else
 		echo ''
-		echo "? Enable system firewall (UFW by default)?"
-		echo -n "> (Y/n): "
-		read FIREWALL
-		if [ "$FIREWALL" == "n" -o "$FIREWALL" == "N" ]; then
-			FIREWALL=0
-		else
-			FIREWALL=1
-		fi
+		FIREWALL=$(prompt_yn --default-yes "? Enable system firewall (UFW by default)?")
 	fi
 else
 	# Existing installations will either have UFW installed or not.
@@ -1996,8 +2129,7 @@ if [ $OPT_INSTALL_CUSTOM_MAP -eq 1 ]; then
 	echo ''
 	echo "Please enter the Mod ID of the custom map to install."
 	echo "This is also called 'Project ID' on Curseforge."
-	echo -n "> : "
-	read CUSTOM_MAP_ID
+	CUSTOM_MAP_ID="$(prompt_text --default="$CUSTOM_MAP_ID" "? Mod/Project ID: ")"
 
 	if [ -z "$CUSTOM_MAP_ID" ]; then
 		echo "No Mod ID specified, cannot continue with custom map installation."
@@ -2007,8 +2139,7 @@ if [ $OPT_INSTALL_CUSTOM_MAP -eq 1 ]; then
 	echo ''
 	echo "Please enter the Map Name to install."
 	echo "This is usually listed on the Curseforge description page."
-	echo -n "> : "
-	read CUSTOM_MAP_NAME
+	CUSTOM_MAP_NAME="$(prompt_text --default="$CUSTOM_MAP_NAME" "? Mod Name: ")"
 
 	if [ -z "$CUSTOM_MAP_NAME" ]; then
 		echo "No Map Name specified, cannot continue with custom map installation."
@@ -2333,7 +2464,7 @@ EOF
 		cat > /etc/systemd/system/${MAP}.service.d/override.conf <<EOF
 [Service]
 # Edit this line to adjust start parameters of the server
-# After modifying, please remember to run `sudo systemctl daemon-reload` to apply changes to the system.
+# After modifying, please remember to run \`sudo systemctl daemon-reload\` to apply changes to the system.
 ExecStart=$PROTON_BIN run ArkAscendedServer.exe ${NAME}?listen?SessionName="${SESSIONNAME}"?RCONPort=${RCONPORT}?ServerAdminPassword=${ADMIN_PASS}?RCONEnabled=True -port=${GAMEPORT} ${GAMEFLAGS} ${MODS_LINE}
 EOF
     fi

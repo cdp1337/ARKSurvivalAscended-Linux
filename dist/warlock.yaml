@@ -9,14 +9,16 @@
     - "Debian 12, 13"
     - "Ubuntu 24.04"
   syntax:
-    - "--reset-proton - Reset proton directories back to default"
-    - "--force-reinstall - Force a reinstall of the game binaries, mods, and engine"
-    - "--uninstall - Uninstall the game server"
-    - "--install-custom-map - Install a custom map (in addition to the defaults)"
-    - "--dir=<path> - Use a custom installation directory instead of the default"
-    - "--non-interactive - Run the installer in non-interactive mode (useful for scripted installs)"
-    - "--skip-firewall - Skip installing/configuring the firewall"
-  image: https://files.eval.bz/warlock/ark_460x215.jpg
-  icon: https://files.eval.bz/warlock/ark-128x128.png
-  thumbnail: https://files.eval.bz/warlock/ark_460x215.jpg
+    - "--reset-proton  - Reset proton directories back to default"
+    - "--force-reinstall  - Force a reinstall of the game binaries, mods, and engine"
+    - "--uninstall  - Uninstall the game server"
+    - "--install-custom-map  - Install a custom map (in addition to the defaults)"
+    - "--custom-map-id=<int> - Mod ID of the custom map to install (use with --install-custom-map) OPTIONAL"
+    - "--custom-map-name=<string> - Map Name of the custom map to install, refer to Curseforge description page (use with --install-custom-map) OPTIONAL"
+    - "--dir=<string> - Use a custom installation directory instead of the default OPTIONAL"
+    - "--non-interactive  - Run the installer in non-interactive mode (useful for scripted installs)"
+    - "--skip-firewall  - Skip installing/configuring the firewall"
+  image: images/ark_460x215.webp
+  icon: images/ark-128x128.webp
+  thumbnail: images/asa-1920x1080.webp
 

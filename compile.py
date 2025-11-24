@@ -6,7 +6,6 @@ import uuid
 from glob import glob
 import os
 import stat
-from pprint import pprint
 import json
 import urllib.request
 
@@ -39,6 +38,10 @@ class Script:
 		self.content_header = ''
 		self.content_body = ''
 		self._generated_usage = False
+		self._argparser_var = None
+		"""
+		Argument parser variable name in Python, used to know what variable to use for parsing arguments
+		"""
 
 	def parse(self):
 		"""
@@ -63,6 +66,11 @@ class Script:
 				write = True
 
 				if line.startswith('# scriptlet:'):
+					"""
+					Most common command; load a script content in its entirety and integrate it into the parent script
+					
+					The loaded script is parsed and supports its own includes, imports, and so forth.
+					"""
 					# Check for "# scriptlet:..." replacements
 					in_header = False
 					include = line[12:].strip()
@@ -89,12 +97,21 @@ class Script:
 					in_header = False
 					self._parse_import(line)
 					write = False
+				elif line.startswith('# import:') and self.type == 'python':
+					in_header = False
+					include = line[9:].strip()
+					line = self._parse_include(self.file, line_number, include)
+					self._parse_import(line)
+					write = False
 				elif line.strip() == '# compile:usage':
 					in_header = False
 					line = self.generate_usage()
 				elif line.strip() == '# compile:argparse':
 					in_header = False
 					line = self.generate_argparse()
+				elif self.type == 'python' and re.match(r'.* = argparse\.ArgumentParser.*', line):
+					in_header = False
+					self._argparser_var = line.split('=')[0].strip()
 				elif in_header and self.type == 'python' and line.strip() == '"""':
 					multiline_header = not multiline_header
 				elif in_header and self.type == 'powershell' and line.strip() == '<#':
@@ -232,14 +249,18 @@ class Script:
 		# Ensure new file is executable
 		os.chmod(dest_file, 0o775)
 
-		# Store the TRMM metafile
-		#script_name = os.path.basename(self.file)[:-3]
-		#with open(os.path.join(os.path.dirname(dest_file), script_name + '.json'), 'w') as dest_f:
-		#	dest_f.write(json.dumps([self.as_trmm_meta()], indent=4))
+	# Store the TRMM metafile
+	#script_name = os.path.basename(self.file)[:-3]
+	#with open(os.path.join(os.path.dirname(dest_file), script_name + '.json'), 'w') as dest_f:
+	#	dest_f.write(json.dumps([self.as_trmm_meta()], indent=4))
 
 	def _parse_import(self, line: str):
 		"""
 		Parse Python-style 'import' statements to the parent script
+
+		These are generally short import statements like 'import blah' or 'from blah import ...'
+		and get appended to the top of the generated script.
+
 		:param line:
 		:return:
 		"""
@@ -248,6 +269,25 @@ class Script:
 			self.imports.append(line.strip())
 
 	def _parse_script(self, src_file: str, src_line: int, include: str):
+		"""
+		Load the contents of a given script and return its body.
+
+		This is similar to scriptlet but differs in that it does not integrate the script
+		and simply returns the contents of the file, (with variables escaped if requested).
+
+		Example usage:
+		```bash
+		# Install system service file to be loaded by systemd
+		cat > /etc/systemd/system/${GAME_SERVICE}.service <<EOF
+		# script:systemd-template.service
+		EOF
+		```
+
+		:param src_file:
+		:param src_line:
+		:param include:
+		:return:
+		"""
 		file = os.path.join('scripts', include)
 		if not os.path.exists(file):
 			print('ERROR - script %s not found' % include)
@@ -268,7 +308,10 @@ class Script:
 					continue
 
 				# @todo language-specific escaping
-				out += line if not escape else line.replace('$', '\\$')
+				if escape:
+					line = line.replace('$', '\\$')
+					line = line.replace('`', '\\`')
+				out += line
 
 		if not out.endswith('\n'):
 			out += '\n'
@@ -328,7 +371,10 @@ class Script:
 			arg_name = arg_map.group('name')
 			arg_type = arg_map.group('type')
 			arg_default = '0' if arg_type == ' ' else ''
+			arg_comment = arg_map.group('comment').strip(' -')
 			var_type = arg_map.group('var_type')
+			arg_required = False
+			default_set = False
 			if arg_var is None:
 				arg_var = arg_name
 
@@ -336,25 +382,45 @@ class Script:
 				# Key/Value pairs require a variable type to be set, defaults to STRING
 				var_type = 'string' if var_type is None else var_type
 
-			if var_type is None:
-				line = tacks + arg_name + arg_type + arg_map.group('comment')
+			if self.type == 'powershell':
+				# Powershell has a slightly different format
+				if var_type is None:
+					line = tacks + arg_name + ' - ' + arg_comment
+				else:
+					line = tacks + arg_name + ' <' + var_type + '> - ' + arg_comment
 			else:
-				line = tacks + arg_name + arg_type + '<' + var_type + '>' + arg_map.group('comment')
+				if var_type is None:
+					line = tacks + arg_name + arg_type + ' - ' + arg_comment
+				else:
+					line = tacks + arg_name + arg_type + '<' + var_type + '> - ' + arg_comment
 
-			arg_required = 'REQUIRED' in line
 			if 'DEFAULT=' in line:
+				default_set = True
 				arg_default = line[line.find('DEFAULT=')+8:]
 				if arg_default[0] == '"':
 					# Default contains quotes, grab the content between them
 					arg_default = arg_default[1:]
 					arg_default = arg_default[:arg_default.find('"')]
+
+					arg_comment = arg_comment.replace('DEFAULT="%s"' % arg_default, '').strip()
 				elif arg_default[0] == "'":
 					# Default contains single quote, grab the content between them
 					arg_default = arg_default[1:]
 					arg_default = arg_default[:arg_default.find("'")]
+
+					arg_comment = arg_comment.replace("DEFAULT='%s'" % arg_default, '').strip()
 				else:
 					# Default is a value, grab the first word
 					arg_default = arg_default.split(' ')[0]
+
+					arg_comment = arg_comment.replace('DEFAULT=%s' % arg_default, '').strip()
+
+			if 'required' in line.lower():
+				arg_required = True
+			elif 'optional' in line.lower():
+				arg_required = False
+			elif not default_set and arg_type == '=':
+				arg_required = True
 
 			self.syntax_arg_map.append({
 				'var': arg_var,
@@ -362,7 +428,8 @@ class Script:
 				'type': arg_type,
 				'var_type': var_type,
 				'required': arg_required,
-				'default': arg_default
+				'default': arg_default,
+				'comment': arg_comment
 			})
 		self.syntax.append(line)
 
@@ -427,24 +494,29 @@ class Script:
 		else:
 			# Supports:\n#  Distro Name\n...
 			line = line[1:].strip()
-		s = line.lower()
-		maps = [
-			('archlinux', ('linux-all', 'archlinux', 'arch')),
-			('centos', ('linux-all', 'rhel-all', 'centos')),
-			('debian', ('linux-all', 'debian-all', 'debian')),
-			('fedora', ('linux-all', 'rhel-all', 'fedora')),
-			('linuxmint', ('linux-all', 'debian-all', 'linuxmint')),
-			('redhat', ('linux-all', 'rhel-all', 'redhat', 'rhel')),
-			('rocky', ('linux-all', 'rhel-all', 'rocky', 'rockylinux')),
-			('suse', ('linux-all', 'suse', 'opensuse')),
-			('ubuntu', ('linux-all', 'debian-all', 'ubuntu')),
-			('windows', ('windows',))
-		]
-		for os_key, lookups in maps:
-			for lookup in lookups:
-				if lookup in s and os_key not in self.supports:
-					self.supports.append(os_key)
-					self.supports_detailed.append((os_key, line))
+
+		# Strip any trailing versions and comments; we just want the first word.
+		s = line.lower().split(' ')[0].strip()
+		aliases = {
+			'linux-all': ('tux',),
+			'debian-all': ('debian', 'ubuntu', 'linuxmint'),
+			'arch': ('archlinux',),
+			'rhel-all': ('redhat', 'centos', 'rocky', 'fedora'),
+			'rhel': ('redhat', 'rocky'),
+			'opensuse': ('suse',),
+			'rocklinux': ('rocky',),
+		}
+
+		if s in aliases:
+			# Check if this is an alias for a set of distros, (or just an alias for a single distro)
+			for alias in aliases[s]:
+				if alias not in self.supports:
+					self.supports.append(alias)
+					self.supports_detailed.append((alias, line))
+		else:
+			if s not in self.supports:
+				self.supports.append(s)
+				self.supports_detailed.append((s, line))
 
 	def generate_usage(self) -> str:
 		"""
@@ -478,6 +550,8 @@ class Script:
 			return self._generate_argparse_shell()
 		elif self.type == 'powershell':
 			return self._generate_argparse_powershell()
+		elif self.type == 'python' and self._argparser_var is not None:
+			return self._generate_argparse_python()
 		else:
 			return ''
 
@@ -486,12 +560,25 @@ class Script:
 		for arg in self.syntax_arg_map:
 			if arg['var_type'] == 'integer':
 				arg['var_type'] = 'int'
-			params.append('\t[%s]$%s = %s' % (arg['var_type'], arg['var'], arg['default']))
+			if arg['required']:
+				if arg['default'] == '':
+					params.append('\t[%s]$%s' % (arg['var_type'], arg['var']))
+				else:
+					params.append('\t[%s]$%s = %s' % (arg['var_type'], arg['var'], arg['default']))
+			else:
+				if arg['default'] == '':
+					params.append('\t[%s]$%s = $None' % (arg['var_type'], arg['var']))
+				else:
+					params.append('\t[%s]$%s = %s' % (arg['var_type'], arg['var'], arg['default']))
 
 		return '# Parse arguments\nparam (\n' + ',\n'.join(params) + '\n)\n\n'
 
 	def _generate_argparse_shell(self) -> str:
 		code = []
+
+		if len(self.syntax_arg_map) == 0 and not self._generated_usage:
+			# No arguments to parse, just return
+			return ''
 
 		code.append('# Parse arguments')
 		# Print default arguments to at least have them defined
@@ -507,7 +594,16 @@ class Script:
 		for arg in self.syntax_arg_map:
 			if arg['type'] == '=':
 				# --version=*) VERSION="${1#*=}"; shift 1;;
-				code.append('\t\t%s=*) %s="${1#*=}"; shift 1;;' % (arg['name'], arg['var']))
+				code.append('\t\t%s=*)\n\t\t\t%s="${1#*=}";' % (arg['name'], arg['var']))
+				code.append(
+					'\t\t\t[ "${%s:0:1}" == "\'" ] && [ "${%s:0-1}" == "\'" ] && %s="${%s:1:-1}"' %
+					(arg['var'], arg['var'], arg['var'], arg['var'])
+				)
+				code.append(
+					'\t\t\t[ "${%s:0:1}" == \'"\' ] && [ "${%s:0-1}" == \'"\' ] && %s="${%s:1:-1}"' %
+					(arg['var'], arg['var'], arg['var'], arg['var'])
+				)
+				code.append('\t\t\tshift 1;;')
 			else:
 				# --noninteractive) NONINTERACTIVE=1; shift 1;;
 				code.append('\t\t%s) %s=1; shift 1;;' % (arg['name'], arg['var']))
@@ -529,7 +625,27 @@ class Script:
 		code.append('')
 		return '\n'.join(code)
 
-		# @todo Support #-p) pidfile="$2"; shift 2;;
+	# @todo Support #-p) pidfile="$2"; shift 2;;
+
+	def _generate_argparse_python(self) -> str:
+		code = []
+
+		if len(self.syntax_arg_map) == 0 and not self._generated_usage:
+			# No arguments to parse, just return
+			return ''
+
+		code.append('# Parse arguments')
+		for arg in self.syntax_arg_map:
+			fn = self._argparser_var + '.add_argument'
+			comment = arg['comment'].replace("'", "\\'")
+			if arg['var_type'] == 'int':
+				default = int(arg['default'])
+			else:
+				default = "'" + arg['default'].replace("'", "\\'") + "'"
+			code.append(f"{fn}('--{arg['var']}', type={arg['var_type']}, help='{comment}', default={default})")
+		code.append('')
+		code.append('')
+		return '\n'.join(code)
 
 
 	def __str__(self):
@@ -563,7 +679,7 @@ class Script:
 	def as_trmm_meta(self):
 		# TRMM treats all *nix distros as just "linux"
 		all_platforms = (
-			('linux', ('archlinux', 'centos', 'debian', 'fedora', 'linuxmint', 'redhat', 'rocky', 'suse', 'ubuntu')),
+			('linux', ('tux', 'archlinux', 'centos', 'debian', 'fedora', 'linuxmint', 'redhat', 'rocky', 'suse', 'ubuntu')),
 			('macos', ('macos',)),
 			('windows', ('windows',)),
 		)

@@ -13,9 +13,9 @@
 # @CATEGORY Game Server
 # @TRMM-TIMEOUT 600
 # @WARLOCK-TITLE ARK Survival Ascended
-# @WARLOCK-IMAGE https://files.eval.bz/warlock/ark_460x215.jpg
-# @WARLOCK-ICON https://files.eval.bz/warlock/ark-128x128.png
-# @WARLOCK-THUMBNAIL https://files.eval.bz/warlock/ark_460x215.jpg
+# @WARLOCK-IMAGE images/ark_460x215.webp
+# @WARLOCK-ICON images/ark-128x128.webp
+# @WARLOCK-THUMBNAIL images/asa-1920x1080.webp
 #
 # F*** Nitrado
 #
@@ -34,8 +34,10 @@
 #   OPT_FORCE_REINSTALL=--force-reinstall - Force a reinstall of the game binaries, mods, and engine
 #   OPT_UNINSTALL=--uninstall - Uninstall the game server
 #   OPT_INSTALL_CUSTOM_MAP=--install-custom-map - Install a custom map (in addition to the defaults)
-#   OPT_OVERRIDE_DIR=--dir=<path> - Use a custom installation directory instead of the default
-#   OPT_NONINTERACTIVE=--non-interactive - Run the installer in non-interactive mode (useful for scripted installs)
+#   CUSTOM_MAP_ID=--custom-map-id=<int> - Mod ID of the custom map to install (use with --install-custom-map) OPTIONAL
+#   CUSTOM_MAP_NAME=--custom-map-name=<string> - Map Name of the custom map to install, refer to Curseforge description page (use with --install-custom-map) OPTIONAL
+#   OPT_OVERRIDE_DIR=--dir=<string> - Use a custom installation directory instead of the default OPTIONAL
+#   NONINTERACTIVE=--non-interactive - Run the installer in non-interactive mode (useful for scripted installs)
 #   OPT_SKIP_FIREWALL=--skip-firewall - Skip installing/configuring the firewall
 #
 # Changelog:
@@ -133,6 +135,9 @@ PORT_CUSTOM_RCON=27101
 # scriptlet:_common/random_password.sh
 # scriptlet:io_github_lsferreira42/lib_ini.sh
 # scriptlet:_local/ark-server.sh
+# scriptlet:bz_eval_tui/prompt_text.sh
+# scriptlet:bz_eval_tui/prompt_yn.sh
+# scriptlet:bz_eval_tui/print_header.sh
 
 
 
@@ -201,11 +206,7 @@ echo ""
 if [ -e /etc/systemd/system/ark-island.service ]; then
 	INSTALLTYPE="upgrade"
 else
-	if [ $OPT_NONINTERACTIVE -eq 1 ]; then
-		INSTALLTYPE="unattended"
-	else
-		INSTALLTYPE="new"
-	fi
+	INSTALLTYPE="new"
 	echo "No existing installation detected, proceeding with new installation"
 fi
 
@@ -246,7 +247,7 @@ fi
 ## Uninstallation
 ############################################
 if [ $OPT_UNINSTALL -eq 1 ]; then
-	if [ $OPT_NONINTERACTIVE -eq 1 ]; then
+	if [ $NONINTERACTIVE -eq 1 ]; then
 		echo "Non-interactive uninstall selected, proceeding without confirmation"
 	else
 		echo "WARNING - You have chosen to uninstall ARK Survival Ascended Dedicated Server"
@@ -254,40 +255,23 @@ if [ $OPT_UNINSTALL -eq 1 ]; then
 		echo "This action is IRREVERSIBLE."
 		echo ''
 
-		echo "? This will remove all game binary content"
-		echo -n "> (y/N): "
-		read CONFIRM
-		if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
+		if prompt_yn -q --invert --default-no "? This will remove all game binary content"; then
 			exit
 		fi
 
-		echo "? This will remove all player and map data"
-		echo -n "> (y/N): "
-		read CONFIRM
-		if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
+		if prompt_yn -q --invert --default-no "? This will remove all player and map data"; then
 			exit
 		fi
 
-		echo "? This will remove all service registration files"
-		echo -n "> (y/N): "
-		read CONFIRM
-		if [ "$CONFIRM" != "y" -a "$CONFIRM" != "Y" ]; then
+		if prompt_yn -q --invert --default-no "? This will remove all service registration files"; then
 			exit
 		fi
 	fi
 
 
 	if [ -e "$GAME_DIR/backup.sh" ]; then
-		if [ $OPT_NONINTERACTIVE -eq 1 ]; then
-			# Non-interactive mode, always backup if possible
+		if prompt_yn -q --default-yes "? Would you like to perform a backup before everything is wiped?"; then
 			$GAME_DIR/backup.sh
-		else
-			echo "? Would you like to perform a backup before everything is wiped?"
-			echo -n "> (Y/n): "
-			read CONFIRM
-			if [ "$CONFIRM" != "n" -a "$CONFIRM" != "N" ]; then
-				$GAME_DIR/backup.sh
-			fi
 		fi
 	fi
 
@@ -337,12 +321,7 @@ fi
 
 # Ask the user some information before installing.
 if [ "$INSTALLTYPE" == "new" ]; then
-	echo "? What is the community name of the server? (e.g. My Awesome ARK Server)"
-	echo -n "> "
-	read COMMUNITYNAME
-	if [ "$COMMUNITYNAME" == "" ]; then
-		COMMUNITYNAME="My Awesome ARK Server"
-	fi
+	COMMUNITYNAME="$(prompt_text --default="My Awesome ARK Server" "? What is the community name of the server?")"
 elif [ -e "$GAME_DIR/services/ark-island.conf" ]; then
 	# To support custom maps, load the existing community name from the island map service file.
 	COMMUNITYNAME="$(egrep '^ExecStart' "$GAME_DIR/services/ark-island.conf" | sed 's:.*SessionName="\([^"]*\) (.*:\1:')"
@@ -351,14 +330,7 @@ else
 fi
 
 if [ "$INSTALLTYPE" == "new" ]; then
-	echo "? Include map names in instance name? e.g. My Awesome ARK Server (Island)"
-	echo -n "> (Y/n): "
-	read JOINEDSESSIONNAME
-	if [ "$JOINEDSESSIONNAME" == "n" -o "$JOINEDSESSIONNAME" == "N" ]; then
-		JOINEDSESSIONNAME=0
-	else
-		JOINEDSESSIONNAME=1
-	fi
+	JOINEDSESSIONNAME=$(prompt_yn --default-yes "? Include map names in instance name? e.g. My Awesome ARK Server (Island)")
 elif [ -e "$GAME_DIR/.settings.ini" ]; then
 	# Detect if it's set in the manager settings file
 	JOINEDSESSIONNAME=$(ini_get_or_default "$GAME_DIR/.settings.ini" "Manager" "JoinedSessionName" "True")
@@ -378,15 +350,13 @@ fi
 # "new" formats save all characters along with the map.
 echo ''
 if [ "$INSTALLTYPE" == "new" ]; then
-	echo "? Will you be migrating an existing Nitrado or Wildcard server? "
-	echo "(answering yes will enable the new save format)"
-	echo -n "> (y/N): "
-	read NEWFORMAT
-	if [ "$NEWFORMAT" == "y" -o "$NEWFORMAT" == "Y" ]; then
-		NEWFORMAT=1
-	else
-		NEWFORMAT=0
-	fi
+	echo "Nitrado and official servers are using a new save format"
+	echo "which combines all player data into the map save files."
+	echo ""
+	echo "If you plan on migrating existing content from those servers,"
+	echo "it is highly recommended to use the new save format."
+
+	NEWFORMAT=$(prompt_yn --default-no "? Use new save format?")
 elif [ -e "$GAME_DIR/services/ark-island.conf" ]; then
 	if grep -q '-newsaveformat' "$GAME_DIR/services/ark-island.conf"; then
 		echo "Using new save format for existing installation"
@@ -400,81 +370,39 @@ else
 	NEWFORMAT=0
 fi
 
-if [ $OPT_NONINTERACTIVE -eq 0 ]; then
-	echo ''
-	if [ "$WHITELIST" -eq 1 ]; then
-		echo "? DISABLE whitelist for players?"
-		echo -n "> (y/N): "
-		read WHITELIST
-		if [ "$WHITELIST" == "y" -o "$WHITELIST" == "Y" ]; then
-			WHITELIST=0
-		else
-			WHITELIST=1
-		fi
-	else
-		echo "? Enable whitelist for players?"
-		echo -n "> (y/N): "
-		read WHITELIST
-		if [ "$WHITELIST" == "y" -o "$WHITELIST" == "Y" ]; then
-			WHITELIST=1
-		else
-			WHITELIST=0
-		fi
+
+echo ''
+if [ "$WHITELIST" -eq 1 ]; then
+	WHITELIST=$(prompt_yn --invert --default-no "? DISABLE whitelist for players?")
+else
+	WHITELIST=$(prompt_yn --default-no "? Enable whitelist for players?")
+fi
+
+echo ''
+echo 'Multi-server support is provided via NFS by default,'
+echo 'but other file synchronization are possible if you prefer a custom solution.'
+echo ''
+echo 'This ONLY affects the default NFS, (do not enable if you are using a custom solution like VirtIO-FS or Gluster).'
+if [ "$MULTISERVER" -eq 1 ]; then
+	MULTISERVER=$(prompt_yn --invert --default-no "? DISABLE multi-server NFS cluster support? (Maps spread across different servers)")
+
+	if [ "$MULTISERVER" -eq 1 ] && [ "$ISPRIMARY" -eq 1 ]; then
+		echo ''
+		SECONDARYIPS="$(prompt_text --default="" "? Add more secondary IPs to the cluster? (Separate different IPs with spaces, enter to just skip)")"
 	fi
+else
+	MULTISERVER=$(prompt_yn --default-no "? Enable multi-server NFS cluster support? (Maps spread across different servers)")
 
-	echo ''
-	echo 'Multi-server support is provided via NFS by default,'
-	echo 'but other file synchronization are possible if you prefer a custom solution.'
-	echo ''
-	echo 'This ONLY affects the default NFS, (do not enable if you are using a custom solution like VirtIO-FS or Gluster).'
 	if [ "$MULTISERVER" -eq 1 ]; then
-		echo "? DISABLE multi-server NFS cluster support? (Maps spread across different servers)"
-		echo -n "> (y/N): "
-		read MULTISERVER
-		if [ "$MULTISERVER" == "y" -o "$MULTISERVER" == "Y" ]; then
-			MULTISERVER=0
-		else
-			MULTISERVER=1
-		fi
+		echo ''
+		ISPRIMARY=$(prompt_yn --default-no "? Is this the first (primary) server?")
 
-		if [ "$MULTISERVER" -eq 1 -a "$ISPRIMARY" -eq 1 ]; then
+		if [ "$ISPRIMARY" -eq 1 ]; then
 			echo ''
-			echo "? Add more secondary IPs to the cluster? (Separate different IPs with spaces, enter to just skip)"
-			echo -n "> "
-			read SECONDARYIPS
-		fi
-	else
-		echo "? Enable multi-server NFS cluster support? (Maps spread across different servers)"
-		echo -n "> (y/N): "
-		read MULTISERVER
-		if [ "$MULTISERVER" == "y" -o "$MULTISERVER" == "Y" ]; then
-			MULTISERVER=1
+			SECONDARYIPS="$(prompt_text --default="" "? What are the IPs of the secondary servers? (Separate different IPs with spaces)")"
 		else
-			MULTISERVER=0
-		fi
-
-		if [ "$MULTISERVER" -eq 1 ]; then
 			echo ''
-			echo "? Is this the first (primary) server?"
-			echo -n "> (y/N): "
-			read ISPRIMARY
-			if [ "$ISPRIMARY" == "y" -o "$ISPRIMARY" == "Y" ]; then
-				ISPRIMARY=1
-			else
-				ISPRIMARY=0
-			fi
-
-			if [ "$ISPRIMARY" -eq 1 ]; then
-				echo ''
-				echo "? What are the IPs of the secondary servers? (Separate different IPs with spaces)"
-				echo -n "> "
-				read SECONDARYIPS
-			else
-				echo ''
-				echo "? What is the IP of the primary server?"
-				echo -n "> "
-				read PRIMARYIP
-			fi
+			PRIMARYIP="$(prompt_text --default="" "? What is the IP of the primary server?")"
 		fi
 	fi
 fi
@@ -482,19 +410,9 @@ fi
 if [ "$INSTALLTYPE" == "new" ]; then
 	if [ $OPT_SKIP_FIREWALL -eq 1 ]; then
 		FIREWALL=0
-	elif [ $OPT_NONINTERACTIVE -eq 1 ]; then
-		# Non-interactive mode, enable firewall by default
-		FIREWALL=1
 	else
 		echo ''
-		echo "? Enable system firewall (UFW by default)?"
-		echo -n "> (Y/n): "
-		read FIREWALL
-		if [ "$FIREWALL" == "n" -o "$FIREWALL" == "N" ]; then
-			FIREWALL=0
-		else
-			FIREWALL=1
-		fi
+		FIREWALL=$(prompt_yn --default-yes "? Enable system firewall (UFW by default)?")
 	fi
 else
 	# Existing installations will either have UFW installed or not.
@@ -506,8 +424,7 @@ if [ $OPT_INSTALL_CUSTOM_MAP -eq 1 ]; then
 	echo ''
 	echo "Please enter the Mod ID of the custom map to install."
 	echo "This is also called 'Project ID' on Curseforge."
-	echo -n "> : "
-	read CUSTOM_MAP_ID
+	CUSTOM_MAP_ID="$(prompt_text --default="$CUSTOM_MAP_ID" "? Mod/Project ID: ")"
 
 	if [ -z "$CUSTOM_MAP_ID" ]; then
 		echo "No Mod ID specified, cannot continue with custom map installation."
@@ -517,8 +434,7 @@ if [ $OPT_INSTALL_CUSTOM_MAP -eq 1 ]; then
 	echo ''
 	echo "Please enter the Map Name to install."
 	echo "This is usually listed on the Curseforge description page."
-	echo -n "> : "
-	read CUSTOM_MAP_NAME
+	CUSTOM_MAP_NAME="$(prompt_text --default="$CUSTOM_MAP_NAME" "? Mod Name: ")"
 
 	if [ -z "$CUSTOM_MAP_NAME" ]; then
 		echo "No Map Name specified, cannot continue with custom map installation."
