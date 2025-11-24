@@ -338,6 +338,9 @@ class Script:
 				script.imports = self.imports
 				# Parse the source
 				script.parse()
+				# Scripts must end with an empty newline.
+				if not script.content_body.endswith('\n'):
+					script.content_body += '\n'
 				return script.content_header + script.content_body
 			else:
 				print('ERROR - script %s not found' % include)

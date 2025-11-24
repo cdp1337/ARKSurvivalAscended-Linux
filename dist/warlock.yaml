@@ -18,7 +18,7 @@
     - "--dir=<string> - Use a custom installation directory instead of the default OPTIONAL"
     - "--non-interactive  - Run the installer in non-interactive mode (useful for scripted installs)"
     - "--skip-firewall  - Skip installing/configuring the firewall"
-  image: images/ark_460x215.webp
+  image: images/asa-1920x1080.webp
   icon: images/ark-128x128.webp
-  thumbnail: images/asa-1920x1080.webp
+  thumbnail: images/ark_460x215.webp
 

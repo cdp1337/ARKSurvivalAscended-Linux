@@ -13,9 +13,9 @@
 # @CATEGORY Game Server
 # @TRMM-TIMEOUT 600
 # @WARLOCK-TITLE ARK Survival Ascended
-# @WARLOCK-IMAGE images/ark_460x215.webp
+# @WARLOCK-IMAGE images/asa-1920x1080.webp
 # @WARLOCK-ICON images/ark-128x128.webp
-# @WARLOCK-THUMBNAIL images/asa-1920x1080.webp
+# @WARLOCK-THUMBNAIL images/ark_460x215.webp
 #
 # F*** Nitrado
 #

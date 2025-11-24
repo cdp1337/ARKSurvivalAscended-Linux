@@ -13,9 +13,9 @@
 # @CATEGORY Game Server
 # @TRMM-TIMEOUT 600
 # @WARLOCK-TITLE ARK Survival Ascended
-# @WARLOCK-IMAGE images/ark_460x215.webp
+# @WARLOCK-IMAGE images/asa-1920x1080.webp
 # @WARLOCK-ICON images/ark-128x128.webp
-# @WARLOCK-THUMBNAIL images/asa-1920x1080.webp
+# @WARLOCK-THUMBNAIL images/ark_460x215.webp
 #
 # F*** Nitrado
 #
@@ -742,6 +742,7 @@ function firewall_allow() {
 function random_password() {
 	< /dev/urandom tr -dc _cdefhjkmnprtvwxyACDEFGHJKLMNPQRTUVWXY2345689 | head -c${1:-24};echo;
 }
+
 
 # ==============================================================================
 # Bash INI Parser Library
@@ -1681,7 +1682,8 @@ function ark_update_installer() {
 		echo "update_installer: Failed to download installer version ${GITHUB_VERSION} from github.com/${REPO}" >&2
 		return 1
 	fi
-}##
+}
+##
 # Determine if the current shell session is non-interactive.
 #
 # Checks NONINTERACTIVE, CI, DEBIAN_FRONTEND, TERM, and TTY status.
