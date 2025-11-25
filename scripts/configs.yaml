@@ -1,0 +1,354 @@
+manager:
+  - name: Shutdown Warning 5 Minutes
+    section: Messages
+    key: shutdown_5min
+    type: str
+    default: Server is shutting down in 5 minutes
+    help: "Custom message broadcasted to players 5 minutes before server shutdown."
+  - name: Shutdown Warning 4 Minutes
+    section: Messages
+    key: shutdown_4min
+    type: str
+    default: Server is shutting down in 4 minutes
+    help: "Custom message broadcasted to players 4 minutes before server shutdown."
+  - name: Shutdown Warning 3 Minutes
+    section: Messages
+    key: shutdown_3min
+    type: str
+    default: Server is shutting down in 3 minutes
+    help: "Custom message broadcasted to players 3 minutes before server shutdown."
+  - name: Shutdown Warning 2 Minutes
+    section: Messages
+    key: shutdown_2min
+    type: str
+    default: Server is shutting down in 2 minutes
+    help: "Custom message broadcasted to players 2 minutes before server shutdown."
+  - name: Shutdown Warning 1 Minute
+    section: Messages
+    key: shutdown_1min
+    type: str
+    default: Server is shutting down in 1 minute
+    help: "Custom message broadcasted to players 1 minute before server shutdown."
+  - name: Shutdown Warning 30 Seconds
+    section: Messages
+    key: shutdown_30sec
+    type: str
+    default: Server is shutting down in 30 seconds!
+    help: "Custom message broadcasted to players 30 seconds before server shutdown."
+  - name: Shutdown Warning NOW
+    section: Messages
+    key: shutdown_now
+    type: str
+    default: Server is shutting down NOW!
+    help: "Custom message broadcasted to players immediately before server shutdown."
+  - name: Joined Session Name
+    section: Manager
+    key: JoinedSessionName
+    type: bool
+    default: true
+    help: "Enables joining the map name to the session name when viewing in the server browser."
+cli:
+  - name: Session Name
+    section: option
+    key: SessionName
+    type: str
+    help: "Set the name of the server session as it appears in the server browser."
+  - name: Alt Save Directory
+    section: option
+    key: AltSaveDirectoryName
+    type: str
+    help: "Specify an alternative save directory for server data."
+  - name: Always Tick Dedicated Skeletal Meshes
+    section: flag
+    key: AlwaysTickDedicatedSkeletalMeshes
+    type: bool
+    help: "Optimize performance by always ticking skeletal meshes on dedicated servers."
+  - name: Auto Destroy Structures
+    section: flag
+    key: AutoDestroyStructures
+    type: bool
+    help: "Enables auto destruction of old structures."
+  - name: Culture
+    section: flag
+    key: culture
+    type: str
+    help: "Set the culture for the server (e.g., en-US)."
+  - name: Custom Cosmetic Validation
+    section: flag
+    key: DoCustomCosmeticValidation
+    type: bool
+    help: "Enables validation of custom cosmetic mods."
+  - name: Disable Custom Cosmetics
+    section: flag
+    key: DisableCustomCosmetics
+    type: bool
+    help: Disables the Custom Cosmetic system (allowing players to use and display special mods that should only be skins and will be downloaded automatically by the connected clients).
+  - name: Disabled Net Range Scaling
+    section: flag
+    key: disabledinonetrangescaling
+    type: bool
+    help: Disables creature's network replication range optimization.
+  - name: Easter Colors
+    section: flag
+    key: EasterColors
+    type: bool
+    help: Chance for Easter colors when creatures spawn.
+  - name: Exclusive Join
+    section: flag
+    key: exclusivejoin
+    type: bool
+    help: Activate a whitelist only mode on the server, allowing players to join if added to the allow list.
+  - name: Force Allow Cave Flyers
+    section: flag
+    key: ForceAllowCaveFlyers
+    type: bool
+    help: Force flyer creatures to be allowed into caves
+  - name: Force Respawn Dinos
+    section: flag
+    key: ForceRespawnDinos
+    type: bool
+    help: Launch with this command to destroy all wild creatures on server start-up.
+  - name: GB Usage To Force Restart
+    section: flag
+    key: GBUsageToForceRestart
+    type: int
+    default: 35
+    help: "Set the memory usage threshold (in GB) to trigger an automatic server restart."
+  - name: Mods
+    section: flag
+    key: mods
+    type: str
+    help: Specifies CurseForge Mod Project IDs. Mods are updated automatically when starting the server.
+  - name: No BattlEye
+    section: flag
+    key: NoBattlEye
+    type: bool
+    help: Disables BattlEye anti-cheat on the server.
+  - name: No Dinos
+    section: flag
+    key: NoDinos
+    type: bool
+    help: Launch with this command to prevent any wild creatures from spawning on the server.
+  - name: No Wild Babies
+    section: flag
+    key: NoWildBabies
+    type: bool
+    help: Launch with this command to prevent wild baby creatures from spawning on the server.
+  - name: Passive Mods
+    section: flag
+    key: passivemods
+    type: str
+    help: This option disables a mod's functionality while still loading its data. This is useful if, for example, you want to have S-Dinos on Astraeos in your cluster but prevent them from spawning on The Island while still allowing them to be transferred back and forth.
+  - name: Port
+    section: flag
+    key: port
+    type: int
+    default: 7777
+    help: "Set the main port for game connections."
+  - name: Server Game Log
+    section: flag
+    key: servergamelog
+    type: bool
+    help: Enable server admin logs (including support in the RCON).
+  - name: Server Game Log Include Tribe Logs
+    section: flag
+    key: servergamelogincludetribelogs
+    type: bool
+    help: Include tribe logs in the server admin logs.
+  - name: Server RCON Output Tribe Logs
+    section: flag
+    key: ServerRCONOutputTribeLogs
+    type: bool
+    help: Output tribe logs to RCON.
+  - name: Server Use Event Colors
+    section: flag
+    key: ServerUseEventColors
+    type: bool
+    help: Enable special event colors for creatures spawned during events.
+  - name: Stasis Keep Controllers
+    section: flag
+    key: StasisKeepControllers
+    type: bool
+    help: Keep AI controllers active while creatures are in stasis.
+  - name: Use Dynamic Config
+    section: flag
+    key: UseDynamicConfig
+    type: bool
+    help: Enables the use of dynamic configuration files for server settings.
+  - name: Use Store
+    section: flag
+    key: usestore
+    type: bool
+    help: "Same basic behaviour of official (non-legacy) servers on handling player characters data: character profile file (.arkprofile) is not saved separately from map save (.ark), nor its backup."
+  - name: Win Live Max Players
+    section: flag
+    key: WinLiveMaxPlayers
+    type: int
+    default: 70
+    help: "Set the maximum number of players."
+  - name: Cluster ID
+    section: flag
+    key: clusterid
+    type: str
+    help: "Set the Cluster ID for server clustering."
+  - name: No Transfer From Filtering
+    section: flag
+    key: NoTransferFromFiltering
+    type: bool
+    help: "Prevents ARK Data usage between single player and servers who do not have a cluster ID."
+  - name: Convert To Store
+    section: flag
+    key: converttostore
+    type: bool
+    help: "Converts legacy save files to the store format on server save."
+  - name: Custom Notification URL
+    section: flag
+    key: CustomNotificationURL
+    type: str
+    help: "Allows server custom notification broadcast using the server message feature. Supports HTTP protocols only (HTTPS is not supported)."
+  - name: Disable Character Tracker
+    section: flag
+    key: disableCharacterTracker
+    type: bool
+    help: "Used to disable character tracking."
+  - name: Disable Dupe Log Deletes
+    section: flag
+    key: DisableDupeLogDeletes
+    type: bool
+    help: "Prevents -ForceDupeLog to take effect."
+  - name: Force Dupe Log
+    section: flag
+    key: ForceDupeLog
+    type: bool
+    help: "Forces dupe logs. Requires -DisableDupeLogDeletes to be not set, enabled behaviour on official."
+  - name: Force Use Performance Threads
+    section: flag
+    key: forceuseperfthreads
+    type: bool
+    help: "Forces the use of performance threads for better server performance."
+  - name: Ignore Duped Items
+    section: flag
+    key: ignoredupeditems
+    type: bool
+    help: "If a duped item is detected in an inventory, this will be ignored and not removed."
+  - name: No AI
+    section: flag
+    key: NoAI
+    type: bool
+    help: "This will disable adding AI controller to creatures."
+  - name: No Dinos Except Forced Spawn
+    section: flag
+    key: NoDinosExceptForcedSpawn
+    type: bool
+    help: "Prevents wild creatures from being spawned, except for forced spawns. You cannot use this option if -NoDinos is used. Enabling this option will make the following options unusable: -NoDinosExceptStreamingSpawn, -NoDinosExceptManualSpawn and -NoDinosExceptWaterSpawn."
+  - name: No Dinos Except Streaming Spawn
+    section: flag
+    key: NoDinosExceptStreamingSpawn
+    type: bool
+    help: "Prevents wild creatures from being spawned, except for streaming spawns. You cannot use this option if one of the following options is used: -NoDinos or -NoDinosExceptForcedSpawn. Enabling this option will make the following options unusable: -NoDinosExceptManualSpawn and -NoDinosExceptWaterSpawn."
+  - name: No Dinos Except Manual Spawn
+    section: flag
+    key: NoDinosExceptManualSpawn
+    type: bool
+    help: "Prevents wild creatures from being spawned, except for manual spawns. You cannot use this option if one of the following options is used: -NoDinos, -NoDinosExceptForcedSpawn or -NoDinosExceptStreamingSpawn. Enabling this option will make option -NoDinosExceptWaterSpawn unusable."
+  - name: No Dinos Except Water Spawn
+    section: flag
+    key: NoDinosExceptWaterSpawn
+    type: bool
+    help: "Prevents wild creatures from being spawned, except for water spawns. You cannot use this option if one of the following options is used: -NoDinos, -NoDinosExceptForcedSpawn, -NoDinosExceptStreamingSpawn or -NoDinosExceptManualSpawn."
+  - name: No Performance Threads
+    section: flag
+    key: noperfthreads
+    type: bool
+    help: "Disables the use of performance threads."
+  - name: No Sound
+    section: flag
+    key: nosound
+    type: bool
+    help: "Disables sound processing on the server."
+  - name: One Thread
+    section: flag
+    key: onethread
+    type: bool
+    help: "Runs the server using a single thread for all processing."
+  - name: Server Platform
+    section: flag
+    key: ServerPlatform
+    type: str
+    default: "ALL"
+    help: "Allows the server to accept specified platforms. Options are PC for Steam, PS5 for PlayStation 5, XSX for XBOX, WINGDK for Microsoft Store, ALL for crossplay between PC (Steam and Windows Store) and all consoles."
+  - name: Unstasis Dino Obstruction Check
+    section: flag
+    key: UnstasisDinoObstructionCheck
+    type: bool
+    help: "Should prevent creatures from ghosting through meshes/structures on re-render."
+  - name: Use Server Net Speed Check
+    section: flag
+    key: UseServerNetSpeedCheck
+    type: bool
+    help: "It should avoid players to accumulate too much movements data per server tick, discarding the last if those are too many."
+  - name: Difficulty Offset
+    section: option
+    key: DifficultyOffset
+    type: float
+    default: 1.0
+    help: "Sets the difficulty offset for the server, affecting wild creature levels."
+  - name: RCON Port
+    section: option
+    key: RCONPort
+    type: int
+    default: 27020
+    help: "Sets the port for RCON (Remote Console) connections."
+  - name: RCON Enabled
+    section: option
+    key: RCONEnabled
+    type: bool
+    default: false
+    help: "Enables or disables RCON (Remote Console) access to the server."
+  - name: Server Admin Password
+    section: option
+    key: ServerAdminPassword
+    type: str
+    help: "Sets the password for server admin access via RCON."
+  - name: Server Hardcore
+    section: option
+    key: ServerHardcore
+    type: bool
+    default: false
+    help: "Enables hardcore mode on the server, where players have only one life."
+  - name: Server Password
+    section: option
+    key: ServerPassword
+    type: str
+    help: "Sets a password required for players to join the server."
+  - name: Server PVE
+    section: option
+    key: serverPVE
+    type: bool
+    default: false
+    help: "Enables Player vs Environment mode on the server, disabling player vs player combat."
+  - name: XP Multiplier
+    section: option
+    key: XPMultiplier
+    type: float
+    default: 1.0
+    help: "Sets the experience points multiplier for players on the server."
+gus:
+  - name: Active Mods
+    section: ServerSettings
+    key: ActiveMods
+    type: str
+    help: "List of active mods on the server by their IDs."
+  - name: Admin Logging
+    section: ServerSettings
+    key: AdminLogging
+    type: bool
+    default: true
+    help: "Enables or disables admin logging on the server."
+game:
+  - name: Baby Cuddle Grace Period Multiplier
+    section: "/script/shootergame.shootergamemode"
+    key: BabyCuddleGracePeriodMultiplier
+    type: float
+    default: "1.0"
+    help: "Scales how long after delaying cuddling with the Baby before Imprinting Quality starts to decrease."

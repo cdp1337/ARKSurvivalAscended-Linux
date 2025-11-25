@@ -24,5 +24,19 @@
             "linux"
         ],
         "category": "Game Server"
+    },
+    {
+        "$schema": "https://raw.githubusercontent.com/amidaware/community-scripts/main/community_scripts.schema.json",
+        "guid": "68388839-b2f3-60a3-ff4d-0f64bdcc0ff5",
+        "filename": "manage.py",
+        "args": [],
+        "env": [],
+        "submittedBy": "",
+        "name": null,
+        "syntax": [],
+        "default_timeout": "60",
+        "shell": "python",
+        "supported_platforms": [],
+        "category": null
     }
 ]
