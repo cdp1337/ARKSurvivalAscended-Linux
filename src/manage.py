@@ -298,6 +298,23 @@ class GameService(RCONService):
 		"""
 		self._rcon_cmd('ServerChat %s' % message)
 
+	def get_game_pid(self) -> int:
+		"""
+		Get the primary game process PID of the actual game server, or 0 if not running
+		:return:
+		"""
+
+		# There's no quick way to get the game process PID from systemd,
+		# so use ps to find the process based on the map name
+		processes = subprocess.run([
+			'ps', 'axh', '-o', 'pid,cmd'
+		], stdout=subprocess.PIPE).stdout.decode().strip()
+		for line in processes.split('\n'):
+			pid, cmd = line.strip().split(' ', 1)
+			if cmd.startswith('ArkAscendedServer.exe %s?listen' % self.map):
+				return int(line.strip().split(' ')[0])
+		return 0
+
 	def get_map_label(self) -> str:
 		if self.map == 'BobsMissions_WP':
 			return 'Club'
@@ -366,32 +383,28 @@ class GameService(RCONService):
 		elif col == 'session':
 			return self.get_option_value('Session Name')
 		elif col == 'port':
-			return str(self.get_option_value('Port'))
+			return self.get_option_value('Port')
 		elif col == 'rcon':
 			return self.get_option_value('RCON Port') if self.is_api_enabled() else 'N/A'
 		elif col == 'enabled':
 			return '✅ Enabled' if self.is_enabled() else '❌ Disabled'
 		elif col == 'running':
 			return '✅ Running' if self.is_running() else '❌ Stopped'
+		elif col == 'admin_password':
+			return self.get_option_value('Server Admin Password')
+		elif col == 'players':
+			v = self.get_player_count()
+			return str(v) if v is not None else 'N/A'
+		elif col == 'mods':
+			return ', '.join(self.mods)
+		elif col == 'cluster':
+			return self.get_option_value('Cluster ID')
+		elif col == 'map_size':
+			return str(self.get_map_file_size())
+		elif col == 'memory':
+			return self.get_memory_usage()
 		else:
 			return '???'
-		'''elif col == 'admin_password':
-			row.append(service.get_option('ServerAdminPassword'))
-		elif col == 'players':
-			v = service.rcon_get_number_players()
-			row.append(str(v) if v is not None else 'N/A')
-		elif col == 'mods':
-			row.append(', '.join(service.mods))
-		elif col == 'cluster':
-			row.append(service.cluster_id or '')
-		elif col == 'map_size':
-			row.append(str(service.get_map_file_size()))
-		elif col == 'player_profiles':
-			row.append(str(service.get_num_player_profiles()))
-		elif col == 'memory':
-			row.append(service.get_memory_usage())
-		'''
-
 
 
 def menu_service(service: GameService):
