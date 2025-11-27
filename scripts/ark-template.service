@@ -14,6 +14,9 @@ WorkingDirectory=$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64
 Environment=XDG_RUNTIME_DIR=/run/user/$(id -u)
 Environment="STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_DIR"
 Environment="STEAM_COMPAT_DATA_PATH=$GAME_DIR/prefixes/$MAP"
+ExecStop=$GAME_DIR/manage.py --pre-stop --service=${MAP}
+ExecStartPost=$GAME_DIR/manage.py --post-start --service=${MAP}
+TimeoutSec=600s
 # Check $GAME_DIR/services to adjust the CLI arguments
 Restart=on-failure
 RestartSec=20s

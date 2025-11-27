@@ -41,12 +41,35 @@ manager:
     type: str
     default: Server is shutting down NOW!
     help: "Custom message broadcasted to players immediately before server shutdown."
+  - name: Map Started (Discord)
+    section: Messages
+    key: map_started
+    type: str
+    default: "{map} has started! :rocket:"
+    help: "Custom message sent to Discord when the server starts, use '{map}' to insert the map name"
+  - name: Map Stopping (Discord)
+    section: Messages
+    key: map_stopping
+    type: str
+    default: ":small_red_triangle_down: {map} is shutting down"
+    help: "Custom message sent to Discord when the server stops, use '{map}' to insert the map name"
   - name: Joined Session Name
     section: Manager
     key: JoinedSessionName
     type: bool
     default: true
     help: "Enables joining the map name to the session name when viewing in the server browser."
+  - name: Discord Enabled
+    section: Discord
+    key: enabled
+    type: bool
+    default: false
+    help: "Enables or disables Discord integration for server status updates."
+  - name: Discord Webhook URL
+    section: Discord
+    key: webhook
+    type: str
+    help: "The webhook URL for sending server status updates to a Discord channel."
 cli:
   - name: Session Name
     section: option
