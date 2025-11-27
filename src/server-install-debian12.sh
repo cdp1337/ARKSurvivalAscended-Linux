@@ -346,6 +346,8 @@ if [ $OPT_UNINSTALL -eq 1 ]; then
 	[ -e "$GAME_DIR/stop_all.sh" ] && rm "$GAME_DIR/stop_all.sh"
 	[ -e "$GAME_DIR/update.sh" ] && rm "$GAME_DIR/update.sh"
 	[ -e "$GAME_DIR/.venv" ] && rm "$GAME_DIR/.venv" -r
+	[ -e "$GAME_DIR/.settings.ini" ] && rm "$GAME_DIR/.settings.ini"
+	[ -e "$GAME_DIR/configs.yaml" ] && rm "$GAME_DIR/configs.yaml"
 
 	if [ -n "$WARLOCK_GUID" ]; then
 		echo "Removing Warlock registration"
