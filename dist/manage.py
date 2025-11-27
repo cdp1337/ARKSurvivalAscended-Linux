@@ -1723,7 +1723,7 @@ class BaseConfig:
 			if value == '':
 				# Allow empty values to defer to default
 				return ''
-			elif value:
+			elif value is True or (str(value).lower() in ('1', 'true', 'yes', 'on')):
 				return 'True'
 			else:
 				return 'False'
@@ -2124,7 +2124,7 @@ class RCONService(BaseService):
 		:param cmd:
 		:return: None if RCON not available, or the result of the command
 		"""
-		if not (self.is_running() or self.is_starting()):
+		if not (self.is_running() or self.is_starting() or self.is_stopping()):
 			# If service is not running, don't even try to connect.
 			return None
 

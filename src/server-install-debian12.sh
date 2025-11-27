@@ -134,11 +134,51 @@ PORT_CUSTOM_RCON=27101
 # scriptlet:_common/firewall_allow.sh
 # scriptlet:_common/random_password.sh
 # scriptlet:io_github_lsferreira42/lib_ini.sh
-# scriptlet:_local/ark-server.sh
 # scriptlet:bz_eval_tui/prompt_text.sh
 # scriptlet:bz_eval_tui/prompt_yn.sh
 # scriptlet:bz_eval_tui/print_header.sh
 
+
+##
+# Install the management script from the project's repo
+#
+# Expects the following variables:
+#   GAME_USER    - User account to install the game under
+#   GAME_DIR     - Directory to install the game into
+#
+function install_management() {
+	print_header "Performing install_management"
+
+	# Install management console and its dependencies
+	local SRC=""
+
+	if [[ "$INSTALLER_VERSION" == *"~DEV"* ]]; then
+		# Development version, pull from dev branch
+		SRC="https://raw.githubusercontent.com/${REPO}/refs/heads/dev/dist/manage.py"
+	else
+		# Stable version, pull from tagged release
+		SRC="https://raw.githubusercontent.com/${REPO}/refs/tags/${INSTALLER_VERSION}/dist/manage.py"
+	fi
+
+	if ! download "$SRC" "$GAME_DIR/manage.py"; then
+		echo "Could not download management script!" >&2
+		exit 1
+	fi
+
+	chown $GAME_USER:$GAME_USER "$GAME_DIR/manage.py"
+	chmod +x "$GAME_DIR/manage.py"
+
+	# Install configuration definitions
+	cat > "$GAME_DIR/configs.yaml" <<EOF
+# script:configs.yaml
+EOF
+
+	# If a pyenv is required:
+	sudo -u $GAME_USER python3 -m venv "$GAME_DIR/.venv"
+	sudo -u $GAME_USER "$GAME_DIR/.venv/bin/pip" install --upgrade pip
+	sudo -u $GAME_USER "$GAME_DIR/.venv/bin/pip" install pyyaml
+	sudo -u $GAME_USER "$GAME_DIR/.venv/bin/pip" install rcon
+}
 
 
 ############################################
@@ -157,7 +197,8 @@ if [ -n "$REPO" -a -n "$(which curl)" -a "${0:0:8}" != "/dev/fd/" ]; then
 			read -p "Do you want to update the installer? (y/N): " -t 10 UPDATE
 			case "$UPDATE" in
 				[yY]*)
-					if ark_update_installer "$REPO" "$GITHUB_VERSION" "$0"; then
+					SRC="https://raw.githubusercontent.com/${REPO}/refs/tags/${GITHUB_VERSION}/dist/server-install-debian12.sh"
+					if download "$SRC" "$0"; then
 						echo "Relaunching installer ${GITHUB_VERSION}"
 						exec "$0" "${@}"
 						exit 0
@@ -269,9 +310,9 @@ if [ $OPT_UNINSTALL -eq 1 ]; then
 	fi
 
 
-	if [ -e "$GAME_DIR/backup.sh" ]; then
+	if [ -e "$GAME_DIR/manage.py" ]; then
 		if prompt_yn -q --default-yes "? Would you like to perform a backup before everything is wiped?"; then
-			$GAME_DIR/backup.sh
+			$GAME_DIR/manage.py --backup
 		fi
 	fi
 
@@ -795,25 +836,25 @@ fi
 
 
 # Install a management script
-sudo -u $GAME_USER python3 -m venv $GAME_DIR/.venv
-sudo -u $GAME_USER $GAME_DIR/.venv/bin/pip install rcon
-cat > $GAME_DIR/manage.py <<EOF
-# script:manage.py
-EOF
-chown $GAME_USER:$GAME_USER $GAME_DIR/manage.py
-chmod +x $GAME_DIR/manage.py
+install_management
 
-cat > $GAME_DIR/backup.sh <<EOF
+# As of v2025.11.27 these scripts have been ported to the management console.
+if [ -e "$GAME_DIR/backup.sh" ]; then
+	cat > $GAME_DIR/backup.sh <<EOF
 # script:backup.sh
 EOF
-chown $GAME_USER:$GAME_USER $GAME_DIR/backup.sh
-chmod +x $GAME_DIR/backup.sh
+	chown $GAME_USER:$GAME_USER $GAME_DIR/backup.sh
+	chmod +x $GAME_DIR/backup.sh
+fi
 
-cat > $GAME_DIR/restore.sh <<EOF
+# As of v2025.11.27 these scripts have been ported to the management console.
+if [ -e "$GAME_DIR/restore.sh" ]; then
+	cat > $GAME_DIR/restore.sh <<EOF
 # script:restore.sh
 EOF
-chown $GAME_USER:$GAME_USER $GAME_DIR/restore.sh
-chmod +x $GAME_DIR/restore.sh
+	chown $GAME_USER:$GAME_USER $GAME_DIR/restore.sh
+	chmod +x $GAME_DIR/restore.sh
+fi
 
 
 # Reload systemd to pick up the new service files
