@@ -137,6 +137,11 @@ cli:
     type: int
     default: 35
     help: "Set the memory usage threshold (in GB) to trigger an automatic server restart."
+  - name: New Save Format
+    section: flag
+    key: newsaveformat
+    type: bool
+    help: Enables the new save format for server saves, improving performance and compatibility with future updates.
   - name: Mods
     section: flag
     key: mods
