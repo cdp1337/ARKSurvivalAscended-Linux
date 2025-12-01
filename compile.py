@@ -32,7 +32,7 @@ def parse_scriptlet_url(include_path: str):
 	if source_data[0] == 'github':
 		repo = source_data[1]
 		branch = 'main' if len(source_data) == 2 else source_data[2]
-		url = 'https://raw.githubusercontent.com/%s/refs/head/%s/scriptlets/%s' % (repo, branch, include_path)
+		url = 'https://raw.githubusercontent.com/%s/refs/heads/%s/scriptlets/%s' % (repo, branch, include_path)
 		return url
 	else:
 		print('Unknown source type: %s' % source_data[0])
@@ -277,11 +277,6 @@ class Script:
 			dest_f.write(self.content_body)
 		# Ensure new file is executable
 		os.chmod(dest_file, 0o775)
-
-	# Store the TRMM metafile
-	#script_name = os.path.basename(self.file)[:-3]
-	#with open(os.path.join(os.path.dirname(dest_file), script_name + '.json'), 'w') as dest_f:
-	#	dest_f.write(json.dumps([self.as_trmm_meta()], indent=4))
 
 	def _parse_import(self, line: str):
 		"""
@@ -660,7 +655,7 @@ class Script:
 		code.append('')
 		return '\n'.join(code)
 
-	# @todo Support #-p) pidfile="$2"; shift 2;;
+		# @todo Support #-p) pidfile="$2"; shift 2;;
 
 	def _generate_argparse_python(self) -> str:
 		code = []

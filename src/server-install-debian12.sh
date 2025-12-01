@@ -161,9 +161,13 @@ function install_management() {
 	fi
 
 	if ! download "$SRC" "$GAME_DIR/manage.py"; then
-		echo "Could not download management script!" >&2
-		exit 1
-	fi
+    		# Fallback to main branch
+    		SRC="https://raw.githubusercontent.com/${REPO}/refs/heads/main/dist/manage.py"
+    		if ! download "$SRC" "$GAME_DIR/manage.py"; then
+    			echo "Could not download management script!" >&2
+    			exit 1
+    		fi
+    	fi
 
 	chown $GAME_USER:$GAME_USER "$GAME_DIR/manage.py"
 	chmod +x "$GAME_DIR/manage.py"

@@ -234,8 +234,8 @@ class GameService(RCONService):
 	"""
 	def __init__(self, service: str, game: GameApp):
 		super().__init__(service, game)
-		self.file = os.path.join(here, 'services', '%s.conf' % service)
-		self.configs['cli'] = CLIConfig('cli')
+		self.file = '/etc/systemd/system/%s.service.d/override.conf' % service
+		self.configs['cli'] = CLIConfig('cli', self.file)
 		self.map = None
 		self.runner = None
 
@@ -253,28 +253,9 @@ class GameService(RCONService):
 				)
 				self.runner = extracted_keys.group('runner')
 				self.map = extracted_keys.group('map').strip()
-				self.configs['cli'].load(extracted_keys.group('args'))
+				self.configs['cli'].format = 'ExecStart=%s run ArkAscendedServer.exe %s?listen[OPTIONS]' % (self.runner, self.map)
 
-	def save(self):
-		"""
-		Save the service definition back to the service file
-		and reload systemd with the new updates.
-		:return:
-		"""
-		exec_line = 'ExecStart=%s run ArkAscendedServer.exe %s?listen?%s' % (self.runner, self.map, str(self.configs['cli']))
-
-		# Save the compiled line back to the service file, (along with the header)
-		with open(self.file, 'w') as f:
-			f.write('[Service]\n')
-			f.write('# Edit this line to adjust start parameters of the server\n')
-			f.write('# After modifying, please remember to run  to apply changes to the system.\n')
-			f.write(exec_line + '\n')
-
-		# Reload the service
-		if os.geteuid() != 0:
-			print('WARNING: Please run sudo systemctl daemon-reload to apply changes to the service.', file=sys.stderr)
-		else:
-			subprocess.run(['systemctl', 'daemon-reload'])
+		self.load()
 
 	def set_option(self, option: str, value: Union[str, int, bool]):
 		"""
@@ -298,15 +279,18 @@ class GameService(RCONService):
 		:return:
 		"""
 
-		# CLI configs cannot save automatically, so save here
-		self.save()
-
 		# Special option actions
 		if option == 'Port':
 			# Update firewall for game port change
 			if previous_value:
 				firewall_remove(int(previous_value), 'udp')
 			firewall_allow(int(value), 'udp', '%s game port - %s' % (self.game.desc, self.get_map_label()))
+
+		# Reload the service
+		if os.geteuid() != 0:
+			print('WARNING: Please run sudo systemctl daemon-reload to apply changes to the service.', file=sys.stderr)
+		else:
+			subprocess.run(['systemctl', 'daemon-reload'])
 
 	def is_api_enabled(self) -> bool:
 		"""
@@ -348,7 +332,7 @@ class GameService(RCONService):
 		Get the current player count on the server, or None if the API is unavailable
 		:return:
 		"""
-		ret =  self._rcon_cmd('ListPlayers')
+		ret =  self._api_cmd('ListPlayers')
 		if ret is None:
 			return None
 		elif ret == 'No Players Connected':
@@ -356,71 +340,12 @@ class GameService(RCONService):
 		else:
 			return len(ret.split('\n'))
 
-	def post_start(self) -> bool:
-		"""
-		Perform the necessary operations for after a game has started
-		:return:
-		"""
-		if self.is_api_enabled():
-			counter = 0
-			print('Waiting for API to become available...')
-			while counter < 24:
-				players = self.get_player_count()
-				if players is not None:
-					msg = self.game.get_option_value('Map Started (Discord)')
-					if '{map}' in msg:
-						msg = msg.replace('{map}', self.get_map_label())
-					self.game.send_discord_message(msg)
-					return True
-				else:
-					print('API not available yet')
-				time.sleep(10)
-				counter += 1
-			print('API did not reply within the allowed time!', file=sys.stderr)
-			return False
-
-		return True
-
-	def pre_stop(self) -> bool:
-		"""
-		Perform operations necessary for safely stopping a server
-
-		Called automatically via systemd
-		:return:
-		"""
-		msg = self.game.get_option_value('Map Stopping (Discord)')
-		if '{map}' in msg:
-			msg = msg.replace('{map}', self.get_map_label())
-		self.game.send_discord_message(msg)
-
-		if self.is_api_enabled():
-			timers = (
-				(self.game.get_option_value('Shutdown Warning 5 Minutes'), 60),
-				(self.game.get_option_value('Shutdown Warning 4 Minutes'), 60),
-				(self.game.get_option_value('Shutdown Warning 3 Minutes'), 60),
-				(self.game.get_option_value('Shutdown Warning 2 Minutes'), 60),
-				(self.game.get_option_value('Shutdown Warning 1 Minute'), 30),
-				(self.game.get_option_value('Shutdown Warning 30 Seconds'), 30),
-				(self.game.get_option_value('Shutdown Warning NOW'), 0),
-			)
-			for timer in timers:
-				players = self.get_player_count()
-				if players is not None and players > 0:
-					print('Players are online, sending warning message: %s' % timer[0])
-					self.send_message(timer[0])
-					if timer[1]:
-						time.sleep(timer[1])
-				else:
-					break
-			self.save_world()
-		return True
-
 	def save_world(self):
 		"""
 		Issue a Save command on the server
 		:return:
 		"""
-		self._rcon_cmd('SaveWorld')
+		self._api_cmd('SaveWorld')
 
 	def send_message(self, message: str):
 		"""
@@ -428,7 +353,7 @@ class GameService(RCONService):
 		:param message:
 		:return:
 		"""
-		self._rcon_cmd('ServerChat %s' % message)
+		self._api_cmd('ServerChat %s' % message)
 
 	def get_game_pid(self) -> int:
 		"""
@@ -554,7 +479,6 @@ class GameService(RCONService):
 
 		mods.append(mod_id)
 		self.set_option('Mods', ','.join(mods))
-		self.save()
 		print('Enabled mod %s on service %s' % (mod_id, self.service))
 
 	def disable_mod(self, mod_id):
@@ -573,7 +497,6 @@ class GameService(RCONService):
 
 		mods.remove(mod_id)
 		self.set_option('Mods', ','.join(mods))
-		self.save()
 		print('Disabled mod %s on service %s' % (mod_id, self.service))
 
 	def toggle_mod(self, mod_id):
@@ -594,7 +517,6 @@ class GameService(RCONService):
 			action = 'Enabled'
 
 		self.set_option('Mods', ','.join(mods))
-		self.save()
 		print('%s mod %s on service %s' % (action, mod_id, self.service))
 
 

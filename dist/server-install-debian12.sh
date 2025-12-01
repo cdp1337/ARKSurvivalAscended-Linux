@@ -1842,9 +1842,13 @@ function install_management() {
 	fi
 
 	if ! download "$SRC" "$GAME_DIR/manage.py"; then
-		echo "Could not download management script!" >&2
-		exit 1
-	fi
+    		# Fallback to main branch
+    		SRC="https://raw.githubusercontent.com/${REPO}/refs/heads/main/dist/manage.py"
+    		if ! download "$SRC" "$GAME_DIR/manage.py"; then
+    			echo "Could not download management script!" >&2
+    			exit 1
+    		fi
+    	fi
 
 	chown $GAME_USER:$GAME_USER "$GAME_DIR/manage.py"
 	chmod +x "$GAME_DIR/manage.py"
@@ -1898,14 +1902,14 @@ manager:
     section: Messages
     key: map_started
     type: str
-    default: "{map} has started! :rocket:"
-    help: "Custom message sent to Discord when the server starts, use '{map}' to insert the map name"
+    default: "{instance} has started! :rocket:"
+    help: "Custom message sent to Discord when the server starts, use '{instance}' to insert the map name"
   - name: Map Stopping (Discord)
     section: Messages
     key: map_stopping
     type: str
-    default: ":small_red_triangle_down: {map} is shutting down"
-    help: "Custom message sent to Discord when the server stops, use '{map}' to insert the map name"
+    default: ":small_red_triangle_down: {instance} is shutting down"
+    help: "Custom message sent to Discord when the server stops, use '{instance}' to insert the map name"
   - name: Joined Session Name
     section: Manager
     key: JoinedSessionName
@@ -1990,6 +1994,11 @@ cli:
     type: int
     default: 35
     help: "Set the memory usage threshold (in GB) to trigger an automatic server restart."
+  - name: New Save Format
+    section: flag
+    key: newsaveformat
+    type: bool
+    help: Enables the new save format for server saves, improving performance and compatibility with future updates.
   - name: Mods
     section: flag
     key: mods
