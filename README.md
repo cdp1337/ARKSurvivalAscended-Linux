@@ -87,6 +87,13 @@ Imports from Nitrado server backups are SUPPORTED, including all player and trib
 * 16GB RAM per map or 96GB RAM for a full cluster
 * CPU/vCPU cores, at least 2 cores per map and 4GHz or faster.
 
+
+## Installation with Warlock
+
+The easiest way to install ARK Survival Ascended Dedicated Server on Linux is to use
+[Warlock](https://github.com/BitsNBytes25/Warlock), a game server management tool.
+
+
 ## Installation on Debian 12/13 or Ubuntu 24.04
 
 To install ARK Survival Ascended Dedicated Server on Debian 12 or Ubuntu 24.04,

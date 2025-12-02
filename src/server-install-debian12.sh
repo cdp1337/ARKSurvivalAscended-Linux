@@ -39,6 +39,7 @@
 #   OPT_OVERRIDE_DIR=--dir=<string> - Use a custom installation directory instead of the default OPTIONAL
 #   NONINTERACTIVE=--non-interactive - Run the installer in non-interactive mode (useful for scripted installs)
 #   OPT_SKIP_FIREWALL=--skip-firewall - Skip installing/configuring the firewall
+#   OPT_NEWFORMAT=--new-format - Use the new save format (Nitrado/Official server compatible) OPTIONAL
 #
 # Changelog:
 #   202511XX - Support custom installation directory
@@ -46,6 +47,9 @@
 #            - Bump Proton to 10.25
 #            - Fix for more flexible support for game options
 #            - Backport 74.24 Steam fix into legacy start/stop scripts
+#            - Add support for --new-format as an argument to support Warlock
+#            - Fix support for JoinedSessionName (ini uses lowercase keys)
+#            - Support for Warlock management system
 #   20251105 - Fix broken Steam library in update 74.24
 #            - Add support for skipping firewall installation
 #            - Add support for using completely custom session names
@@ -133,7 +137,6 @@ PORT_CUSTOM_RCON=27101
 # scriptlet:ufw/install.sh
 # scriptlet:_common/firewall_allow.sh
 # scriptlet:_common/random_password.sh
-# scriptlet:io_github_lsferreira42/lib_ini.sh
 # scriptlet:bz_eval_tui/prompt_text.sh
 # scriptlet:bz_eval_tui/prompt_yn.sh
 # scriptlet:bz_eval_tui/print_header.sh
@@ -182,6 +185,14 @@ EOF
 	sudo -u $GAME_USER "$GAME_DIR/.venv/bin/pip" install --upgrade pip
 	sudo -u $GAME_USER "$GAME_DIR/.venv/bin/pip" install pyyaml
 	sudo -u $GAME_USER "$GAME_DIR/.venv/bin/pip" install rcon
+
+	# Use the management utility to store some preferences from the installer
+	# Save the preferences for the manager
+    if [ "$JOINEDSESSIONNAME" == "1" ]; then
+    	"$GAME_DIR/manage.py" --set-config "Joined Session Name" True
+    else
+    	"$GAME_DIR/manage.py" --set-config "Joined Session Name" False
+    fi
 }
 
 
@@ -378,16 +389,11 @@ fi
 
 if [ "$INSTALLTYPE" == "new" ]; then
 	JOINEDSESSIONNAME=$(prompt_yn --default-yes "? Include map names in instance name? e.g. My Awesome ARK Server (Island)")
-elif [ -e "$GAME_DIR/.settings.ini" ]; then
-	# Detect if it's set in the manager settings file
-	JOINEDSESSIONNAME=$(ini_get_or_default "$GAME_DIR/.settings.ini" "Manager" "JoinedSessionName" "True")
-	if [ "$JOINEDSESSIONNAME" == "True" ]; then
-		JOINEDSESSIONNAME=1
-	else
-		JOINEDSESSIONNAME=0
-	fi
+elif [ -e "$GAME_DIR/.settings.ini" ] && grep -q "joinedsessionname = False" "$GAME_DIR/.settings.ini" ; then
+	# Explicitly disabled
+	JOINEDSESSIONNAME=0
 else
-	# Existing install but no settings defined, default to legacy behaviour
+	# Enabled by default
 	JOINEDSESSIONNAME=1
 fi
 
@@ -396,15 +402,7 @@ fi
 # Legacy formats use individual files for each character whereas
 # "new" formats save all characters along with the map.
 echo ''
-if [ "$INSTALLTYPE" == "new" ]; then
-	echo "Nitrado and official servers are using a new save format"
-	echo "which combines all player data into the map save files."
-	echo ""
-	echo "If you plan on migrating existing content from those servers,"
-	echo "it is highly recommended to use the new save format."
-
-	NEWFORMAT=$(prompt_yn --default-no "? Use new save format?")
-elif [ -e "$GAME_DIR/services/ark-island.conf" ]; then
+if [ -e "$GAME_DIR/services/ark-island.conf" ]; then
 	if grep -q '-newsaveformat' "$GAME_DIR/services/ark-island.conf"; then
 		echo "Using new save format for existing installation"
 		NEWFORMAT=1
@@ -412,9 +410,27 @@ elif [ -e "$GAME_DIR/services/ark-island.conf" ]; then
 		echo "Using legacy save format for existing installation"
 		NEWFORMAT=0
 	fi
+elif [ $OPT_NEWFORMAT -eq 1 ]; then
+	echo "Using new save format for existing installation based on explicit argument"
+	NEWFORMAT=1
+elif [ "$INSTALLTYPE" == "new" ]; then
+  	echo "Nitrado and official servers are using a new save format"
+  	echo "which combines all player data into the map save files."
+  	echo ""
+  	echo "If you plan on migrating existing content from those servers,"
+  	echo "it is highly recommended to use the new save format."
+
+  	NEWFORMAT=$(prompt_yn --default-no "? Use new save format?")
 else
 	echo "Using legacy save format for existing installation"
 	NEWFORMAT=0
+fi
+
+# Load or generate a cluster ID as users usually want to cluster their maps together
+if [ -e "$GAME_DIR/services/ark-island.conf" ] && grep -q 'clusterid=' "$GAME_DIR/services/ark-island.conf"; then
+	CLUSTERID="grep -Eo 'clusterid=[^ ]*' "$GAME_DIR/services/ark-island.conf" | sed 's:.*=::'"
+else
+	CLUSTERID="$(random_password 12)"
 fi
 
 
@@ -533,13 +549,6 @@ chmod 600 "/home/$GAME_USER/.ssh/authorized_keys"
 # This generally isn't needed when using defaults, but is helpful if the GAME_DIR location is changed.
 [ -d "$GAME_DIR" ] || mkdir -p "$GAME_DIR"
 chown -R $GAME_USER:$GAME_USER "$GAME_DIR"
-
-# Save the preferences for the manager
-if [ "$JOINEDSESSIONNAME" == "1" ]; then
-	ini_write "$GAME_DIR/.settings.ini" "Manager" "JoinedSessionName" "True"
-else
-	ini_write "$GAME_DIR/.settings.ini" "Manager" "JoinedSessionName" "False"
-fi
 
 # Preliminary requirements
 apt install -y curl sudo python3-venv
@@ -686,6 +695,9 @@ GAMEFLAGS="-servergamelog"
 if [ $NEWFORMAT -eq 1 ]; then
 	GAMEFLAGS="$GAMEFLAGS -newsaveformat -usestore"
 fi
+
+# Append the cluster ID
+GAMEFLAGS="$GAMEFLAGS -clusterid=$CLUSTERID"
 
 # Install the systemd service files for ARK Survival Ascended Dedicated Server
 for MAP in $GAME_MAPS; do

@@ -55,7 +55,7 @@ manager:
     help: "Custom message sent to Discord when the server stops, use '{instance}' to insert the map name"
   - name: Joined Session Name
     section: Manager
-    key: JoinedSessionName
+    key: joinedsessionname
     type: bool
     default: true
     help: "Enables joining the map name to the session name when viewing in the server browser."
