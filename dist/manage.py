@@ -985,11 +985,18 @@ class BaseApp:
 				src = os.path.join(save_source, f)
 				dst = os.path.join(temp_store, 'save', f)
 				if os.path.exists(src):
-					print('Backing up save file: %s' % src)
 					if os.path.isfile(src):
+						print('Backing up save file: %s' % src)
+						if not os.path.exists(os.path.dirname(dst)):
+							os.makedirs(os.path.dirname(dst))
 						shutil.copy(src, dst)
 					else:
-						shutil.copytree(src, dst)
+						print('Backing up save directory: %s' % src)
+						if not os.path.exists(dst):
+							os.makedirs(dst)
+						shutil.copytree(src, dst, dirs_exist_ok=True)
+				else:
+					print('Save file %s does not exist, skipping...' % src, file=sys.stderr)
 
 		return temp_store
 
@@ -1808,7 +1815,7 @@ class BaseService:
 		"""
 		if self.is_api_enabled():
 			counter = 0
-			print('Waiting for API to become available...')
+			print('Waiting for API to become available...', file=sys.stderr)
 			time.sleep(15)
 			while counter < 24:
 				players = self.get_player_count()
@@ -1820,7 +1827,7 @@ class BaseService:
 						self.game.send_discord_message(msg)
 					return True
 				else:
-					print('API not available yet')
+					print('API not available yet', file=sys.stderr)
 
 				# Is the game PID still available?
 				if self.get_pid() == 0:
@@ -3055,9 +3062,6 @@ FUNDING = 'https://ko-fi.com/bitsandbytes'
 GAME_USER = 'steam'
 STEAM_DIR = '/home/%s/.local/share/Steam' % GAME_USER
 
-SAVE_DIR = '/home/%s/.config/Epic/Vein/Saved/SaveGames/' % GAME_USER
-# VEIN uses the default Epic save handler which stores saves in ~/.config
-
 ICON_ENABLED = '✅'
 ICON_STOPPED = '🛑'
 ICON_DISABLED = '❌'
@@ -3170,82 +3174,27 @@ class GameApp(BaseApp):
 		"""
 		return steamcmd_check_app_update(os.path.join(here, 'AppFiles', 'steamapps', 'appmanifest_%s.acf' % self.steam_id))
 
-	def backup(self, max_backups: int = 0) -> bool:
+	def get_save_directory(self):
 		"""
-		Backup the game server files
+		Get the save directory for the game server
 
-		:param max_backups: Maximum number of backups to keep (0 = unlimited)
 		:return:
 		"""
-		temp_store = self.prepare_backup()
+		return os.path.join(here, 'AppFiles', 'ShooterGame', 'Saved')
 
-		# Copy service files from systemd
-		os.makedirs(os.path.join(temp_store, 'services'), exist_ok=True)
+	def get_save_files(self):
+		ret = ['clusters']
 		for svc in self.get_services():
-			shutil.copy(
-				'/etc/systemd/system/%s.service.d/override.conf' % svc.service,
-				os.path.join(temp_store, 'services', '%s.service' % svc.service),
-				)
-
-		# Copy save content from AppFiles
-		save_src = os.path.join(here, 'AppFiles', 'ShooterGame', 'Saved')
-		save_dst = os.path.join(temp_store, 'save')
-		shutil.copytree(os.path.join(save_src, 'clusters'), os.path.join(save_dst, 'clusters'))
-		shutil.copytree(
-			os.path.join(save_src, 'SavedArks'),
-			os.path.join(save_dst, 'SavedArks'),
-			ignore=shutil.ignore_patterns('*.bak', '*.profilebak', '*.tribebak', '*_WP_0*.ark', '*_WP_1*.ark')
-		)
-
-		backup_path = game.complete_backup(max_backups)
-
-		print('Backup saved to %s' % backup_path)
-		return True
-
-	def restore(self, path: str) -> bool:
-		"""
-		Restore the game server files
-
-		:param path: Path to the backup archive
-		:return:
-		"""
-		if os.geteuid() != 0:
-			print('ERROR: Restore operation requires sudo / root privileges!', file=sys.stderr)
-			return False
-
-		temp_store = self.prepare_restore(path)
-		if temp_store is False:
-			return False
-
-		# Copy service files from systemd
-		os.makedirs(os.path.join(temp_store, 'services'), exist_ok=True)
-		for svc in self.get_services():
-			src = os.path.join(temp_store, 'services', '%s.service' % svc.service)
-			dst = '/etc/systemd/system/%s.service.d/override.conf' % svc.service
-			if os.path.exists(src):
-				print('Restoring service file for %s' % svc.service)
-				shutil.copy(src, dst)
-				os.chown(dst, 0, 0)
-		subprocess.run(['systemctl', 'daemon-reload'])
-
-		# Restore save content to AppFiles
-		save_dst = os.path.join(here, 'AppFiles', 'ShooterGame', 'Saved')
-		save_src = os.path.join(temp_store, 'save')
-		print('Restoring cluster save data...')
-		shutil.copytree(
-			os.path.join(save_src, 'clusters'),
-			os.path.join(save_dst, 'clusters'),
-			dirs_exist_ok=True
-		)
-		print('Restoring world save data...')
-		shutil.copytree(
-			os.path.join(save_src, 'SavedArks'),
-			os.path.join(save_dst, 'SavedArks'),
-			dirs_exist_ok=True
-		)
-
-		self.complete_restore()
-		return True
+			path = svc.get_saved_location()
+			base_path = os.path.basename(path)
+			if os.path.exists(path):
+				for file in os.listdir(path):
+					if file.endswith('bak'):
+						continue
+					if '_WP_0' in file or '_WP_1' in file:
+						continue
+					ret.append(os.path.join('SavedArks', base_path, file))
+		return ret
 
 
 class GameService(RCONService):
