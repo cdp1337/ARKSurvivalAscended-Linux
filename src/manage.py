@@ -519,6 +519,16 @@ class GameService(RCONService):
 		self.set_option('Mods', ','.join(mods))
 		print('%s mod %s on service %s' % (action, mod_id, self.service))
 
+	def post_start(self) -> bool:
+		ret = super().post_start()
+		if not ret:
+			# Print the last few messages from the Game log to provide a hint to the user if there was a problem.
+			log = os.path.join(here, 'AppFiles/ShooterGame/Saved/Logs/ShooterGame.log')
+			if os.path.exists(log):
+				subprocess.run(['tail', '-n', '20', log])
+
+		return ret
+
 
 def menu_service(service: GameService):
 	"""

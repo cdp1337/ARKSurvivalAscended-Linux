@@ -1312,24 +1312,976 @@ cli:
     default: 1.0
     help: "Sets the experience points multiplier for players on the server."
 gus:
-  - name: Active Mods
+  - key: ActiveMods
     section: ServerSettings
-    key: ActiveMods
-    type: str
-    help: "List of active mods on the server by their IDs."
-  - name: Admin Logging
+    name: Active Mods
+    help: List of mod IDs, comma-separated (no spaces). Order sets priority (left-most highest).
+  - key: ActiveMapMod
     section: ServerSettings
-    key: AdminLogging
+    name: Active Map Mod
+    help: Mod ID of the currently active mod map.
+  - key: AdminLogging
+    section: ServerSettings
+    name: Admin Logging
+    help: If true, logs all admin commands to in-game chat.
+    type: bool
+    default: false
+  - key: AllowAnyoneBabyImprintCuddle
+    section: ServerSettings
+    name: Allow Anyone Baby Imprint Cuddle
+    help: If true, allows anyone to cuddle/imprint baby creatures (not only the imprinter).
+    type: bool
+    default: false
+  - key: AllowCaveBuildingPvE
+    section: ServerSettings
+    name: Allow Cave Building PvE
+    help: If true, allows building in caves when PvE mode is enabled.
+    type: bool
+    default: false
+  - key: AllowCaveBuildingPvP
+    section: ServerSettings
+    name: Allow Cave Building PvP
+    help: If false, prevents building in caves when PvP mode is enabled.
     type: bool
     default: true
-    help: "Enables or disables admin logging on the server."
-game:
-  - name: Baby Cuddle Grace Period Multiplier
-    section: "/script/shootergame.shootergamemode"
-    key: BabyCuddleGracePeriodMultiplier
+  - key: AllowCryoFridgeOnSaddle
+    section: ServerSettings
+    name: Allow Cryo Fridge On Saddle
+    help: If true, allows cryofridges on platform saddles and rafts.
+    type: bool
+    default: false
+  - key: AllowFlyerCarryPvE
+    section: ServerSettings
+    name: Allow Flyer Carry PvE
+    help: If true, allows flyers to pick up wild creatures in PvE.
+    type: bool
+    default: false
+  - key: AllowHideDamageSourceFromLogs
+    section: ServerSettings
+    name: Allow Hide Damage Source From Logs
+    help: If false, damage sources are shown in tribe logs.
+    type: bool
+    default: true
+  - key: AllowHitMarkers
+    section: ServerSettings
+    name: Allow Hit Markers
+    help: If false, disables optional ranged attack hit markers.
+    type: bool
+    default: true
+  - key: AllowMultipleAttachedC4
+    section: ServerSettings
+    name: Allow Multiple Attached C4
+    help: If true, allows attaching more than one C4 per creature.
+    type: bool
+    default: false
+  - key: AllowRaidDinoFeeding
+    section: ServerSettings
+    name: Allow Raid Dino Feeding
+    help: If true, allows Titanosaurs to be fed permanently (permanent tame).
+    type: bool
+    default: false
+  - key: AllowThirdPersonPlayer
+    section: ServerSettings
+    name: Allow Third Person Player
+    help: If false, disables third-person camera on dedicated servers.
+    type: bool
+    default: true
+  - key: AlwaysAllowStructurePickup
+    section: ServerSettings
+    name: Always Allow Structure Pickup
+    help: If true, disables the quick pick-up timer.
+    type: bool
+    default: false
+  - key: ArmadoggoDeathCooldown
+    section: ServerSettings
+    name: Armadoggo Death Cooldown
+    help: Seconds until Armadoggo can reappear after fatal damage.
+    type: int
+    default: 3600
+  - key: AutoSavePeriodMinutes
+    section: ServerSettings
+    name: Auto Save Period Minutes
+    help: Interval for automatic saves in minutes (0 = constant saving).
     type: float
-    default: "1.0"
+    default: 15.0
+  - key: BanListURL
+    section: ServerSettings
+    name: Ban List URL
+    help: |
+      URL to the global ban list (official ASA: https://cdn2.arkdedicated.com/asa/BanList.txt).
+  - key: ClampItemSpoilingTimes
+    section: ServerSettings
+    name: Clamp Item Spoiling Times
+    help: If true, clamps spoiling times to items' max spoiling times.
+    type: bool
+    default: false
+  - key: ClampResourceHarvestDamage
+    section: ServerSettings
+    name: Clamp Resource Harvest Damage
+    help: If true, limits harvest damage based on resource remaining health.
+    type: bool
+    default: false
+  - key: CosmeticWhitelistOverride
+    section: ServerSettings
+    name: Cosmetic Whitelist Override
+    help: URL to a comma-separated list of whitelisted custom cosmetics (special format).
+  - key: CosmoWeaponAmmoReloadAmount
+    section: ServerSettings
+    name: Cosmo Weapon Ammo Reload Amount
+    help: Amount of ammo given when Cosmo's webslinger reloads over time.
+    type: int
+    default: 1
+  - key: CustomLiveTuningUrl
+    section: ServerSettings
+    name: Custom Live Tuning URL
+    help: Direct link to the live tuning JSON file (overrides live tuning).
+  - key: DayCycleSpeedScale
+    section: ServerSettings
+    name: Day Cycle Speed Scale
+    help: Scaling factor for passage of time (day/night cycle). 1.0 is default.
+    type: float
+    default: 1.0
+  - key: DayTimeSpeedScale
+    section: ServerSettings
+    name: Day Time Speed Scale
+    help: Scaling factor for day-time speed relative to night.
+    type: float
+    default: 1.0
+  - key: DifficultyOffset
+    section: ServerSettings
+    name: Difficulty Offset
+    help: Server difficulty multiplier.
+    type: float
+    default: 1.0
+  - key: DinoCharacterFoodDrainMultiplier
+    section: ServerSettings
+    name: Dino Character Food Drain Multiplier
+    help: Scaling for creature food consumption (taming also affected).
+    type: float
+    default: 1.0
+  - key: DinoCharacterHealthRecoveryMultiplier
+    section: ServerSettings
+    name: Dino Character Health Recovery Multiplier
+    help: Scaling for creature health recovery.
+    type: float
+    default: 1.0
+  - key: DinoCharacterStaminaDrainMultiplier
+    section: ServerSettings
+    name: Dino Character Stamina Drain Multiplier
+    help: Scaling for creature stamina consumption.
+    type: float
+    default: 1.0
+  - key: DinoDamageMultiplier
+    section: ServerSettings
+    name: Dino Damage Multiplier
+    help: Scaling for damage wild creatures deal.
+    type: float
+    default: 1.0
+  - key: DinoResistanceMultiplier
+    section: ServerSettings
+    name: Dino Resistance Multiplier
+    help: Scaling for resistance wild creatures have to incoming damage.
+    type: float
+    default: 1.0
+  - key: DestroyTamesOverTheSoftTameLimit
+    section: ServerSettings
+    name: Destroy Tames Over The Soft Tame Limit
+    help: If true, marks/destroys dinos above the soft tame limit.
+    type: bool
+    default: false
+  - key: DisableCryopodEnemyCheck
+    section: ServerSettings
+    name: Disable Cryopod Enemy Check
+    help: If true, allows cryopods to be used while enemies are nearby.
+    type: bool
+    default: false
+  - key: DisableCryopodFridgeRequirement
+    section: ServerSettings
+    name: Disable Cryopod Fridge Requirement
+    help: If true, allows cryopods without a powered cryofridge nearby.
+    type: bool
+    default: false
+  - key: DisableDinoDecayPvE
+    section: ServerSettings
+    name: Disable Dino Decay PvE
+    help: If true, disables creature decay in PvE mode.
+    type: bool
+    default: false
+  - key: DisableImprintDinoBuff
+    section: ServerSettings
+    name: Disable Imprint Dino Buff
+    help: If true, disables the imprinting stat bonus for imprinted creatures.
+    type: bool
+    default: false
+  - key: DisablePvEGamma
+    section: ServerSettings
+    name: Disable PvE Gamma
+    help: If true, prevents use of "gamma" console command in PvE.
+    type: bool
+    default: false
+  - key: DisableStructureDecayPvE
+    section: ServerSettings
+    name: Disable Structure Decay PvE
+    help: If true, disables gradual auto-decay of player structures.
+    type: bool
+    default: false
+  - key: DisableWeatherFog
+    section: ServerSettings
+    name: Disable Weather Fog
+    help: If true, disables fog.
+    type: bool
+    default: false
+  - key: DontAlwaysNotifyPlayerJoined
+    section: ServerSettings
+    name: Dont Always Notify Player Joined
+    help: If true, disables player join notifications globally.
+    type: bool
+    default: false
+  - key: EnableExtraStructurePreventionVolumes
+    section: ServerSettings
+    name: Enable Extra Structure Prevention Volumes
+    help: If true, prevents building in certain resource-rich areas.
+    type: bool
+    default: false
+  - key: EnablePvPGamma
+    section: ServerSettings
+    name: Enable PvP Gamma
+    help: If true, allows "gamma" console command in PvP.
+    type: bool
+    default: false
+  - key: ForceAllStructureLocking
+    section: ServerSettings
+    name: Force All Structure Locking
+    help: If true, defaults all structures to locked.
+    type: bool
+    default: false
+  - key: ForceGachaUnhappyInCaves
+    section: ServerSettings
+    name: Force Gacha Unhappy In Caves
+    help: If true, Gachas become unhappy inside caves.
+    type: bool
+    default: true
+  - key: globalVoiceChat
+    section: ServerSettings
+    name: Global Voice Chat
+    help: If true, voice chat is global.
+    type: bool
+    default: false
+  - key: HarvestAmountMultiplier
+    section: ServerSettings
+    name: Harvest Amount Multiplier
+    help: Scaling for harvested resource yields.
+    type: float
+    default: 1.0
+  - key: HarvestHealthMultiplier
+    section: ServerSettings
+    name: Harvest Health Multiplier
+    help: Scaling for resource "health" (how many strikes it survives).
+    type: float
+    default: 1.0
+  - key: IgnoreLimitMaxStructuresInRangeTypeFlag
+    section: ServerSettings
+    name: Ignore Limit Max Structures In Range Type Flag
+    help: If true, removes the 150 decorative-structures limit (flags, signs, etc.).
+    type: bool
+    default: false
+  - key: ImplantSuicideCD
+    section: ServerSettings
+    name: Implant Suicide CD
+    help: Seconds between uses of implant's respawn feature.
+    type: int
+    default: 28800
+  - key: ItemStackSizeMultiplier
+    section: ServerSettings
+    name: Item Stack Size Multiplier
+    help: Multiplies default item stack sizes (items with stack size 1 unaffected).
+    type: float
+    default: 1.0
+  - key: KickIdlePlayersPeriod
+    section: ServerSettings
+    name: Kick Idle Players Period
+    help: Seconds of inactivity before idle-kick (requires command-line flag).
+    type: float
+    default: 3600.0
+  - key: MaxCosmoWeaponAmmo
+    section: ServerSettings
+    name: Max Cosmo Weapon Ammo
+    help: Max ammo for Cosmo webslinger (-1 = scale with level).
+    type: int
+    default: -1
+  - key: MaxPersonalTamedDinos
+    section: ServerSettings
+    name: Max Personal Tamed Dinos
+    help: Per-tribe creature tame limit (0 disables per-tribe limit).
+    type: int
+    default: 0
+  - key: MaxTamedDinos
+    section: ServerSettings
+    name: Max Tamed Dinos
+    help: Global cap on tamed creatures (suggest integer, code uses float).
+    type: float
+    default: 5000.0
+  - key: MaxTamedDinos_SoftTameLimit
+    section: ServerSettings
+    name: Max Tamed Dinos Soft Tame Limit
+    help: Soft server-wide tame limit (used with DestroyTamesOverTheSoftTameLimit).
+    type: int
+    default: 5000
+  - key: MaxTamedDinos_SoftTameLimit_CountdownForDeletionDuration
+    section: ServerSettings
+    name: Max Tamed Dinos Soft Tame Limit Countdown For Deletion Duration
+    help: Seconds before soft-tamed dinos are auto-destroyed.
+    type: int
+    default: 604800
+  - key: MaxTrainCars
+    section: ServerSettings
+    name: Max Train Cars
+    help: Maximum number of carts a train cave can have.
+    type: int
+    default: 8
+  - key: MaxTributeDinos
+    section: ServerSettings
+    name: Max Tribute Dinos
+    help: Slots for uploaded creatures via Tribute (upload slots).
+    type: int
+    default: 20
+  - key: MaxTributeItems
+    section: ServerSettings
+    name: Max Tribute Items
+    help: Slots for uploaded items/resources via Tribute.
+    type: int
+    default: 50
+  - key: NightTimeSpeedScale
+    section: ServerSettings
+    name: Night Time Speed Scale
+    help: Scaling factor for night-time speed relative to day.
+    type: float
+    default: 1.0
+  - key: NonPermanentDiseases
+    section: ServerSettings
+    name: Non Permanent Diseases
+    help: If true, permanent diseases become non-permanent (lost on respawn).
+    type: bool
+    default: false
+  - key: OverrideOfficialDifficulty
+    section: ServerSettings
+    name: Override Official Difficulty
+    help: Float to override default server difficulty (0.0 disables).
+    type: float
+    default: 0.0
+  - key: OverrideStructurePlatformPrevention
+    section: ServerSettings
+    name: Override Structure Platform Prevention
+    help: If true, allows turrets/platform structures on platform saddles.
+    type: bool
+    default: false
+  - key: OxygenSwimSpeedStatMultiplier
+    section: ServerSettings
+    name: Oxygen Swim Speed Stat Multiplier
+    help: Multiplier for swim speed per oxygen stat level.
+    type: float
+    default: 1.0
+  - key: PerPlatformMaxStructuresMultiplier
+    section: ServerSettings
+    name: Per Platform Max Structures Multiplier
+    help: Multiplier increasing max items placeable on saddles/rafts.
+    type: float
+    default: 1.0
+  - key: PlatformSaddleBuildAreaBoundsMultiplier
+    section: ServerSettings
+    name: Platform Saddle Build Area Bounds Multiplier
+    help: Multiplier to allow placing structures further from platform.
+    type: float
+    default: 1.0
+  - key: PlayerCharacterFoodDrainMultiplier
+    section: ServerSettings
+    name: Player Character Food Drain Multiplier
+    help: Player food consumption scaling.
+    type: float
+    default: 1.0
+  - key: PlayerCharacterHealthRecoveryMultiplier
+    section: ServerSettings
+    name: Player Character Health Recovery Multiplier
+    help: Player health recovery scaling.
+    type: float
+    default: 1.0
+  - key: PlayerCharacterStaminaDrainMultiplier
+    section: ServerSettings
+    name: Player Character Stamina Drain Multiplier
+    help: Player stamina consumption scaling.
+    type: float
+    default: 1.0
+  - key: PlayerCharacterWaterDrainMultiplier
+    section: ServerSettings
+    name: Player Character Water Drain Multiplier
+    help: Player water consumption scaling.
+    type: float
+    default: 1.0
+  - key: PlayerDamageMultiplier
+    section: ServerSettings
+    name: Player Damage Multiplier
+    help: Scaling for player damage dealt.
+    type: float
+    default: 1.0
+  - key: PlayerResistanceMultiplier
+    section: ServerSettings
+    name: Player Resistance Multiplier
+    help: Scaling for player resistance to incoming damage.
+    type: float
+    default: 1.0
+  - key: PreventDiseases
+    section: ServerSettings
+    name: Prevent Diseases
+    help: If true, disables diseases (e.g., Swamp Fever).
+    type: bool
+    default: false
+  - key: PreventMateBoost
+    section: ServerSettings
+    name: Prevent Mate Boost
+    help: If true, disables creature mate boosting.
+    type: bool
+    default: false
+  - key: PreventOfflinePvP
+    section: ServerSettings
+    name: Prevent Offline PvP
+    help: If true, enables Offline Raid Prevention (ORP).
+    type: bool
+    default: false
+  - key: PreventOfflinePvPInterval
+    section: ServerSettings
+    name: Prevent Offline PvP Interval
+    help: Seconds to wait before ORP becomes active for tribe/players.
+    type: float
+    default: 0.0
+  - key: PreventSpawnAnimations
+    section: ServerSettings
+    name: Prevent Spawn Animations
+    help: If true, players spawn without wake-up animation.
+    type: bool
+    default: false
+  - key: PreventTribeAlliances
+    section: ServerSettings
+    name: Prevent Tribe Alliances
+    help: If true, prevents tribes from creating alliances.
+    type: bool
+    default: false
+  - key: ProximityChat
+    section: ServerSettings
+    name: Proximity Chat
+    help: If true, chat is visible only to nearby players.
+    type: bool
+    default: false
+  - key: PvEAllowStructuresAtSupplyDrops
+    section: ServerSettings
+    name: PvE Allow Structures At Supply Drops
+    help: If true, allows building near supply drop points in PvE.
+    type: bool
+    default: false
+  - key: PvEDinoDecayPeriodMultiplier
+    section: ServerSettings
+    name: PvE Dino Decay Period Multiplier
+    help: Creature PvE auto-decay time multiplier.
+    type: float
+    default: 1.0
+  - key: PvPDinoDecay
+    section: ServerSettings
+    name: PvP Dino Decay
+    help: If true, enables creature decay in PvP while ORP active.
+    type: bool
+    default: false
+  - key: RaidDinoCharacterFoodDrainMultiplier
+    section: ServerSettings
+    name: Raid Dino Character Food Drain Multiplier
+    help: Affects food drain rate for raid dinos (e.g., Titanosaurus).
+    type: float
+    default: 1.0
+  - key: RandomSupplyCratePoints
+    section: ServerSettings
+    name: Random Supply Crate Points
+    help: If true, supply drops spawn at random locations.
+    type: bool
+    default: false
+  - key: RCONPort
+    section: ServerSettings
+    name: RCON Port
+    help: TCP port for RCON communication.
+    type: int
+    default: 27020
+  - key: RCONServerGameLogBuffer
+    section: ServerSettings
+    name: RCON Server Game Log Buffer
+    help: Number of game-log lines sent over RCON.
+    type: float
+    default: 600.0
+  - key: ResourcesRespawnPeriodMultiplier
+    section: ServerSettings
+    name: Resources Respawn Period Multiplier
+    help: Scaling factor for resource node respawn timing.
+    type: float
+    default: 1.0
+  - key: ServerAdminPassword
+    section: ServerSettings
+    name: Server Admin Password
+    help: Admin password (clients use via console to gain admin access).
+  - key: ServerCrosshair
+    section: ServerSettings
+    name: Server Crosshair
+    help: If false, disables the server crosshair.
+    type: bool
+    default: true
+  - key: ServerForceNoHUD
+    section: ServerSettings
+    name: Server Force No HUD
+    help: If true, HUD is always disabled for non-tribe owned NPCs.
+    type: bool
+    default: false
+  - key: ServerHardcore
+    section: ServerSettings
+    name: Server Hardcore
+    help: If true, enables Hardcore mode (players revert to level 1 on death).
+    type: bool
+    default: false
+  - key: ServerPassword
+    section: ServerSettings
+    name: Server Password
+    help: Server password required to join (if specified).
+  - key: serverPVE
+    section: ServerSettings
+    name: Server PVE
+    help: If true, enables PvE mode (disables PvP).
+    type: bool
+    default: false
+  - key: ShowFloatingDamageText
+    section: ServerSettings
+    name: Show Floating Damage Text
+    help: If true, enables popup floating damage text.
+    type: bool
+    default: false
+  - key: ShowMapPlayerLocation
+    section: ServerSettings
+    name: Show Map Player Location
+    help: If false, hides players' precise position on their map.
+    type: bool
+    default: true
+  - key: StructurePickupHoldDuration
+    section: ServerSettings
+    name: Structure Pickup Hold Duration
+    help: Quick pick-up hold duration in seconds (0 = instant).
+    type: float
+    default: 0.5
+  - key: StructurePickupTimeAfterPlacement
+    section: ServerSettings
+    name: Structure Pickup Time After Placement
+    help: Seconds after placement quick pick-up becomes available.
+    type: float
+    default: 30.0
+  - key: StructurePreventResourceRadiusMultiplier
+    section: ServerSettings
+    name: Structure Prevent Resource Radius Multiplier
+    help: Multiplier for structure prevention radius for resources.
+    type: float
+    default: 1.0
+  - key: StructureResistanceMultiplier
+    section: ServerSettings
+    name: Structure Resistance Multiplier
+    help: Scaling for structure resistance to incoming damage.
+    type: float
+    default: 1.0
+  - key: TamingSpeedMultiplier
+    section: ServerSettings
+    name: Taming Speed Multiplier
+    help: Scaling for creature taming speed.
+    type: float
+    default: 1.0
+  - key: TheMaxStructuresInRange
+    section: ServerSettings
+    name: The Max Structures In Range
+    help: Max number of structures constructible in the enforced range.
+    type: int
+    default: 10500
+  - key: TribeNameChangeCooldown
+    section: ServerSettings
+    name: Tribe Name Change Cooldown
+    help: Cooldown in minutes between tribe name changes.
+    type: float
+    default: 15.0
+  - key: XPMultiplier
+    section: ServerSettings
+    name: XP Multiplier
+    help: Scaling for experience gained by players, tribes, and tames.
+    type: float
+    default: 1.0
+  - key: YoungIceFoxDeathCooldown
+    section: ServerSettings
+    name: Young Ice Fox Death Cooldown
+    help: Seconds until Veilwyn can reappear after fatal damage.
+    type: int
+    default: 3600
+  - key: CrossARKAllowForeignDinoDownloads
+    section: ServerSettings
+    name: Cross ARK Allow Foreign Dino Downloads
+    help: If true, allows non-native dinos' tribute downloads on some maps.
+    type: bool
+    default: false
+  - key: noTributeDownloads
+    section: ServerSettings
+    name: No Tribute Downloads
+    help: If true, prevents Cross-ARK data downloads.
+    type: bool
+    default: false
+  - key: PreventDownloadDinos
+    section: ServerSettings
+    name: Prevent Download Dinos
+    help: If true, prevents creature downloads via Cross-ARK.
+    type: bool
+    default: false
+  - key: PreventDownloadItems
+    section: ServerSettings
+    name: Prevent Download Items
+    help: If true, prevents item/resource downloads via Cross-ARK.
+    type: bool
+    default: false
+  - key: PreventDownloadSurvivors
+    section: ServerSettings
+    name: Prevent Download Survivors
+    help: If true, prevents survivor downloads via Cross-ARK.
+    type: bool
+    default: false
+  - key: PreventUploadDinos
+    section: ServerSettings
+    name: Prevent Upload Dinos
+    help: If true, prevents creature uploads via Cross-ARK.
+    type: bool
+    default: false
+  - key: PreventUploadItems
+    section: ServerSettings
+    name: Prevent Upload Items
+    help: If true, prevents item uploads via Cross-ARK.
+    type: bool
+    default: false
+  - key: PreventUploadSurvivors
+    section: ServerSettings
+    name: Prevent Upload Survivors
+    help: If true, prevents survivor uploads via Cross-ARK.
+    type: bool
+    default: false
+  - key: BadWordListURL
+    section: ServerSettings
+    name: Bad Word List URL
+    help: |
+      URL(s) to a bad-words list for text filtering.
+    default: "http://cdn2.arkdedicated.com/asa/badwords.txt"
+  - key: BadWordWhiteListURL
+    section: ServerSettings
+    name: Bad Word White List URL
+    help: |
+      URL(s) to a good-words list for text filtering.
+    default: "http://cdn2.arkdedicated.com/asa/goodwords.txt"
+game:
+  - key: BabyCuddleGracePeriodMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Baby Cuddle Grace Period Multiplier"
     help: "Scales how long after delaying cuddling with the Baby before Imprinting Quality starts to decrease."
+    type: float
+    default: 1.0
+  - key: BabyCuddleIntervalMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Baby Cuddle Interval Multiplier"
+    help: "Scales how often babies needs attention for imprinting."
+    type: float
+    default: 1.0
+  - key: BabyCuddleLoseImprintQualitySpeedMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Baby Cuddle Lose Imprint Quality Speed Multiplier"
+    help: "Scales how fast Imprinting Quality decreases after the grace period if you haven't yet cuddled with the Baby."
+    type: float
+    default: 1.0
+  - key: BabyFoodConsumptionSpeedMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Baby Food Consumption Speed Multiplier"
+    help: "Scales the speed that baby tames eat their food."
+    type: float
+    default: 1.0
+  - key: BabyImprintAmountMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Baby Imprint Amount Multiplier"
+    help: "Scales the percentage each imprint provides."
+    type: float
+    default: 1.0
+  - key: BabyImprintingStatScaleMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Baby Imprinting Stat Scale Multiplier"
+    help: "Scales how much of an effect on stats the Imprinting Quality has."
+    type: float
+    default: 1.0
+  - key: BabyMatureSpeedMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Baby Mature Speed Multiplier"
+    help: "Scales the maturation speed of babies."
+    type: float
+    default: 1.0
+  - key: bAllowFlyerSpeedLeveling
+    section: /script/shootergame.shootergamemode
+    name: "Allow Flyer Speed Leveling"
+    help: "Specifies whether flyer creatures can have their Movement Speed levelled up."
+    type: bool
+    default: false
+  - key: bAllowSpeedLeveling
+    section: /script/shootergame.shootergamemode
+    name: "Allow Speed Leveling"
+    help: "Specifies whether players and non-flyer creatures can have their Movement Speed levelled up."
+    type: bool
+    default: false
+  - key: bAllowUnlimitedRespecs
+    section: /script/shootergame.shootergamemode
+    name: "Allow Unlimited Respecs"
+    help: "If True, allows more than one usage of Mindwipe Tonic without 24 hours cooldown."
+    type: bool
+    default: false
+  - key: bDisableFriendlyFire
+    section: /script/shootergame.shootergamemode
+    name: "Disable Friendly Fire"
+    help: "If True, prevents Friendly-Fire (among tribe mates/tames/structures)."
+    type: bool
+    default: false
+  - key: bDisablePhotoMode
+    section: /script/shootergame.shootergamemode
+    name: "Disable Photo Mode"
+    help: "Defines if photo mode is allowed (False) or not (True)."
+    type: bool
+    default: false
+  - key: bDisableStructurePlacementCollision
+    section: /script/shootergame.shootergamemode
+    name: "Disable Structure Placement Collision"
+    help: "If True, allows for structures to clip into the terrain."
+    type: bool
+    default: false
+  - key: bIgnoreStructuresPreventionVolumes
+    section: /script/shootergame.shootergamemode
+    name: "Ignore Structures Prevention Volumes"
+    help: "If True, enables building areas where normally it's not allowed, such around some maps' Obelisks, in the Aberration Portal and in Mission Volumes areas on Genesis: Part 1."
+    type: bool
+    default: false
+  - key: bPvEDisableFriendlyFire
+    section: /script/shootergame.shootergamemode
+    name: "PvE Disable Friendly Fire"
+    help: "If True, disabled Friendly-Fire (among tribe mates/tames/structures) in PvE servers."
+    type: bool
+    default: false
+  - key: bShowCreativeMode
+    section: /script/shootergame.shootergamemode
+    name: "Show Creative Mode"
+    help: "If True, adds a button to the pause menu to enable/disable creative mode."
+    type: bool
+    default: false
+  - key: bUseDinoLevelUpAnimations
+    section: /script/shootergame.shootergamemode
+    name: "Use Dino Level Up Animations"
+    help: "If False, tame creatures on level-up will not perform the related animation."
+    type: bool
+    default: true
+  - key: bUseSingleplayerSettings
+    section: /script/shootergame.shootergamemode
+    name: "Use Singleplayer Settings"
+    help: "If True, all game settings will be more balanced for an individual player experience."
+    type: bool
+    default: false
+  - key: ConfigAddNPCSpawnEntriesContainer
+    section: /script/shootergame.shootergamemode
+    name: "Config Add NPC Spawn Entries Container"
+    help: "Adds specific creatures in spawn areas."
+    type: any
+    default: "N/A"
+  - key: CraftingSkillBonusMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Crafting Skill Bonus Multiplier"
+    help: "Scales the bonus received from upgrading the Crafting Skill."
+    type: float
+    default: 1.0
+  - key: CraftXPMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Craft XP Multiplier"
+    help: "Scales the amount of XP earned for crafting."
+    type: float
+    default: 1.0
+  - key: CropDecaySpeedMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Crop Decay Speed Multiplier"
+    help: "Scales the speed of crop decay in plots."
+    type: float
+    default: 1.0
+  - key: CropGrowthSpeedMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Crop Growth Speed Multiplier"
+    help: "Scales the speed of crop growth in plots."
+    type: float
+    default: 1.0
+  - key: CustomRecipeEffectivenessMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Custom Recipe Effectiveness Multiplier"
+    help: "Scales the effectiveness of custom recipes."
+    type: float
+    default: 1.0
+  - key: CustomRecipeSkillMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Custom Recipe Skill Multiplier"
+    help: "Scales the effect of the players crafting speed level that is used as a base for the formula in creating a custom recipe."
+    type: float
+    default: 1.0
+  - key: DestroyTamesOverLevelClamp
+    section: /script/shootergame.shootergamemode
+    name: "Destroy Tames Over Level Clamp"
+    help: "Tames that exceed that level will be deleted on server start."
+    type: int
+    default: 0
+  - key: EggHatchSpeedMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Egg Hatch Speed Multiplier"
+    help: "Scales the time needed for a fertilised egg to hatch."
+    type: float
+    default: 1.0
+  - key: ExcludeItemIndices
+    section: /script/shootergame.shootergamemode
+    name: "Exclude Item Indices"
+    help: "Excludes an item from supply crates specifying its Item ID."
+    type: int
+  - key: LimitGeneratorsNum
+    section: /script/shootergame.shootergamemode
+    name: "Limit Generators Num"
+    help: "Limits the number of generators in the area defined by LimitGeneratorsRange."
+    type: int
+    default: 3
+  - key: LimitGeneratorsRange
+    section: /script/shootergame.shootergamemode
+    name: "Limit Generators Range"
+    help: "Sets the area range (in Unreal Units) in which the option LimitGeneratorsNum applies."
+    type: int
+    default: 15000
+  - key: GenericXPMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Generic XP Multiplier"
+    help: "Scales the amount of XP earned for generic XP (automatic over time)."
+    type: float
+    default: 1.0
+  - key: GlobalItemDecompositionTimeMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Global Item Decomposition Time Multiplier"
+    help: "Scales the decomposition time of dropped items, loot bags etc."
+    type: float
+    default: 1.0
+  - key: GlobalSpoilingTimeMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Global Spoiling Time Multiplier"
+    help: "Scales the spoiling time of perishables globally."
+    type: float
+    default: 1.0
+  - key: HairGrowthSpeedMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Hair Growth Speed Multiplier"
+    help: "Scales the hair growth."
+    type: float
+    default: "1.0 (ASE), 0 (ASA)"
+  - key: HarvestResourceItemAmountClassMultipliers
+    section: /script/shootergame.shootergamemode
+    name: "Harvest Resource Item Amount Class Multipliers"
+    help: "Scales on a per-resource type basis, the amount of resources harvested."
+    type: any
+    default: "N/A"
+  - key: HarvestXPMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Harvest XP Multiplier"
+    help: "Scales the amount of XP earned for harvesting."
+    type: float
+    default: 1.0
+  - key: KillXPMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Kill XP Multiplier"
+    help: "Scale the amount of XP earned for a kill."
+    type: float
+    default: 1.0
+  - key: LayEggIntervalMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Lay Egg Interval Multiplier"
+    help: "Scales the time between eggs are spawning / being laid."
+    type: float
+    default: 1.0
+  - key: MatingIntervalMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Mating Interval Multiplier"
+    help: "Scales the interval between tames can mate."
+    type: float
+    default: 1.0
+  - key: MatingSpeedMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Mating Speed Multiplier"
+    help: "Scales the speed at which tames mate with each other."
+    type: float
+    default: 1.0
+  - key: MaxFallSpeedMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Max Fall Speed Multiplier"
+    help: "Defines the falling speed multiplier at which players starts taking fall damage."
+    type: float
+    default: 1.0
+  - key: OverrideNamedEngramEntries
+    section: /script/shootergame.shootergamemode
+    name: "Override Named Engram Entries"
+    help: "Configures the status and requirements for learning an engram, specified by its name."
+    type: any
+    default: "N/A"
+  - key: PerLevelStatsMultiplier_Player[<integer>]
+    section: /script/shootergame.shootergamemode
+    name: "Per Level Stats Multiplier Player[<integer>]"
+    help: "Scales Player stats."
+    type: float
+  - key: PhotoModeRangeLimit
+    section: /script/shootergame.shootergamemode
+    name: "Photo Mode Range Limit"
+    help: "Defines the maximum distance between photo mode camera position and player position."
+    type: int
+    default: 3000
+  - key: PoopIntervalMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Poop Interval Multiplier"
+    help: "Scales how frequently survivors can poop."
+    type: float
+    default: 1.0
+  - key: ResourceNoReplenishRadiusPlayers
+    section: /script/shootergame.shootergamemode
+    name: "Resource No Replenish Radius Players"
+    help: "Controls how resources regrow closer or farther away from players."
+    type: float
+    default: 1.0
+  - key: ResourceNoReplenishRadiusStructures
+    section: /script/shootergame.shootergamemode
+    name: "Resource No Replenish Radius Structures"
+    help: "Controls how resources regrow closer or farther away from structures Values higher than 1.0 increase the distance around structures where resources are not allowed to grow back."
+    type: float
+    default: 1.0
+  - key: SpecialXPMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Special XP Multiplier"
+    help: "Scale the amount of XP earned for SpecialEvent."
+    type: float
+    default: 1.0
+  - key: ValgueroMemorialEntries
+    section: /script/shootergame.shootergamemode
+    name: "Valguero Memorial Entries"
+    help: "The Valguero Memorial is now interactable, honouring those who have ascended by displaying their names."
+    type: list
+    default: "N/A"
+  - key: BaseHexagonRewardMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Base Hexagon Reward Multiplier"
+    help: "Scales the missions score hexagon rewards."
+    type: float
+    default: 1.0
+  - key: HexagonCostMultiplier
+    section: /script/shootergame.shootergamemode
+    name: "Hexagon Cost Multiplier"
+    help: "Scales the hexagon cost of items in the Hexagon store."
+    type: float
+    default: 1.0
 EOF
 
 	# If a pyenv is required:

@@ -1809,6 +1809,7 @@ class BaseService:
 		if self.is_api_enabled():
 			counter = 0
 			print('Waiting for API to become available...')
+			time.sleep(15)
 			while counter < 24:
 				players = self.get_player_count()
 				if players is not None:
@@ -1820,6 +1821,15 @@ class BaseService:
 					return True
 				else:
 					print('API not available yet')
+
+				# Is the game PID still available?
+				if self.get_pid() == 0:
+					print('Game process has exited unexpectedly!', file=sys.stderr)
+					return False
+
+				if self.get_game_pid() == 0:
+					print('Game server process has exited unexpectedly!', file=sys.stderr)
+					return False
 
 				time.sleep(10)
 				counter += 1
@@ -3528,6 +3538,16 @@ class GameService(RCONService):
 
 		self.set_option('Mods', ','.join(mods))
 		print('%s mod %s on service %s' % (action, mod_id, self.service))
+
+	def post_start(self) -> bool:
+		ret = super().post_start()
+		if not ret:
+			# Print the last few messages from the Game log to provide a hint to the user if there was a problem.
+			log = os.path.join(here, 'AppFiles/ShooterGame/Saved/Logs/ShooterGame.log')
+			if os.path.exists(log):
+				subprocess.run(['tail', '-n', '20', log])
+
+		return ret
 
 
 def menu_service(service: GameService):
