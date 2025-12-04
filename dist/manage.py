@@ -33,7 +33,6 @@ from rcon.source import Client
 from rcon import SessionTimeout
 from rcon.exceptions import WrongPassword
 import tempfile
-from pprint import pprint
 
 def get_enabled_firewall() -> str:
 	"""
@@ -668,6 +667,7 @@ def steamcmd_check_app_update(app_manifest: str):
 	return build_id != available_build_id
 
 
+
 class BaseApp:
 	"""
 	Game application manager
@@ -881,6 +881,14 @@ class BaseApp:
 	def check_update_available(self) -> bool:
 		"""
 		Check if there's an update available for this game
+
+		:return:
+		"""
+		return False
+
+	def update(self) -> bool:
+		"""
+		Update the game server
 
 		:return:
 		"""
@@ -1172,6 +1180,87 @@ class BaseApp:
 
 		# Cleanup
 		shutil.rmtree(temp_store)
+
+class SteamApp(BaseApp):
+	"""
+	Game application manager
+	"""
+
+	def __init__(self):
+		super().__init__()
+		self.steam_id = ''
+
+	def check_update_available(self) -> bool:
+		"""
+		Check if a SteamCMD update is available for this game
+
+		:return:
+		"""
+		here = os.path.dirname(os.path.realpath(__file__))
+		return steamcmd_check_app_update(os.path.join(here, 'AppFiles', 'steamapps', 'appmanifest_%s.acf' % self.steam_id))
+
+	def update(self):
+		"""
+		Update the game server via SteamCMD
+
+		:return:
+		"""
+		# Stop any running services before updating
+		services = []
+		for service in self.get_services():
+			if service.is_running() or service.is_starting():
+				print('Stopping service %s for update...' % service.service)
+				services.append(service.service)
+				subprocess.Popen(['systemctl', 'stop', service.service])
+
+		if len(services) > 0:
+			# Wait for all services to stop, may take 5 minutes if players are online.
+			print('Waiting up to 5 minutes for all services to stop...')
+			counter = 0
+			while counter < 30:
+				all_stopped = True
+				counter += 1
+				for service in self.get_services():
+					if service.is_running() or service.is_starting() or service.is_stopping():
+						all_stopped = False
+						break
+				if all_stopped:
+					break
+				time.sleep(10)
+		else:
+			print('No running services found, proceeding with update...')
+
+		here = os.path.dirname(os.path.realpath(__file__))
+		cmd = [
+			'/usr/games/steamcmd',
+			'+force_install_dir',
+			os.path.join(here, 'AppFiles'),
+			'+login',
+			'anonymous',
+			'+app_update',
+			self.steam_id,
+			'validate',
+			'+quit'
+		]
+
+		if os.geteuid() == 0:
+			stat_info = os.stat(here)
+			uid = stat_info.st_uid
+			cmd = [
+				'sudo',
+				'-u',
+				'#%s' % uid
+			] + cmd
+
+		res = subprocess.run(cmd)
+
+		if len(services) > 0:
+			print('Update completed, restarting previously running services...')
+			for service in services:
+				subprocess.Popen(['systemctl', 'start', service])
+				time.sleep(10)
+
+		return res.returncode == 0
 
 
 class BaseService:
@@ -3143,7 +3232,7 @@ class GameAPIException(Exception):
 	pass
 
 
-class GameApp(BaseApp):
+class GameApp(SteamApp):
 	"""
 	Game application manager
 	"""
@@ -3166,14 +3255,6 @@ class GameApp(BaseApp):
 		}
 		self.load()
 
-	def check_update_available(self) -> bool:
-		"""
-		Check if a SteamCMD update is available for this game
-
-		:return:
-		"""
-		return steamcmd_check_app_update(os.path.join(here, 'AppFiles', 'steamapps', 'appmanifest_%s.acf' % self.steam_id))
-
 	def get_save_directory(self):
 		"""
 		Get the save directory for the game server
@@ -3195,6 +3276,28 @@ class GameApp(BaseApp):
 						continue
 					ret.append(os.path.join('SavedArks', base_path, file))
 		return ret
+
+	def post_update(self):
+		"""
+		Perform any post-update actions needed for this game
+
+		Called immediately after an update is performed but before services are restarted.
+
+		:return:
+		"""
+		# Version 74.24 released on Nov 4th 2025 with the comment "Fixed a crash" introduces a serious bug
+		# that causes the game to segfault when attempting to load the Steam API.
+		# Being Wildcard, they don't actually provide any reason as to why they're using the Steam API for an Epic game,
+		# but it seems to work without the Steam library available.
+		#
+		# In the logs you will see:
+		# Initializing Steam Subsystem for server validation.
+		# Steam Subsystem initialized: FAILED
+		#
+		check_path = os.path.join(here, 'AppFiles/ShooterGame/Binaries/Win64/steamclient64.dll')
+		if os.path.exists(check_path):
+			print('Removing broken Steam library to prevent segfault')
+			os.remove(check_path)
 
 
 class GameService(RCONService):
@@ -4101,7 +4204,7 @@ def menu_main(game: GameApp):
 			if running:
 				print('⚠️ Please stop all maps prior to updating.')
 			else:
-				subprocess.run([os.path.join(here, 'update.sh')], stderr=sys.stderr, stdout=sys.stdout)
+				game.update()
 		elif opt == 'w':
 			if running:
 				print('⚠️  Please stop all maps before wiping user data.')
@@ -4167,6 +4270,11 @@ parser.add_argument(
 parser.add_argument(
 	'--check-update',
 	help='Check for game updates via SteamCMD and report the status',
+	action='store_true'
+)
+parser.add_argument(
+	'--update',
+	help='Update the game server via SteamCMD',
 	action='store_true'
 )
 parser.add_argument(
@@ -4267,6 +4375,8 @@ elif args.restore != '':
 	sys.exit(0 if game.restore(args.restore) else 1)
 elif args.check_update:
 	menu_check_update(game)
+elif args.update:
+	sys.exit(0 if game.update() else 1)
 elif args.get_services:
 	menu_get_services(game)
 elif args.get_configs:

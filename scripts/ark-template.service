@@ -3,7 +3,6 @@
 # compile:noescape
 Description=ARK Survival Ascended Dedicated Server (${DESC})
 After=network.target
-After=ark-updater.service
 
 [Service]
 Type=simple

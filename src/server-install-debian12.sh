@@ -195,6 +195,32 @@ EOF
     fi
 }
 
+##
+# Update the installer from Github
+#
+function ark_update_installer() {
+	local REPO="$1"
+	local GITHUB_VERSION="$2"
+	local TARGET="$3"
+
+	if [ -z "$REPO" ] || [ -z "$GITHUB_VERSION" ] || [ -z "$TARGET" ]; then
+		echo "update_installer: Missing required parameters!" >&2
+		return 1
+	fi
+
+	TMP="$(mktemp)"
+	local GITHUB_SOURCE="https://raw.githubusercontent.com/${REPO}/refs/tags/${GITHUB_VERSION}/dist/server-install-debian12.sh"
+	if download "$GITHUB_SOURCE" "$TARGET"; then
+		echo "Downloaded new installer version $GITHUB_VERSION from github.com/${REPO}"
+		chmod +x "$TARGET"
+
+		return 0
+	else
+		echo "update_installer: Failed to download installer version ${GITHUB_VERSION} from github.com/${REPO}" >&2
+		return 1
+	fi
+}
+
 
 ############################################
 ## Pre-exec Checks
@@ -816,19 +842,18 @@ EOF
 	fi
 done
 
-# Create update helper and service
-# Install system service file to be loaded by systemd
-cat > /etc/systemd/system/ark-updater.service <<EOF
-# script:ark-updater.service
-EOF
+# The update helper is no longer used as of v2025.12.04
+[ -e /etc/systemd/system/ark-updater.service ] && rm /etc/systemd/system/ark-updater.service
 
-cat > $GAME_DIR/update.sh <<EOF
+if [ -e "$GAME_DIR/update.sh" ]; then
+	cat > $GAME_DIR/update.sh <<EOF
 # script:update.sh
 EOF
-chown $GAME_USER:$GAME_USER $GAME_DIR/update.sh
-chmod +x $GAME_DIR/update.sh
+    chown $GAME_USER:$GAME_USER $GAME_DIR/update.sh
+    chmod +x $GAME_DIR/update.sh
+fi
+
 systemctl daemon-reload
-systemctl enable ark-updater
 
 
 # As of v2025.11.02 this script has been ported to the management console.

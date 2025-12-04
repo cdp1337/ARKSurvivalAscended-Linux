@@ -178,11 +178,11 @@ that are hosted outside Nitrado's network...)
 ├── ShooterGame.log            # Game log file
 ├── PlayersJoinNoCheckList.txt # Player whitelist
 ├── admins.txt                 # Admin whitelist (needs manually setup)
-├── start_all.sh               # Start all maps
-├── stop_all.sh                # Stop all maps
-├── backup.sh                  # Backup game files to local archive
-├── restore.sh                 # Restore game files from archive
-├── update.sh                  # Update game files (only when all maps stopped)
+├── start_all.sh               # (DEPRECATED) Start all maps
+├── stop_all.sh                # (DEPRECATED) Stop all maps
+├── backup.sh                  # (DEPRECATED) Backup game files to local archive
+├── restore.sh                 # (DEPRECATED) Restore game files from archive
+├── update.sh                  # (DEPRECATED) Update game files (only when all maps stopped)
 └── manage.py                  # Management console for game server, maps, and settings
 ```
 
@@ -343,6 +343,12 @@ A world save is automatically requested on the map prior to shutdown.
 ### Updating
 
 If all maps are stopped, the `u` option will update the game server files from Steam.
+
+Updating the game binaries can also be done by invoking the management script with the `--update` option:
+
+```bash
+/home/steam/ArkSurvivalAscended/manage.py --update
+```
 
 ### Managing individual maps
 

@@ -17,13 +17,12 @@ from scriptlets.bz_eval_tui.print_header import *
 from scriptlets._common.get_wan_ip import *
 from scriptlets.steam.steamcmd_check_app_update import *
 # import:org_python/venv_path_include.py
-from scriptlets.warlock.base_app import *
+from scriptlets.warlock.steam_app import *
 from scriptlets.warlock.base_service import *
 from scriptlets.warlock.cli_config import *
 from scriptlets.warlock.ini_config import *
 from scriptlets.warlock.rcon_service import *
 from scriptlets.warlock.unreal_config import *
-from pprint import pprint
 
 
 here = os.path.dirname(os.path.realpath(__file__))
@@ -116,7 +115,7 @@ class GameAPIException(Exception):
 	pass
 
 
-class GameApp(BaseApp):
+class GameApp(SteamApp):
 	"""
 	Game application manager
 	"""
@@ -139,14 +138,6 @@ class GameApp(BaseApp):
 		}
 		self.load()
 
-	def check_update_available(self) -> bool:
-		"""
-		Check if a SteamCMD update is available for this game
-
-		:return:
-		"""
-		return steamcmd_check_app_update(os.path.join(here, 'AppFiles', 'steamapps', 'appmanifest_%s.acf' % self.steam_id))
-
 	def get_save_directory(self):
 		"""
 		Get the save directory for the game server
@@ -168,6 +159,28 @@ class GameApp(BaseApp):
 						continue
 					ret.append(os.path.join('SavedArks', base_path, file))
 		return ret
+
+	def post_update(self):
+		"""
+		Perform any post-update actions needed for this game
+
+		Called immediately after an update is performed but before services are restarted.
+
+		:return:
+		"""
+		# Version 74.24 released on Nov 4th 2025 with the comment "Fixed a crash" introduces a serious bug
+		# that causes the game to segfault when attempting to load the Steam API.
+		# Being Wildcard, they don't actually provide any reason as to why they're using the Steam API for an Epic game,
+		# but it seems to work without the Steam library available.
+		#
+		# In the logs you will see:
+		# Initializing Steam Subsystem for server validation.
+		# Steam Subsystem initialized: FAILED
+		#
+		check_path = os.path.join(here, 'AppFiles/ShooterGame/Binaries/Win64/steamclient64.dll')
+		if os.path.exists(check_path):
+			print('Removing broken Steam library to prevent segfault')
+			os.remove(check_path)
 
 
 class GameService(RCONService):
@@ -1074,7 +1087,7 @@ def menu_main(game: GameApp):
 			if running:
 				print('⚠️ Please stop all maps prior to updating.')
 			else:
-				subprocess.run([os.path.join(here, 'update.sh')], stderr=sys.stderr, stdout=sys.stdout)
+				game.update()
 		elif opt == 'w':
 			if running:
 				print('⚠️  Please stop all maps before wiping user data.')
@@ -1140,6 +1153,11 @@ parser.add_argument(
 parser.add_argument(
 	'--check-update',
 	help='Check for game updates via SteamCMD and report the status',
+	action='store_true'
+)
+parser.add_argument(
+	'--update',
+	help='Update the game server via SteamCMD',
 	action='store_true'
 )
 parser.add_argument(
@@ -1240,6 +1258,8 @@ elif args.restore != '':
 	sys.exit(0 if game.restore(args.restore) else 1)
 elif args.check_update:
 	menu_check_update(game)
+elif args.update:
+	sys.exit(0 if game.update() else 1)
 elif args.get_services:
 	menu_get_services(game)
 elif args.get_configs:

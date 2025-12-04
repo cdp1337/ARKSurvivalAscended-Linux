@@ -2299,6 +2299,32 @@ EOF
     fi
 }
 
+##
+# Update the installer from Github
+#
+function ark_update_installer() {
+	local REPO="$1"
+	local GITHUB_VERSION="$2"
+	local TARGET="$3"
+
+	if [ -z "$REPO" ] || [ -z "$GITHUB_VERSION" ] || [ -z "$TARGET" ]; then
+		echo "update_installer: Missing required parameters!" >&2
+		return 1
+	fi
+
+	TMP="$(mktemp)"
+	local GITHUB_SOURCE="https://raw.githubusercontent.com/${REPO}/refs/tags/${GITHUB_VERSION}/dist/server-install-debian12.sh"
+	if download "$GITHUB_SOURCE" "$TARGET"; then
+		echo "Downloaded new installer version $GITHUB_VERSION from github.com/${REPO}"
+		chmod +x "$TARGET"
+
+		return 0
+	else
+		echo "update_installer: Failed to download installer version ${GITHUB_VERSION} from github.com/${REPO}" >&2
+		return 1
+	fi
+}
+
 
 ############################################
 ## Pre-exec Checks
@@ -2888,7 +2914,6 @@ for MAP in $GAME_MAPS; do
 # DYNAMICALLY GENERATED FILE! Edit at your own risk
 Description=ARK Survival Ascended Dedicated Server (${DESC})
 After=network.target
-After=ark-updater.service
 
 [Service]
 Type=simple
@@ -2946,27 +2971,11 @@ EOF
 	fi
 done
 
-# Create update helper and service
-# Install system service file to be loaded by systemd
-cat > /etc/systemd/system/ark-updater.service <<EOF
-[Unit]
-# DYNAMICALLY GENERATED FILE! Edit at your own risk
-Description=ARK Survival Ascended Dedicated Server Updater
-After=network.target
+# The update helper is no longer used as of v2025.12.04
+[ -e /etc/systemd/system/ark-updater.service ] && rm /etc/systemd/system/ark-updater.service
 
-[Service]
-Type=oneshot
-User=$GAME_USER
-Group=$GAME_USER
-WorkingDirectory=$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64
-Environment=XDG_RUNTIME_DIR=/run/user/$(id -u)
-ExecStart=$GAME_DIR/update.sh
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-cat > $GAME_DIR/update.sh <<EOF
+if [ -e "$GAME_DIR/update.sh" ]; then
+	cat > $GAME_DIR/update.sh <<EOF
 #!/bin/bash
 #
 # Update ARK Survival Ascended Dedicated Server
@@ -3022,10 +3031,11 @@ fi
 
 update_game
 EOF
-chown $GAME_USER:$GAME_USER $GAME_DIR/update.sh
-chmod +x $GAME_DIR/update.sh
+    chown $GAME_USER:$GAME_USER $GAME_DIR/update.sh
+    chmod +x $GAME_DIR/update.sh
+fi
+
 systemctl daemon-reload
-systemctl enable ark-updater
 
 
 # As of v2025.11.02 this script has been ported to the management console.
