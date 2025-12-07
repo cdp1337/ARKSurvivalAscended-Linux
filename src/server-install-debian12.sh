@@ -42,7 +42,7 @@
 #   OPT_NEWFORMAT=--new-format - Use the new save format (Nitrado/Official server compatible) OPTIONAL
 #
 # Changelog:
-#   202511XX - Support custom installation directory
+#   20251207 - Support custom installation directory
 #            - Add support for some custom usecases of the installer
 #            - Bump Proton to 10.25
 #            - Fix for more flexible support for game options

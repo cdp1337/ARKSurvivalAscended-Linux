@@ -93,6 +93,8 @@ Imports from Nitrado server backups are SUPPORTED, including all player and trib
 The easiest way to install ARK Survival Ascended Dedicated Server on Linux is to use
 [Warlock](https://github.com/BitsNBytes25/Warlock), a game server management tool.
 
+[![Warlock ARK Support](images/warlock.webp)](https://github.com/BitsNBytes25/Warlock)
+
 
 ## Installation on Debian 12/13 or Ubuntu 24.04
 
