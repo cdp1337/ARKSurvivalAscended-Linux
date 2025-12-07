@@ -3243,10 +3243,12 @@ class GameApp(SteamApp):
 		self.name = 'ARK:SA'
 		self.desc = 'ARK: Survival Ascended'
 		self.steam_id = '2430930'
-		services_path = os.path.join(here, 'services')
-		for f in os.listdir(services_path):
-			if f.endswith('.conf'):
-				self.services.append(f[:-5])
+		# Find services for this game within systemd
+		res = subprocess.run(['grep', '-lr', os.path.join(here, 'AppFiles'), '/etc/systemd/system/'], stdout=subprocess.PIPE)
+		for line in res.stdout.decode().strip().split('\n'):
+			if line.endswith('.service'):
+				service_name = os.path.basename(line)[:-8]
+				self.services.append(service_name)
 
 		self.configs = {
 			'game': UnrealConfig('game', os.path.join(here, 'AppFiles', 'ShooterGame', 'Saved', 'Config', 'WindowsServer', 'Game.ini')),
