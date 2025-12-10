@@ -29,10 +29,10 @@ sys.path.insert(
 	)
 )
 import yaml
+import tempfile
 from rcon.source import Client
 from rcon import SessionTimeout
 from rcon.exceptions import WrongPassword
-import tempfile
 
 def get_enabled_firewall() -> str:
 	"""
@@ -667,7 +667,6 @@ def steamcmd_check_app_update(app_manifest: str):
 	return build_id != available_build_id
 
 
-
 class BaseApp:
 	"""
 	Game application manager
@@ -893,6 +892,16 @@ class BaseApp:
 		:return:
 		"""
 		return False
+
+	def post_update(self):
+		"""
+		Perform any post-update actions needed for this game
+
+		Called immediately after an update is performed but before services are restarted.
+
+		:return:
+		"""
+		pass
 
 	def send_discord_message(self, message: str):
 		"""
@@ -1189,6 +1198,8 @@ class SteamApp(BaseApp):
 	def __init__(self):
 		super().__init__()
 		self.steam_id = ''
+		self.steam_branch = 'public'
+		self.steam_branch_password = ''
 
 	def check_update_available(self) -> bool:
 		"""
@@ -1239,9 +1250,17 @@ class SteamApp(BaseApp):
 			'anonymous',
 			'+app_update',
 			self.steam_id,
-			'validate',
-			'+quit'
 		]
+
+		if self.steam_branch != 'public':
+			cmd.append('-beta')
+			cmd.append(self.steam_branch)
+			if self.steam_branch_password != '':
+				cmd.append('-betapassword')
+				cmd.append(self.steam_branch_password)
+
+		cmd.append('validate')
+		cmd.append('+quit')
 
 		if os.geteuid() == 0:
 			stat_info = os.stat(here)
@@ -1253,6 +1272,9 @@ class SteamApp(BaseApp):
 			] + cmd
 
 		res = subprocess.run(cmd)
+
+		# Allow the game to perform any post-update tasks
+		self.post_update()
 
 		if len(services) > 0:
 			print('Update completed, restarting previously running services...')
@@ -1772,6 +1794,20 @@ class BaseService:
 		"""
 		pass
 
+	def get_port_definitions(self) -> list:
+		"""
+		Get a list of port definitions for this service
+
+		Each entry in the returned list should contain 3 items:
+
+		* Config name or integer of port (for non-definable ports)
+		* 'UDP' or 'TCP'
+		* Description of the port purpose
+
+		:return:
+		"""
+		pass
+
 	def start(self):
 		"""
 		Start this service in systemd
@@ -1960,6 +1996,7 @@ class BaseService:
 
 		self.stop()
 		self.start()
+
 
 
 class BaseConfig:
@@ -2478,6 +2515,12 @@ class INIConfig(BaseConfig):
 		super().__init__(group_name)
 		self.path = path
 		self.parser = configparser.ConfigParser()
+		self.group = group_name
+		self.spoof_group = False
+		"""
+		:type self.spoof_group: bool
+		Set to True to spoof a fake group from the ini.  Useful for games which ship with non-standard ini files.
+		"""
 
 	def get_value(self, name: str) -> Union[str, int, bool]:
 		"""
@@ -2494,6 +2537,10 @@ class INIConfig(BaseConfig):
 		key = self.options[name][1]
 		default = self.options[name][2]
 		val_type = self.options[name][3]
+
+		if section is None and self.spoof_group:
+			section = self.group
+
 		if section not in self.parser:
 			val = default
 		else:
@@ -2517,6 +2564,9 @@ class INIConfig(BaseConfig):
 		val_type = self.options[name][3]
 		str_value = BaseConfig.convert_from_system_type(value, val_type)
 
+		if section is None and self.spoof_group:
+			section = self.group
+
 		# Escape '%' characters that may be present
 		str_value = str_value.replace('%', '%%')
 
@@ -2536,6 +2586,10 @@ class INIConfig(BaseConfig):
 
 		section = self.options[name][0]
 		key = self.options[name][1]
+
+		if section is None and self.spoof_group:
+			section = self.group
+
 		if section not in self.parser:
 			return False
 		else:
@@ -2554,15 +2608,47 @@ class INIConfig(BaseConfig):
 		:return:
 		"""
 		if os.path.exists(self.path):
-			self.parser.read(self.path)
+			if self.spoof_group:
+				with open(self.path, 'r') as f:
+					self.parser.read_string('[%s]\n' % self.group + f.read())
+			else:
+				self.parser.read(self.path)
 
 	def save(self):
 		"""
 		Save the configuration file back to disk
 		:return:
 		"""
-		with open(self.path, 'w') as cfgfile:
-			self.parser.write(cfgfile)
+		if self.spoof_group:
+			# Write parser output to a temporary file, then strip out the fake
+			# section header that was inserted when loading (we spoofed a group).
+			tf = tempfile.NamedTemporaryFile(mode='w+', delete=False)
+			try:
+				# Write the parser to the temp file
+				self.parser.write(tf)
+				# Ensure content is flushed before reading
+				tf.flush()
+				tf.close()
+				with open(tf.name, 'r') as f:
+					lines = f.readlines()
+				# Remove the first line if it's the fake section header like: [GroupName]
+				if lines and lines[0].strip().startswith('[') and lines[0].strip().endswith(']'):
+					lines = lines[1:]
+					# If there's an empty line after the header, remove it as well
+					if lines and lines[0].strip() == '':
+						lines = lines[1:]
+				# Write the cleaned lines to the target path
+				with open(self.path, 'w') as cfgfile:
+					cfgfile.writelines(lines)
+			finally:
+				# Attempt to remove the temp file; ignore errors
+				try:
+					os.unlink(tf.name)
+				except Exception:
+					pass
+		else:
+			with open(self.path, 'w') as cfgfile:
+				self.parser.write(cfgfile)
 
 		# Change ownership to game user if running as root
 		if os.geteuid() == 0:
@@ -2576,6 +2662,7 @@ class INIConfig(BaseConfig):
 					os.chown(self.path, uid, gid)
 					break
 				check_path = os.path.dirname(check_path)
+
 
 
 class RCONService(BaseService):
@@ -3603,6 +3690,16 @@ class GameService(RCONService):
 
 		return ret
 
+	def get_port_definitions(self) -> list:
+		"""
+		Get a list of port definitions for this service
+		:return:
+		"""
+		return [
+			('Port', 'udp', '%s game port - %s' % (self.game.desc, self.get_map_label())),
+			('RCON Port', 'tcp', '%s RCON port - %s' % (self.game.desc, self.get_map_label()))
+		]
+
 
 def menu_service(service: GameService):
 	"""
@@ -4296,6 +4393,11 @@ parser.add_argument(
 	nargs=2
 )
 parser.add_argument(
+	'--get-ports',
+	help='Get the list of ports used by the game server (JSON encoded)',
+	action='store_true'
+)
+parser.add_argument(
 	'--is-running',
 	help='Check if any game service is currently running (exit code 0 = yes, 1 = no)',
 	action='store_true'
@@ -4394,6 +4496,28 @@ elif args.set_config != None:
 	else:
 		g = services[0]
 		g.set_option(option, value)
+elif args.get_ports:
+	ports = []
+	for svc in services:
+		if not getattr(svc, 'get_port_definitions', None):
+			continue
+
+		for port_dat in svc.get_port_definitions():
+			port_def = {}
+			if isinstance(port_dat[0], int):
+				# Port statically assigned and cannot be changed
+				port_def['value'] = port_dat[0]
+				port_def['config'] = None
+			else:
+				port_def['value'] = svc.get_option_value(port_dat[0])
+				port_def['config'] = port_dat[0]
+
+			port_def['service'] = svc.service
+			port_def['protocol'] = port_dat[1]
+			port_def['description'] = port_dat[2]
+			ports.append(port_def)
+	print(json.dumps(ports))
+	sys.exit(0)
 elif args.first_run:
 	menu_first_run(game, False)
 else:

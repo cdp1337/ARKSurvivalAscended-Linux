@@ -486,6 +486,16 @@ class GameService(RCONService):
 
 		return ret
 
+	def get_port_definitions(self) -> list:
+		"""
+		Get a list of port definitions for this service
+		:return:
+		"""
+		return [
+			('Port', 'udp', '%s game port - %s' % (self.game.desc, self.get_map_label())),
+			('RCON Port', 'tcp', '%s RCON port - %s' % (self.game.desc, self.get_map_label()))
+		]
+
 
 def menu_service(service: GameService):
 	"""
@@ -1179,6 +1189,11 @@ parser.add_argument(
 	nargs=2
 )
 parser.add_argument(
+	'--get-ports',
+	help='Get the list of ports used by the game server (JSON encoded)',
+	action='store_true'
+)
+parser.add_argument(
 	'--is-running',
 	help='Check if any game service is currently running (exit code 0 = yes, 1 = no)',
 	action='store_true'
@@ -1277,6 +1292,28 @@ elif args.set_config != None:
 	else:
 		g = services[0]
 		g.set_option(option, value)
+elif args.get_ports:
+	ports = []
+	for svc in services:
+		if not getattr(svc, 'get_port_definitions', None):
+			continue
+
+		for port_dat in svc.get_port_definitions():
+			port_def = {}
+			if isinstance(port_dat[0], int):
+				# Port statically assigned and cannot be changed
+				port_def['value'] = port_dat[0]
+				port_def['config'] = None
+			else:
+				port_def['value'] = svc.get_option_value(port_dat[0])
+				port_def['config'] = port_dat[0]
+
+			port_def['service'] = svc.service
+			port_def['protocol'] = port_dat[1]
+			port_def['description'] = port_dat[2]
+			ports.append(port_def)
+	print(json.dumps(ports))
+	sys.exit(0)
 elif args.first_run:
 	menu_first_run(game, False)
 else:
