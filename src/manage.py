@@ -131,7 +131,8 @@ class GameApp(SteamApp):
 		for line in res.stdout.decode().strip().split('\n'):
 			if line.endswith('.service'):
 				service_name = os.path.basename(line)[:-8]
-				self.services.append(service_name)
+				if os.path.exists(os.path.join('/etc/systemd/system/', service_name + '.service.d/override.conf')):
+					self.services.append(service_name)
 
 		self.configs = {
 			'game': UnrealConfig('game', os.path.join(here, 'AppFiles', 'ShooterGame', 'Saved', 'Config', 'WindowsServer', 'Game.ini')),
