@@ -155,22 +155,12 @@ function install_management() {
 	# Install management console and its dependencies
 	local SRC=""
 
-	if [[ "$INSTALLER_VERSION" == *"~DEV"* ]]; then
-		# Development version, pull from dev branch
-		SRC="https://raw.githubusercontent.com/${REPO}/refs/heads/dev/dist/manage.py"
-	else
-		# Stable version, pull from tagged release
-		SRC="https://raw.githubusercontent.com/${REPO}/refs/tags/${INSTALLER_VERSION}/dist/manage.py"
-	fi
+	SRC="https://raw.githubusercontent.com/${REPO}/refs/heads/main/dist/manage.py"
 
 	if ! download "$SRC" "$GAME_DIR/manage.py"; then
-    		# Fallback to main branch
-    		SRC="https://raw.githubusercontent.com/${REPO}/refs/heads/main/dist/manage.py"
-    		if ! download "$SRC" "$GAME_DIR/manage.py"; then
-    			echo "Could not download management script!" >&2
-    			exit 1
-    		fi
-    	fi
+		echo "Could not download management script!" >&2
+		exit 1
+	fi
 
 	chown $GAME_USER:$GAME_USER "$GAME_DIR/manage.py"
 	chmod +x "$GAME_DIR/manage.py"
@@ -195,65 +185,10 @@ EOF
     fi
 }
 
-##
-# Update the installer from Github
-#
-function ark_update_installer() {
-	local REPO="$1"
-	local GITHUB_VERSION="$2"
-	local TARGET="$3"
-
-	if [ -z "$REPO" ] || [ -z "$GITHUB_VERSION" ] || [ -z "$TARGET" ]; then
-		echo "update_installer: Missing required parameters!" >&2
-		return 1
-	fi
-
-	TMP="$(mktemp)"
-	local GITHUB_SOURCE="https://raw.githubusercontent.com/${REPO}/refs/tags/${GITHUB_VERSION}/dist/server-install-debian12.sh"
-	if download "$GITHUB_SOURCE" "$TARGET"; then
-		echo "Downloaded new installer version $GITHUB_VERSION from github.com/${REPO}"
-		chmod +x "$TARGET"
-
-		return 0
-	else
-		echo "update_installer: Failed to download installer version ${GITHUB_VERSION} from github.com/${REPO}" >&2
-		return 1
-	fi
-}
-
 
 ############################################
 ## Pre-exec Checks
 ############################################
-
-# Allow for auto-update checks
-if [ -n "$REPO" -a -n "$(which curl)" -a "${0:0:8}" != "/dev/fd/" ]; then
-	# Repo is enabled, curl is available, and the script was NOT dynamically loaded
-	# Check if there's an updated version available on Github
-	echo "Checking Github for updates..."
-	GITHUB_VERSION="$(curl -s -L "https://api.github.com/repos/$REPO/releases?per_page=1&page=1" | grep 'tag_name' | sed 's:.* "\(v[0-9]*\)",:\1:')"
-	if [ -n "$GITHUB_VERSION" ]; then
-		if [ "$GITHUB_VERSION" != "$INSTALLER_VERSION" ]; then
-			echo "A new version of the installer is available!"
-			read -p "Do you want to update the installer? (y/N): " -t 10 UPDATE
-			case "$UPDATE" in
-				[yY]*)
-					SRC="https://raw.githubusercontent.com/${REPO}/refs/tags/${GITHUB_VERSION}/dist/server-install-debian12.sh"
-					if download "$SRC" "$0"; then
-						echo "Relaunching installer ${GITHUB_VERSION}"
-						exec "$0" "${@}"
-						exit 0
-					else
-						echo "Failed to download updated installer from $GITHUB_SOURCE" >&2
-						echo "Resuming with existing installer" >&2
-					fi
-					;;
-				*)
-					echo "Skipping update";;
-			esac
-		fi
-	fi
-fi
 
 
 # This script can run on an existing server, but should not update the game if a map is actively running.
@@ -631,17 +566,6 @@ EOF
 	fi
 done
 ## End Release 2023.10.31 - Issue #8
-
-
-############################################
-## Installer Save (for uninstalling/upgrading/etc)
-############################################
-
-if [ -n "$REPO" -a "${0:0:8}" == "/dev/fd/" ]; then
-	# Script was dynamically loaded, save a copy for future reference
-	echo "Saving installer script for future reference..."
-	ark_update_installer "$REPO" "$INSTALLER_VERSION" "$GAME_DIR/installer.sh"
-fi
 
 
 ############################################
