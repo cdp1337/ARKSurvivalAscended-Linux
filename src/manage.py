@@ -1200,6 +1200,11 @@ parser.add_argument(
 	action='store_true'
 )
 parser.add_argument(
+	'--has-players',
+	help='Check if any players are currently connected to any game service (exit code 0 = yes, 1 = no)',
+	action='store_true'
+)
+parser.add_argument(
 	'--logs',
 	help='Print the latest logs from the game service',
 	action='store_true'
@@ -1315,6 +1320,21 @@ elif args.get_ports:
 			ports.append(port_def)
 	print(json.dumps(ports))
 	sys.exit(0)
+elif args.has_players:
+	has_players = False
+	for svc in services:
+		c = svc.get_player_count()
+		if c is not None and c > 0:
+			has_players = True
+			break
+	sys.exit(0 if has_players else 1)
+elif args.is_running:
+	is_running = False
+	for svc in services:
+		if svc.is_running():
+			is_running = True
+			break
+	sys.exit(0 if is_running else 1)
 elif args.first_run:
 	menu_first_run(game, False)
 else:
