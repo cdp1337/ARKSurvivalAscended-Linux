@@ -200,6 +200,27 @@ if [ $(id -u) -ne 0 ]; then
 	exit 1
 fi
 ##
+# Simple wrapper to emulate `which -s`
+#
+# The -s flag is not available on all systems, so this function
+# provides a consistent way to check for command existence
+# without having to include '&>/dev/null' everywhere.
+#
+# Returns 0 on success, 1 on failure
+#
+# Arguments:
+#   $1 - Command to check
+#
+# CHANGELOG:
+#   2025.12.15 - Initial version (for a regression fix)
+#
+function cmd_exists() {
+	local CMD="$1"
+	which "$CMD" &>/dev/null
+	return $?
+}
+
+##
 # Simple download utility function
 #
 # Uses either cURL or wget based on which is available
@@ -209,22 +230,44 @@ fi
 #
 # Returns 0 on success, 1 on failure
 #
+# Arguments:
+#   --no-overwrite       Skip download if destination file already exists
+#
 # CHANGELOG:
+#   2025.12.15 - Use cmd_exists to fix regression bug
+#   2025.12.04 - Add --no-overwrite option to allow skipping download if the destination file exists
 #   2025.11.23 - Download to a temp location to verify download was successful
 #              - use which -s for cleaner checks
 #   2025.11.09 - Initial version
 #
 function download() {
+	# Argument parsing
 	local SOURCE="$1"
 	local DESTINATION="$2"
+	local OVERWRITE=1
 	local TMP=$(mktemp)
+	shift 2
+
+	while [ $# -ge 1 ]; do
+    		case $1 in
+    			--no-overwrite)
+    				OVERWRITE=0
+    				;;
+    		esac
+    		shift
+    	done
 
 	if [ -z "$SOURCE" ] || [ -z "$DESTINATION" ]; then
 		echo "download: Missing required parameters!" >&2
 		return 1
 	fi
 
-	if which -s curl; then
+	if [ -f "$DESTINATION" ] && [ $OVERWRITE -eq 0 ]; then
+		echo "download: Destination file $DESTINATION already exists, skipping download." >&2
+		return 0
+	fi
+
+	if cmd_exists curl; then
 		if curl -fsL "$SOURCE" -o "$TMP"; then
 			mv $TMP "$DESTINATION"
 			return 0
@@ -232,7 +275,7 @@ function download() {
 			echo "download: curl failed to download $SOURCE" >&2
 			return 1
 		fi
-	elif which -s wget; then
+	elif cmd_exists wget; then
 		if wget -q "$SOURCE" -O "$TMP"; then
 			mv $TMP "$DESTINATION"
 			return 0
@@ -285,6 +328,7 @@ function install_proton() {
 		tar -x -C /opt/script-collection/ -f "/opt/script-collection/$PROTON_TGZ"
 	fi
 }
+
 ##
 # Get which firewall is enabled,
 # or "none" if none located
@@ -305,11 +349,12 @@ function get_enabled_firewall() {
 # or "none" if none located
 #
 # CHANGELOG:
+#   2025.12.15 - Use cmd_exists to fix regression bug
 #   2025.04.10 - Switch from "systemctl list-unit-files" to "which" to support older systems
 function get_available_firewall() {
-	if which -s firewall-cmd; then
+	if cmd_exists firewall-cmd; then
 		echo "firewalld"
-	elif which -s ufw; then
+	elif cmd_exists ufw; then
 		echo "ufw"
 	elif systemctl list-unit-files iptables.service &>/dev/null; then
 		echo "iptables"
