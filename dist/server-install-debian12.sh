@@ -97,7 +97,6 @@
 ## Parameter Configuration
 ############################################
 
-INSTALLER_VERSION="v20251105~DEV"
 # https://github.com/GloriousEggroll/proton-ge-custom
 PROTON_VERSION="10-25"
 WARLOCK_GUID="0c2de651-ec30-d4ac-c53f-ebdb67398324"
@@ -366,97 +365,152 @@ function get_available_firewall() {
 # Check if the OS is "like" a certain type
 #
 # ie: "ubuntu" will be like "debian"
+#
+# Returns 0 if true, 1 if false
+# Prints 1 if true, 0 if false
+#
+# Usage:
+#   if [ "$(os_like_debian)" -eq 1 ]; then ... ; fi
+#   if os_like_debian; then ... ; fi
+#
 function os_like_debian() {
 	if [ -f '/etc/os-release' ]; then
 		ID="$(egrep '^ID=' /etc/os-release | sed 's:ID=::')"
 		LIKE="$(egrep '^ID_LIKE=' /etc/os-release | sed 's:ID_LIKE=::')"
 
-		if [[ "$LIKE" =~ 'debian' ]]; then echo 1; return; fi
-		if [[ "$LIKE" =~ 'ubuntu' ]]; then echo 1; return; fi
-		if [ "$ID" == 'debian' ]; then echo 1; return; fi
-		if [ "$ID" == 'ubuntu' ]; then echo 1; return; fi
+		if [[ "$LIKE" =~ 'debian' ]]; then echo 1; return 0; fi
+		if [[ "$LIKE" =~ 'ubuntu' ]]; then echo 1; return 0; fi
+		if [ "$ID" == 'debian' ]; then echo 1; return 0; fi
+		if [ "$ID" == 'ubuntu' ]; then echo 1; return 0; fi
 	fi
 
 	echo 0
+	return 1
 }
 
 ##
 # Check if the OS is "like" a certain type
 #
 # ie: "ubuntu" will be like "debian"
+#
+# Returns 0 if true, 1 if false
+# Prints 1 if true, 0 if false
+#
+# Usage:
+#   if [ "$(os_like_ubuntu)" -eq 1 ]; then ... ; fi
+#   if os_like_ubuntu; then ... ; fi
+#
 function os_like_ubuntu() {
 	if [ -f '/etc/os-release' ]; then
 		ID="$(egrep '^ID=' /etc/os-release | sed 's:ID=::')"
 		LIKE="$(egrep '^ID_LIKE=' /etc/os-release | sed 's:ID_LIKE=::')"
 
-		if [[ "$LIKE" =~ 'ubuntu' ]]; then echo 1; return; fi
-		if [ "$ID" == 'ubuntu' ]; then echo 1; return; fi
+		if [[ "$LIKE" =~ 'ubuntu' ]]; then echo 1; return 0; fi
+		if [ "$ID" == 'ubuntu' ]; then echo 1; return 0; fi
 	fi
 
 	echo 0
+	return 1
 }
 
 ##
 # Check if the OS is "like" a certain type
 #
 # ie: "ubuntu" will be like "debian"
+#
+# Returns 0 if true, 1 if false
+# Prints 1 if true, 0 if false
+#
+# Usage:
+#   if [ "$(os_like_rhel)" -eq 1 ]; then ... ; fi
+#   if os_like_rhel; then ... ; fi
+#
 function os_like_rhel() {
 	if [ -f '/etc/os-release' ]; then
 		ID="$(egrep '^ID=' /etc/os-release | sed 's:ID=::')"
 		LIKE="$(egrep '^ID_LIKE=' /etc/os-release | sed 's:ID_LIKE=::')"
 
-		if [[ "$LIKE" =~ 'rhel' ]]; then echo 1; return; fi
-		if [[ "$LIKE" =~ 'fedora' ]]; then echo 1; return; fi
-		if [[ "$LIKE" =~ 'centos' ]]; then echo 1; return; fi
-		if [ "$ID" == 'rhel' ]; then echo 1; return; fi
-		if [ "$ID" == 'fedora' ]; then echo 1; return; fi
-		if [ "$ID" == 'centos' ]; then echo 1; return; fi
+		if [[ "$LIKE" =~ 'rhel' ]]; then echo 1; return 0; fi
+		if [[ "$LIKE" =~ 'fedora' ]]; then echo 1; return 0; fi
+		if [[ "$LIKE" =~ 'centos' ]]; then echo 1; return 0; fi
+		if [ "$ID" == 'rhel' ]; then echo 1; return 0; fi
+		if [ "$ID" == 'fedora' ]; then echo 1; return 0; fi
+		if [ "$ID" == 'centos' ]; then echo 1; return 0; fi
 	fi
 
 	echo 0
+	return 1
 }
 
 ##
 # Check if the OS is "like" a certain type
 #
 # ie: "ubuntu" will be like "debian"
+#
+# Returns 0 if true, 1 if false
+# Prints 1 if true, 0 if false
+#
+# Usage:
+#   if [ "$(os_like_suse)" -eq 1 ]; then ... ; fi
+#   if os_like_suse; then ... ; fi
+#
 function os_like_suse() {
 	if [ -f '/etc/os-release' ]; then
 		ID="$(egrep '^ID=' /etc/os-release | sed 's:ID=::')"
 		LIKE="$(egrep '^ID_LIKE=' /etc/os-release | sed 's:ID_LIKE=::')"
 
-		if [[ "$LIKE" =~ 'suse' ]]; then echo 1; return; fi
-		if [ "$ID" == 'suse' ]; then echo 1; return; fi
+		if [[ "$LIKE" =~ 'suse' ]]; then echo 1; return 0; fi
+		if [ "$ID" == 'suse' ]; then echo 1; return 0; fi
 	fi
 
 	echo 0
+	return 1
 }
 
 ##
 # Check if the OS is "like" a certain type
 #
 # ie: "ubuntu" will be like "debian"
+#
+# Returns 0 if true, 1 if false
+# Prints 1 if true, 0 if false
+#
+# Usage:
+#   if [ "$(os_like_arch)" -eq 1 ]; then ... ; fi
+#   if os_like_arch; then ... ; fi
+#
 function os_like_arch() {
 	if [ -f '/etc/os-release' ]; then
 		ID="$(egrep '^ID=' /etc/os-release | sed 's:ID=::')"
 		LIKE="$(egrep '^ID_LIKE=' /etc/os-release | sed 's:ID_LIKE=::')"
 
-		if [[ "$LIKE" =~ 'arch' ]]; then echo 1; return; fi
-		if [ "$ID" == 'arch' ]; then echo 1; return; fi
+		if [[ "$LIKE" =~ 'arch' ]]; then echo 1; return 0; fi
+		if [ "$ID" == 'arch' ]; then echo 1; return 0; fi
 	fi
 
 	echo 0
+	return 1
 }
 
 ##
 # Check if the OS is "like" a certain type
 #
 # ie: "ubuntu" will be like "debian"
+#
+# Returns 0 if true, 1 if false
+# Prints 1 if true, 0 if false
+#
+# Usage:
+#   if [ "$(os_like_bsd)" -eq 1 ]; then ... ; fi
+#   if os_like_bsd; then ... ; fi
+#
 function os_like_bsd() {
 	if [ "$(uname -s)" == 'FreeBSD' ]; then
 		echo 1
+		return 0
 	else
 		echo 0
+		return 1
 	fi
 }
 
@@ -464,11 +518,21 @@ function os_like_bsd() {
 # Check if the OS is "like" a certain type
 #
 # ie: "ubuntu" will be like "debian"
+#
+# Returns 0 if true, 1 if false
+# Prints 1 if true, 0 if false
+#
+# Usage:
+#   if [ "$(os_like_macos)" -eq 1 ]; then ... ; fi
+#   if os_like_macos; then ... ; fi
+#
 function os_like_macos() {
 	if [ "$(uname -s)" == 'Darwin' ]; then
 		echo 1
+		return 0
 	else
 		echo 0
+		return 1
 	fi
 }
 ##
@@ -566,6 +630,7 @@ function install_steamcmd() {
 
 		# Install steam repo
 		download http://repo.steampowered.com/steam/archive/stable/steam.gpg /usr/share/keyrings/steam.gpg
+		chmod +r /usr/share/keyrings/steam.gpg
 		echo "deb [arch=amd64,i386 signed-by=/usr/share/keyrings/steam.gpg] http://repo.steampowered.com/steam/ stable steam" > /etc/apt/sources.list.d/steam.list
 
 		# By using this script, you agree to the Steam license agreement at https://store.steampowered.com/subscriber_agreement/
@@ -797,11 +862,12 @@ function random_password() {
 ##
 # Determine if the current shell session is non-interactive.
 #
-# Checks NONINTERACTIVE, CI, DEBIAN_FRONTEND, TERM, and TTY status.
+# Checks NONINTERACTIVE, CI, DEBIAN_FRONTEND, and TERM.
 #
 # Returns 0 (true) if non-interactive, 1 (false) if interactive.
 #
 # CHANGELOG:
+#   2025.12.16 - Remove TTY checks to avoid false positives in some environments
 #   2025.11.23 - Initial version
 #
 function is_noninteractive() {
@@ -815,8 +881,8 @@ function is_noninteractive() {
 		return 0
 	fi
 
-	# dumb terminal or no tty on stdin/stdout
-	if [ "${TERM:-}" = "dumb" ] || [ ! -t 0 ] || [ ! -t 1 ]; then
+	# dumb terminal
+	if [ "${TERM:-}" = "dumb" ]; then
 		return 0
 	fi
 
@@ -907,10 +973,12 @@ function prompt_yn() {
 
 	echo "$PROMPT" >&2
 	if [ "$DEFAULT" == "y" ]; then
+		DEFAULT_TEXT="yes"
 		DEFAULT="$YES"
 		DEFAULT_CODE=$TRUE
 		echo -n "> (Y/n): " >&2
 	else
+		DEFAULT_TEXT="no"
 		DEFAULT="$NO"
 		DEFAULT_CODE=$FALSE
 		echo -n "> (y/N): " >&2
@@ -918,6 +986,7 @@ function prompt_yn() {
 
 	if is_noninteractive; then
 		# In non-interactive mode, return the default value
+		echo "$DEFAULT_TEXT (default non-interactive)" >&2
 		if [ $QUIET -eq 0 ]; then
 			echo $DEFAULT
 		fi
@@ -936,6 +1005,12 @@ function prompt_yn() {
 				echo $NO
 			fi
 			return $FALSE;;
+		"")
+			echo "$DEFAULT_TEXT (default choice)" >&2
+			if [ $QUIET -eq 0 ]; then
+				echo $DEFAULT
+			fi
+			return $DEFAULT_CODE;;
 		*)
 			if [ $QUIET -eq 0 ]; then
 				echo $DEFAULT
@@ -2365,7 +2440,7 @@ if [ $RUNNING -eq 1 -a $OPT_UNINSTALL -eq 1 ]; then
 fi
 
 echo "================================================================================"
-echo "         	  ARK Survival Ascended *unofficial* Installer $INSTALLER_VERSION"
+echo "         	  ARK Survival Ascended *unofficial* Installer"
 echo ""
 
 # Determine if this is a new installation or an upgrade (/repair)
@@ -3291,6 +3366,7 @@ fi
 
 # Register with Warlock
 if [ -n "$WARLOCK_GUID" ]; then
+	[ -d "/var/lib/warlock" ] || mkdir -p "/var/lib/warlock"
 	echo -n "$GAME_DIR" > "/var/lib/warlock/$WARLOCK_GUID.app"
 fi
 

@@ -97,7 +97,6 @@
 ## Parameter Configuration
 ############################################
 
-INSTALLER_VERSION="v20251105~DEV"
 # https://github.com/GloriousEggroll/proton-ge-custom
 PROTON_VERSION="10-25"
 WARLOCK_GUID="0c2de651-ec30-d4ac-c53f-ebdb67398324"
@@ -216,7 +215,7 @@ if [ $RUNNING -eq 1 -a $OPT_UNINSTALL -eq 1 ]; then
 fi
 
 echo "================================================================================"
-echo "         	  ARK Survival Ascended *unofficial* Installer $INSTALLER_VERSION"
+echo "         	  ARK Survival Ascended *unofficial* Installer"
 echo ""
 
 # Determine if this is a new installation or an upgrade (/repair)
@@ -946,6 +945,7 @@ fi
 
 # Register with Warlock
 if [ -n "$WARLOCK_GUID" ]; then
+	[ -d "/var/lib/warlock" ] || mkdir -p "/var/lib/warlock"
 	echo -n "$GAME_DIR" > "/var/lib/warlock/$WARLOCK_GUID.app"
 fi
 
