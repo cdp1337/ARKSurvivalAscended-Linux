@@ -91,7 +91,7 @@ Imports from Nitrado server backups are SUPPORTED, including all player and trib
 ## Installation with Warlock
 
 The easiest way to install ARK Survival Ascended Dedicated Server on Linux is to use
-[Warlock](https://github.com/BitsNBytes25/Warlock), a game server management tool.
+[Warlock](https://github.com/BitsNBytes25/Warlock), a game server management tool we have developed.
 
 [![Warlock ARK Support](images/warlock.webp)](https://github.com/BitsNBytes25/Warlock)
 
@@ -243,7 +243,13 @@ Installed Mods:
 [E]nable mod on all maps | [D]isable mod on all maps | [B]ack:
 ```
 
-Here, `e` will allow you to enable a mod on all maps and `d` will disable a mod on all maps.
+Here, `e` will allow you to enable (aka add) a mod on all maps and `d` will disable a mod on all maps.
+
+![Curseforge Mod ID Location](images/curseforge-mod-id.webp)
+
+Enabling (aka adding) a mod is done by providing the Curseforge Project ID in the interface when asked.
+This adds the mod ID to the list of mods in the game configuration,
+which will get downloaded and installed automatically on next server start.
 
 `b` will go back to the main menu overview.
 
