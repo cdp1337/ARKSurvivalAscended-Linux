@@ -104,8 +104,8 @@ as root or sudo.
 
 * Debian 12 tested on Digital Ocean, OVHCloud, and Proxmox.
 * Debian 13 tested on Proxmox.
-* Ubuntu 24.04 tested on Proxmox.
 * Ubuntu 22.04 tested on Proxmox.
+* Ubuntu 24.04 tested on Proxmox.
 
 Quick run (if you trust me, which of course you should not):
 
@@ -114,6 +114,15 @@ sudo su -c "bash <(wget -qO- https://raw.githubusercontent.com/cdp1337/ARKSurviv
 ```
 
 Quick note for Debian users; you need sudo installed to run the above command.
+If you do not have sudo installed, run:
+
+```bash
+# Login as root
+su -
+
+# Install the script
+bash <(wget -qO- https://raw.githubusercontent.com/cdp1337/ARKSurvivalAscended-Linux/main/dist/server-install-debian12.sh)
+```
 
 ### Advanced Usage
 

@@ -531,6 +531,10 @@ fi
 # Install steam binary and steamcmd
 install_steamcmd
 
+# Run Steamcmd to ensure it's available; fixes the ERROR! Failed to install app '...' (Missing configuration) issue
+sudo -u $GAME_USER /usr/games/steamcmd +login anonymous +quit
+sleep 5
+
 # Grab Proton from Glorious Eggroll
 install_proton "$PROTON_VERSION"
 
