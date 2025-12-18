@@ -1230,7 +1230,7 @@ game:
     name: "Hair Growth Speed Multiplier"
     help: "Scales the hair growth."
     type: float
-    default: "1.0 (ASE), 0 (ASA)"
+    default: 0.0
   - key: HarvestResourceItemAmountClassMultipliers
     section: /script/shootergame.shootergamemode
     name: "Harvest Resource Item Amount Class Multipliers"

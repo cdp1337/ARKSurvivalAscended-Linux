@@ -498,6 +498,72 @@ class GameService(RCONService):
 		]
 
 
+def menu_service_options(service: GameService):
+	"""
+	Interface for managing service options
+	:param service:
+	:return:
+	"""
+	while True:
+		print_header('Service Options')
+		print('')
+		table = Table(['#', 'Option', 'Value'])
+		table.align = ['r', 'l', 'l']
+		options = service.get_options()
+		opts = []
+		counter = 0
+		for opt in options:
+			if opt in ['Session Name', 'Server Admin Password', 'Mods', 'Cluster ID']:
+				# Skip some options that are configurable elsewhere
+				continue
+
+			counter += 1
+			opts.append(opt)
+			table.add([str(counter), opt, str(service.get_option_value(opt))])
+		table.render()
+		print('')
+
+		opt = input('Enter option number to edit | [B]ack: ').strip()
+		if opt.lower() == 'b':
+			return
+		elif opt.isdigit() and 1 <= int(opt) <= len(opts):
+			service.prompt_option(opts[int(opt) - 1])
+		else:
+			print('Invalid option')
+
+def menu_game_options(game: GameApp):
+	"""
+	Interface for managing game options
+	:param game:
+	:return:
+	"""
+	while True:
+		print_header('Game Options')
+		print('')
+		table = Table(['#', 'Option', 'Value'])
+		table.align = ['r', 'l', 'l']
+		options = game.get_options()
+		opts = []
+		counter = 0
+		for opt in options:
+			if opt in ['Session Name', 'Server Admin Password', 'Mods', 'Cluster ID']:
+				# Skip some options that are configurable elsewhere
+				continue
+
+			counter += 1
+			opts.append(opt)
+			table.add([str(counter), opt, str(game.get_option_value(opt))])
+		table.render()
+		print('')
+
+		opt = input('Enter option number to edit | [B]ack: ').strip()
+		if opt.lower() == 'b':
+			return
+		elif opt.isdigit() and 1 <= int(opt) <= len(opts):
+			game.prompt_option(opts[int(opt) - 1])
+		else:
+			print('Invalid option')
+
 def menu_service(service: GameService):
 	"""
 	Interface for managing an individual service
@@ -588,7 +654,7 @@ def menu_service(service: GameService):
 			val = prompt_text('Please enter new name: ', default=name, prefill=True)
 			service.set_option('Session Name', val)
 		elif opt == 'o':
-			print('@TODO')
+			menu_service_options(service)
 		elif opt == 's':
 			service.start()
 		elif opt == 't':
@@ -745,39 +811,6 @@ def menu_get_service_configs(service: GameService):
 
 	print(json.dumps(opts))
 	sys.exit(0)
-
-
-def menu_messages(game):
-	"""
-	Management interface to view/edit player messages for various events
-	:return:
-	"""
-	messages = []
-	for key in game.configs['manager'].options.keys():
-		if game.configs['manager'].options[key][0] == 'Messages':
-			messages.append(key)
-
-	while True:
-		print_header('Player Messages')
-		print('The following messages will be sent to players when certain events occur.')
-		print('')
-		table = Table()
-		counter = 0
-		for key in messages:
-			counter += 1
-			table.add(['opt %s' % str(counter), key, game.get_option_value(key)])
-		table.render()
-
-		print('')
-		opt = input('[1-%s] change message | [B]ack: ' % counter).lower()
-
-		if opt == 'b':
-			return
-		elif str.isnumeric(opt) and 1 <= int(opt) <= counter:
-			key = messages[int(opt)-1]
-			game.prompt_option(key)
-		else:
-			print('Invalid option')
 
 
 def menu_mods(game: GameApp):
@@ -1050,7 +1083,7 @@ def menu_main(game: GameApp):
 
 		print('')
 		print('1-%s to manage individual map settings' % len(services))
-		print('Configure: [M]ods | [C]luster | [A]dmin password/RCON | re[N]ame | [D]iscord integration | [P]layer messages')
+		print('Configure: [M]ods | [C]luster | [A]dmin password/RCON | re[N]ame | [D]iscord integration | [O]ptions')
 		print('Control: [S]tart all | s[T]op all | [R]estart all | [U]pdate')
 		if running:
 			print('Manage Data: (please stop all maps to manage game data)')
@@ -1080,8 +1113,12 @@ def menu_main(game: GameApp):
 				if val != '':
 					for s in services:
 						s.set_option('Session Name', val)
+		elif opt == 'o':
+			menu_game_options(game)
 		elif opt == 'p':
-			menu_messages(game)
+			print('Player messages are now managed from [O]ptions.')
+			time.sleep(2)
+			menu_game_options(game)
 		elif opt == 'q':
 			stay = False
 		elif opt == 'r':
