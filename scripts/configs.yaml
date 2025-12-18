@@ -41,13 +41,13 @@ manager:
     type: str
     default: Server is shutting down NOW!
     help: "Custom message broadcasted to players immediately before server shutdown."
-  - name: Map Started (Discord)
+  - name: Instance Started (Discord)
     section: Messages
     key: map_started
     type: str
     default: "{instance} has started! :rocket:"
     help: "Custom message sent to Discord when the server starts, use '{instance}' to insert the map name"
-  - name: Map Stopping (Discord)
+  - name: Instance Stopping (Discord)
     section: Messages
     key: map_stopping
     type: str
