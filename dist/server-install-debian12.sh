@@ -1131,6 +1131,54 @@ manager:
     type: str
     help: "The webhook URL for sending server status updates to a Discord channel."
 cli:
+  - key: CrossARKAllowForeignDinoDownloads
+    section: option
+    name: Cross ARK Allow Foreign Dino Downloads (Instance)
+    help: If true, allows non-native dinos' tribute downloads on some maps.
+    type: bool
+    default: false
+  - key: noTributeDownloads
+    section: option
+    name: No Tribute Downloads (Instance)
+    help: If true, prevents Cross-ARK data downloads.
+    type: bool
+    default: false
+  - key: PreventDownloadDinos
+    section: option
+    name: Prevent Download Dinos (Instance)
+    help: If true, prevents creature downloads via Cross-ARK.
+    type: bool
+    default: false
+  - key: PreventDownloadItems
+    section: option
+    name: Prevent Download Items (Instance)
+    help: If true, prevents item/resource downloads via Cross-ARK.
+    type: bool
+    default: false
+  - key: PreventDownloadSurvivors
+    section: option
+    name: Prevent Download Survivors (Instance)
+    help: If true, prevents survivor downloads via Cross-ARK.
+    type: bool
+    default: false
+  - key: PreventUploadDinos
+    section: option
+    name: Prevent Upload Dinos (Instance)
+    help: If true, prevents creature uploads via Cross-ARK.
+    type: bool
+    default: false
+  - key: PreventUploadItems
+    section: option
+    name: Prevent Upload Items (Instance)
+    help: If true, prevents item uploads via Cross-ARK.
+    type: bool
+    default: false
+  - key: PreventUploadSurvivors
+    section: option
+    name: Prevent Upload Survivors (Instance)
+    help: If true, prevents survivor uploads via Cross-ARK.
+    type: bool
+    default: false
   - name: Session Name
     section: option
     key: SessionName
@@ -2733,7 +2781,7 @@ fi
 
 # Load or generate a cluster ID as users usually want to cluster their maps together
 if [ -e "$GAME_DIR/services/ark-island.conf" ] && grep -q 'clusterid=' "$GAME_DIR/services/ark-island.conf"; then
-	CLUSTERID="grep -Eo 'clusterid=[^ ]*' "$GAME_DIR/services/ark-island.conf" | sed 's:.*=::'"
+	CLUSTERID="$(grep -Eo 'clusterid=[^ ]*' "$GAME_DIR/services/ark-island.conf" | sed 's:.*=::')"
 else
 	CLUSTERID="$(random_password 12)"
 fi

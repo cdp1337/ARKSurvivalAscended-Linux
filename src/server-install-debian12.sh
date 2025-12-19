@@ -388,7 +388,7 @@ fi
 
 # Load or generate a cluster ID as users usually want to cluster their maps together
 if [ -e "$GAME_DIR/services/ark-island.conf" ] && grep -q 'clusterid=' "$GAME_DIR/services/ark-island.conf"; then
-	CLUSTERID="grep -Eo 'clusterid=[^ ]*' "$GAME_DIR/services/ark-island.conf" | sed 's:.*=::'"
+	CLUSTERID="$(grep -Eo 'clusterid=[^ ]*' "$GAME_DIR/services/ark-island.conf" | sed 's:.*=::')"
 else
 	CLUSTERID="$(random_password 12)"
 fi
