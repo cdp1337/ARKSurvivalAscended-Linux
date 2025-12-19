@@ -116,14 +116,14 @@ PROTON_BIN="/opt/script-collection/GE-Proton${PROTON_VERSION}/proton"
 # Steam ID of the game
 STEAM_ID="2430930"
 # List of game maps currently available
-GAME_MAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter ark-extinction ark-astraeos ark-ragnarok ark-valguero"
+GAME_MAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter ark-extinction ark-astraeos ark-ragnarok ark-valguero ark-lostcolony"
 # How many base maps are installed by default (needed for the custom map logic)
-BASE_MAP_COUNT=9
+BASE_MAP_COUNT=10
 # Range of game ports to enable in the firewall
 PORT_GAME_START=7701
-PORT_GAME_END=7709
+PORT_GAME_END=7710
 PORT_RCON_START=27001
-PORT_RCON_END=27009
+PORT_RCON_END=27010
 PORT_CUSTOM_GAME=7801
 PORT_CUSTOM_RCON=27101
 
@@ -1422,6 +1422,126 @@ cli:
     default: 1.0
     help: "Sets the experience points multiplier for players on the server."
 gus:
+  - key: LimitBunkersPerTribe
+    section: ServerSettings
+    name: Limit Bunkers Per Tribe
+    help: If true, limits the number of bunkers a tribe can own.
+    type: bool
+    default: true
+  - key: LimitBunkersPerTribeNum
+    section: ServerSettings
+    name: Limit Bunkers Per Tribe Num
+    help: Maximum number of bunkers a tribe can own (if limiting enabled).
+    type: int
+    default: 3
+  - key: AllowBunkersInPreventionZones
+    section: ServerSettings
+    name: Allow Bunkers In Prevention Zones
+    help: If true, allows building bunkers in structure prevention zones.
+    type: bool
+    default: false
+  - key: AllowRidingDinosInsideBunkers
+    section: ServerSettings
+    name: Allow Riding Dinos Inside Bunkers
+    help: If true, allows riding creatures while inside bunkers.
+    type: bool
+    default: true
+  - key: AllowBunkerModulesAboveGround
+    section: ServerSettings
+    name: Allow Bunker Modules Above Ground
+    help: If true, allows placing bunker modules above ground level.
+    type: bool
+    default: false
+  - key: AllowDinoAIInsideBunkers
+    section: ServerSettings
+    name: Allow Dino AI Inside Bunkers
+    help: If true, allows wild creature AI to function inside bunkers.
+    type: bool
+    default: true
+  - key: AllowBunkerModulesInPreventionZones
+    section: ServerSettings
+    name: Allow Bunker Modules In Prevention Zones
+    help: If true, allows placing bunker modules in structure prevention zones.
+    type: bool
+    default: false
+  - key: MinDistanceBetweenBunkers
+    section: ServerSettings
+    name: Min Distance Between Bunkers
+    help: Minimum distance required between two bunkers.
+    type: float
+    default: 3000.0
+  - key: EnemyAccessBunkerHPThreshold
+    section: ServerSettings
+    name: Enemy Access Bunker HP Threshold
+    help: Percentage HP threshold below which enemies can enter bunkers.
+    type: float
+    default: 0.25
+  - key: BunkerUnderHPThresholdDmgMultiplier
+    section: ServerSettings
+    name: Bunker Under HP Threshold Dmg Multiplier
+    help: Damage multiplier applied to bunkers below the HP threshold.
+    type: float
+    default: 0.05
+  - key: CryoHospitalHoursToRegenHP
+    section: ServerSettings
+    name: Cryo Hospital Hours To Regen HP
+    help: Hours required in a cryo hospital to fully regenerate HP.
+    type: float
+    default: 1.0
+  - key: CryoHospitalHoursToRegenFood
+    section: ServerSettings
+    name: Cryo Hospital Hours To Regen Food
+    help: Hours required in a cryo hospital to fully regenerate food.
+    type: float
+    default: 24.0
+  - key: CryoHospitalHoursToDrainTorpor
+    section: ServerSettings
+    name: Cryo Hospital Hours To Drain Torpor
+    help: Hours required in a cryo hospital to fully drain torpor.
+    type: float
+    default: 1.0
+  - key: CryoHospitalMatingCooldownReduction
+    section: ServerSettings
+    name: Cryo Hospital Mating Cooldown Reduction
+    help: Multiplier reducing mating cooldown when in a cryo hospital.
+    type: float
+    default: 2.0
+  - key: BloodforgeReinforceExtraDurability
+    section: ServerSettings
+    name: Bloodforge Reinforce Extra Durability
+    help: Extra durability added when reinforcing items at the Bloodforge.
+    type: float
+    default: 0.3
+  - key: BloodforgeReinforceResourceCostMultiplier
+    section: ServerSettings
+    name: Bloodforge Reinforce Resource Cost Multiplier
+    help: Multiplier for resource costs when reinforcing items at the Bloodforge.
+    type: float
+    default: 3.0
+  - key: BloodforgeReinforceSpeedMultiplier
+    section: ServerSettings
+    name: Bloodforge Reinforce Speed Multiplier
+    help: Multiplier for the speed of reinforcing items at the Bloodforge.
+    type: float
+    default: 0.1
+  - key: MaxActiveOutposts
+    section: ServerSettings
+    name: Max Active Outposts
+    help: Maximum number of active outposts allowed on the server.
+    type: int
+    default: 1
+  - key: MaxActiveResourceCaches
+    section: ServerSettings
+    name: Max Active Resource Caches
+    help: Maximum number of active resource caches allowed on the server.
+    type: int
+    default: 3
+  - key: MaxActiveCityOutposts
+    section: ServerSettings
+    name: Max Active City Outposts
+    help: Maximum number of active city outposts allowed on the server.
+    type: int
+    default: 1
   - key: ActiveMods
     section: ServerSettings
     name: Active Mods
@@ -2934,6 +3054,12 @@ for MAP in $GAME_MAPS; do
 		MODS=""
 		GAMEPORT=7709
 		RCONPORT=27009
+	elif [ "$MAP" == "ark-lostcolony" ]; then
+		DESC="Lost Colony"
+		NAME="LostColony_WP"
+		MODS=""
+		GAMEPORT=7710
+		RCONPORT=27010
 	elif [ "$MAP" == "CUSTOM" ]; then
 		MAP="$CUSTOM_MAP_MAP"
 		DESC="$CUSTOM_MAP_DESC"

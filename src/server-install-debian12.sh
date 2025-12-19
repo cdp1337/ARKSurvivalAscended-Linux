@@ -116,14 +116,14 @@ PROTON_BIN="/opt/script-collection/GE-Proton${PROTON_VERSION}/proton"
 # Steam ID of the game
 STEAM_ID="2430930"
 # List of game maps currently available
-GAME_MAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter ark-extinction ark-astraeos ark-ragnarok ark-valguero"
+GAME_MAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter ark-extinction ark-astraeos ark-ragnarok ark-valguero ark-lostcolony"
 # How many base maps are installed by default (needed for the custom map logic)
-BASE_MAP_COUNT=9
+BASE_MAP_COUNT=10
 # Range of game ports to enable in the firewall
 PORT_GAME_START=7701
-PORT_GAME_END=7709
+PORT_GAME_END=7710
 PORT_RCON_START=27001
-PORT_RCON_END=27009
+PORT_RCON_END=27010
 PORT_CUSTOM_GAME=7801
 PORT_CUSTOM_RCON=27101
 
@@ -709,6 +709,12 @@ for MAP in $GAME_MAPS; do
 		MODS=""
 		GAMEPORT=7709
 		RCONPORT=27009
+	elif [ "$MAP" == "ark-lostcolony" ]; then
+		DESC="Lost Colony"
+		NAME="LostColony_WP"
+		MODS=""
+		GAMEPORT=7710
+		RCONPORT=27010
 	elif [ "$MAP" == "CUSTOM" ]; then
 		MAP="$CUSTOM_MAP_MAP"
 		DESC="$CUSTOM_MAP_DESC"
