@@ -174,6 +174,7 @@ that are hosted outside Nitrado's network...)
 │   ├── ark-thecenter/
 │   ├── ark-extinction/
 │   ├── ark-astraeos/
+│   ├── ark-lostcolony/
 │   └── ark-valguero/
 ├── services/                  # Service file overrides (for setting startup options)
 │   ├── ark-aberration.conf
@@ -183,6 +184,7 @@ that are hosted outside Nitrado's network...)
 │   ├── ark-thecenter.conf
 │   ├── ark-extinction.conf
 │   ├── ark-astraeos.conf
+│   ├── ark-lostcolony.conf
 │   └── ark-valguero.conf
 ├── GameUserSettings.ini       # Game Server Configuration
 ├── Game.ini                   # Game Server Configuration
@@ -205,17 +207,18 @@ Once installed, run `sudo /home/steam/ArkSurvivalAscended/manage.py` to access t
 ```
 == Welcome to the ARK Survival Ascended Linux Server Manager ==
 
-| # | Map              | Session                      | Port | RCON  | Auto-Start  | Status     | Mem     | Players |
-|---|------------------|------------------------------|------|-------|-------------|------------|---------|---------|
-| 1 | Extinction_WP    | BitsnBytes Test (Extinction) | 7706 | 27006 | ❌ Disabled  | ✅ Running  | 5.68 GB | 0       |
-| 2 | Astraeos_WP      | BitsnBytes Test (Astraeos)   | 7707 | 27007 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |
-| 3 | ScorchedEarth_WP | BitsnBytes Test (Scorched)   | 7704 | 27004 | ❌ Disabled  | ✅ Running  | 5.90 GB | 0       |
-| 4 | TheCenter_WP     | BitsnBytes Test (TheCenter)  | 7705 | 27005 | ❌ Disabled  | ✅ Running  | 2.01 GB | N/A     |
-| 5 | Aberration_WP    | BitsnBytes Test (Aberration) | 7702 | 27002 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |
-| 6 | TheIsland_WP     | BitsnBytes Test (Island)     | 7701 | 27001 | ❌ Disabled  | ✅ Running  | 9.77 GB | 0       |
-| 7 | BobsMissions_WP  | BitsnBytes Test (Club)       | 7703 | 27003 | ❌ Disabled  | ✅ Running  | 1.57 GB | 0       |
-| 8 | Valguero_WP      | BitsnBytes Test (Valguero)   | 7709 | 27009 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |
-| 9 | Ragnarok_WP      | BitsnBytes Test (Ragnarok)   | 7708 | 27008 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |     
+|  # | Map              | Session                       | Port | RCON  | Auto-Start  | Status     | Mem     | Players |
+|----|------------------|-------------------------------|------|-------|-------------|------------|---------|---------|
+|  1 | Extinction_WP    | BitsnBytes Test (Extinction)  | 7706 | 27006 | ❌ Disabled  | ✅ Running  | 5.68 GB | 0       |
+|  2 | Astraeos_WP      | BitsnBytes Test (Astraeos)    | 7707 | 27007 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |
+|  3 | ScorchedEarth_WP | BitsnBytes Test (Scorched)    | 7704 | 27004 | ❌ Disabled  | ✅ Running  | 5.90 GB | 0       |
+|  4 | TheCenter_WP     | BitsnBytes Test (TheCenter)   | 7705 | 27005 | ❌ Disabled  | ✅ Running  | 2.01 GB | N/A     |
+|  5 | Aberration_WP    | BitsnBytes Test (Aberration)  | 7702 | 27002 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |
+|  6 | TheIsland_WP     | BitsnBytes Test (Island)      | 7701 | 27001 | ❌ Disabled  | ✅ Running  | 9.77 GB | 0       |
+|  7 | BobsMissions_WP  | BitsnBytes Test (Club)        | 7703 | 27003 | ❌ Disabled  | ✅ Running  | 1.57 GB | 0       |
+|  8 | Valguero_WP      | BitsnBytes Test (Valguero)    | 7709 | 27009 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |
+|  9 | Ragnarok_WP      | BitsnBytes Test (Ragnarok)    | 7708 | 27008 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |   
+| 10 | LostColony_WP    | BitsnBytes Test (Lost Colony) | 7710 | 27010 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |     
 
 1-9 to manage individual map settings
 Configure: [M]ods | [C]luster | [A]dmin password/RCON | re[N]ame | [D]iscord integration | [P]layer messages
@@ -562,6 +565,7 @@ Below is a table of each map (as of 73.42) and the approximate RAM required for 
 | Astraeos                  |           11.2 GB |
 | Ragnarok                  |           10.2 GB |
 | Valguero                  |            8.6 GB |
+| Lost Colony               |           20.0 GB |
 
 
 **Fix**
