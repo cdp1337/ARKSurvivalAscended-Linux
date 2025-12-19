@@ -42,6 +42,11 @@
 #   OPT_NEWFORMAT=--new-format - Use the new save format (Nitrado/Official server compatible) OPTIONAL
 #
 # Changelog:
+#   20251219 - Add support for Lost Colony
+#            - Add per-map options to disable downloads
+#            - Re-add option editing from CLI
+#            - Regression fix for Debian 12
+#            - New Warlock features
 #   20251207 - Support custom installation directory
 #            - Add support for some custom usecases of the installer
 #            - Bump Proton to 10.25
