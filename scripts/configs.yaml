@@ -71,6 +71,11 @@ manager:
     type: str
     help: "The webhook URL for sending server status updates to a Discord channel."
 cli:
+  - key: allowicefox
+    section: flag
+    name: Allow Veilwyn Transfers
+    type: bool
+    default: false
   - key: CrossARKAllowForeignDinoDownloads
     section: option
     name: Cross ARK Allow Foreign Dino Downloads (Instance)
