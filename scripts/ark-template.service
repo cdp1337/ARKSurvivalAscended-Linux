@@ -10,7 +10,7 @@ LimitNOFILE=10000
 User=$GAME_USER
 Group=$GAME_USER
 WorkingDirectory=$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64
-Environment=XDG_RUNTIME_DIR=/run/user/$(id -u)
+Environment=XDG_RUNTIME_DIR=/run/user/$(id -u $GAME_USER)
 Environment="STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_DIR"
 Environment="STEAM_COMPAT_DATA_PATH=$GAME_DIR/prefixes/$MAP"
 ExecStop=$GAME_DIR/manage.py --pre-stop --service=${MAP}
