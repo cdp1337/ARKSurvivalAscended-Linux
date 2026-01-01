@@ -182,8 +182,25 @@ class GameApp(SteamApp):
 		#
 		check_path = os.path.join(here, 'AppFiles/ShooterGame/Binaries/Win64/steamclient64.dll')
 		if os.path.exists(check_path):
-			print('Removing broken Steam library to prevent segfault')
+			print('Removing broken Steam library to fix build 74.24 crash...')
 			os.remove(check_path)
+
+		# As discovered by Deciphersoul; the update 77.34 released on Dec 24 2025 caused an issue with some Debian
+		# servers, notably Debian 12, and when using certain mods.
+		# The fix is to download the Microsoft XAudio2 Redist package and extract the required DLLs.
+		#
+		# https://github.com/Acekorneya/Ark-Survival-Ascended-Server/issues/116
+		print('Installing Microsoft XAudio2 Redist DLL to fix build 77.34 crash...')
+		req = request.urlopen('https://www.nuget.org/api/v2/package/Microsoft.XAudio2.Redist/1.2.11', timeout=30)
+		package_data = req.read()
+		package_path = '/tmp/Microsoft.XAudio2.Redist.nupkg'
+		with open(package_path, 'wb') as f:
+			f.write(package_data)
+		shutil.unpack_archive(package_path, '/tmp/Microsoft.XAudio2.Redist')
+		shutil.copy(
+			'/tmp/Microsoft.XAudio2.Redist/build/native/release/bin/x64/xaudio2_9redist.dll',
+			os.path.join(here, 'AppFiles/ShooterGame/Binaries/Win64/xaudio2_9.dll')
+		)
 
 
 class GameService(RCONService):
