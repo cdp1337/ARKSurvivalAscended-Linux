@@ -267,7 +267,7 @@ class GameService(RCONService):
 			# Update firewall for game port change
 			if previous_value:
 				firewall_remove(int(previous_value), 'udp')
-			firewall_allow(int(value), 'udp', '%s game port - %s' % (self.game.desc, self.get_map_label()))
+			firewall_allow(int(new_value), 'udp', '%s game port - %s' % (self.game.desc, self.get_map_label()))
 
 		# Reload the service
 		if os.geteuid() != 0:
