@@ -3436,13 +3436,19 @@ class GameApp(SteamApp):
 		req = request.urlopen('https://www.nuget.org/api/v2/package/Microsoft.XAudio2.Redist/1.2.11', timeout=30)
 		package_data = req.read()
 		package_path = '/tmp/Microsoft.XAudio2.Redist.zip'
+		dll_dest = os.path.join(here, 'AppFiles/ShooterGame/Binaries/Win64/xaudio2_9.dll')
 		with open(package_path, 'wb') as f:
 			f.write(package_data)
 		shutil.unpack_archive(package_path, '/tmp/Microsoft.XAudio2.Redist')
 		shutil.copy(
 			'/tmp/Microsoft.XAudio2.Redist/build/native/release/bin/x64/xaudio2_9redist.dll',
-			os.path.join(here, 'AppFiles/ShooterGame/Binaries/Win64/xaudio2_9.dll')
+			dll_dest
 		)
+		if os.geteuid() == 0:
+			stat_info = os.stat(here)
+			uid = stat_info.st_uid
+			gid = stat_info.st_gid
+			os.chown(dll_dest, uid, gid)
 
 
 class GameService(RCONService):
