@@ -148,6 +148,125 @@ PORT_CUSTOM_RCON=27101
 # scriptlet:warlock/install_warlock_manager.sh
 
 
+##
+# Install the game server
+#
+# Expects the following variables:
+#   GAME_USER    - User account to install the game under
+#   GAME_DIR     - Directory to install the game into
+#   STEAM_ID     - Steam App ID of the game
+#   GAME_DESC    - Description of the game (for logging purposes)
+#   GAME_SERVICE - Service name to install with Systemd
+#   SAVE_DIR     - Directory to store game save files
+#
+function install_application() {
+	# Create a "steam" user account
+    # This will create the account with no password, so if you need to log in with this user,
+    # run `sudo passwd steam` to set a password.
+    if [ -z "$(getent passwd $GAME_USER)" ]; then
+    	useradd -m -U $GAME_USER
+    fi
+
+    # Preliminary requirements
+    apt install -y curl sudo python3-venv
+
+    if [ "$FIREWALL" == "1" ]; then
+    	if [ "$(get_enabled_firewall)" == "none" ]; then
+    		# No firewall installed, go ahead and install UFW
+    		install_ufw
+    	fi
+    fi
+
+    if [ "$MULTISERVER" -eq 1 ]; then
+    	if [ "$ISPRIMARY" -eq 1 ]; then
+    		apt install -y nfs-kernel-server nfs-common
+    	else
+    		apt install -y nfs-common
+    	fi
+    fi
+
+    # Setup the ssh directory for ths steam user; this will save some steps later
+    # should the user want to access the files via SFTP.
+    [ -d "/home/$GAME_USER/.ssh" ] || mkdir -p "/home/$GAME_USER/.ssh"
+    [ -e "/home/$GAME_USER/.ssh/authorized_keys" ] || touch "/home/$GAME_USER/.ssh/authorized_keys"
+    chown -R $GAME_USER:$GAME_USER "/home/$GAME_USER/.ssh"
+    chmod 700 "/home/$GAME_USER/.ssh"
+    chmod 600 "/home/$GAME_USER/.ssh/authorized_keys"
+
+    # Ensure target directory exists and is writable by the target user
+    # This generally isn't needed when using defaults, but is helpful if the GAME_DIR location is changed.
+    [ -d "$GAME_DIR" ] || mkdir -p "$GAME_DIR"
+    chown -R $GAME_USER:$GAME_USER "$GAME_DIR"
+
+    # Install steam binary and steamcmd
+    install_steamcmd
+
+    # Run Steamcmd to ensure it's available; fixes the ERROR! Failed to install app '...' (Missing configuration) issue
+    sudo -u $GAME_USER /usr/games/steamcmd +login anonymous +quit
+    sleep 5
+
+    # Grab Proton from Glorious Eggroll
+    install_proton "$PROTON_VERSION"
+
+    # Install the management script
+    install_warlock_manager "$REPO" "$BRANCH"
+    sudo -u $GAME_USER "$GAME_DIR/.venv/bin/pip" install rcon
+
+    # Use the management script to install the game server
+	if ! $GAME_DIR/manage.py --update; then
+		echo "Could not install $GAME_DESC, exiting" >&2
+		exit 1
+	fi
+}
+
+##
+# Uninstall the game server
+#
+# Expects the following variables:
+#   GAME_DIR     - Directory where the game is installed
+#   GAME_SERVICE - Service name used with Systemd
+#   SAVE_DIR     - Directory where game save files are stored
+#
+function uninstall_application() {
+	echo "Removing proton prefixes"
+	[ -e "$GAME_DIR/prefixes" ] && rm "$GAME_DIR/prefixes" -r
+
+	echo "Removing service files"
+	ls -1 "$GAME_DIR/services" | while read SERVICE; do
+		SERVICE="${SERVICE:0:-5}"
+		systemctl disable $SERVICE
+		[ -h "$GAME_DIR/services/${SERVICE}.conf" ] && unlink "$GAME_DIR/services/${SERVICE}.conf"
+		[ -e "/etc/systemd/system/${SERVICE}.service" ] && rm "/etc/systemd/system/${SERVICE}.service"
+		[ -e "/etc/systemd/system/${SERVICE}.service.d" ] && rm -r "/etc/systemd/system/${SERVICE}.service.d"
+	done
+	[ -e "/etc/systemd/system/ark-updater.service" ] && rm "/etc/systemd/system/ark-updater.service"
+	[ -e "$GAME_DIR/services" ] && rm "$GAME_DIR/services" -r
+
+	echo "Removing application data"
+	[ -e "$GAME_DIR/AppFiles" ] && rm -r "$GAME_DIR/AppFiles"
+
+	echo "Removing management system"
+	[ -h "$GAME_DIR/admins.txt" ] && unlink "$GAME_DIR/admins.txt"
+	[ -h "$GAME_DIR/Game.ini" ] && unlink "$GAME_DIR/Game.ini"
+	[ -h "$GAME_DIR/GameUserSettings.ini" ] && unlink "$GAME_DIR/GameUserSettings.ini"
+	[ -h "$GAME_DIR/PlayersJoinNoCheckList.txt" ] && unlink "$GAME_DIR/PlayersJoinNoCheckList.txt"
+	[ -h "$GAME_DIR/ShooterGame.log" ] && unlink "$GAME_DIR/ShooterGame.log"
+	[ -e "$GAME_DIR/manage.py" ] && rm "$GAME_DIR/manage.py"
+	[ -e "$GAME_DIR/backup.sh" ] && rm "$GAME_DIR/backup.sh"
+	[ -e "$GAME_DIR/restore.sh" ] && rm "$GAME_DIR/restore.sh"
+	[ -e "$GAME_DIR/start_all.sh" ] && rm "$GAME_DIR/start_all.sh"
+	[ -e "$GAME_DIR/stop_all.sh" ] && rm "$GAME_DIR/stop_all.sh"
+	[ -e "$GAME_DIR/update.sh" ] && rm "$GAME_DIR/update.sh"
+	[ -e "$GAME_DIR/.venv" ] && rm "$GAME_DIR/.venv" -r
+	[ -e "$GAME_DIR/.settings.ini" ] && rm "$GAME_DIR/.settings.ini"
+	[ -e "$GAME_DIR/configs.yaml" ] && rm "$GAME_DIR/configs.yaml"
+
+	if [ -n "$WARLOCK_GUID" ]; then
+		echo "Removing Warlock registration"
+		[ -e "/var/lib/warlock/$WARLOCK_GUID.app" ] && rm "/var/lib/warlock/$WARLOCK_GUID.app"
+	fi
+}
+
 ############################################
 ## Pre-exec Checks
 ############################################
@@ -254,44 +373,7 @@ if [ $OPT_UNINSTALL -eq 1 ]; then
 		fi
 	fi
 
-	echo "Removing proton prefixes"
-	[ -e "$GAME_DIR/prefixes" ] && rm "$GAME_DIR/prefixes" -r
-
-	echo "Removing service files"
-	ls -1 "$GAME_DIR/services" | while read SERVICE; do
-		SERVICE="${SERVICE:0:-5}"
-		systemctl disable $SERVICE
-		[ -h "$GAME_DIR/services/${SERVICE}.conf" ] && unlink "$GAME_DIR/services/${SERVICE}.conf"
-		[ -e "/etc/systemd/system/${SERVICE}.service" ] && rm "/etc/systemd/system/${SERVICE}.service"
-		[ -e "/etc/systemd/system/${SERVICE}.service.d" ] && rm -r "/etc/systemd/system/${SERVICE}.service.d"
-	done
-	[ -e "/etc/systemd/system/ark-updater.service" ] && rm "/etc/systemd/system/ark-updater.service"
-	[ -e "$GAME_DIR/services" ] && rm "$GAME_DIR/services" -r
-
-	echo "Removing application data"
-	[ -e "$GAME_DIR/AppFiles" ] && rm -r "$GAME_DIR/AppFiles"
-
-	echo "Removing management system"
-	[ -h "$GAME_DIR/admins.txt" ] && unlink "$GAME_DIR/admins.txt"
-	[ -h "$GAME_DIR/Game.ini" ] && unlink "$GAME_DIR/Game.ini"
-	[ -h "$GAME_DIR/GameUserSettings.ini" ] && unlink "$GAME_DIR/GameUserSettings.ini"
-	[ -h "$GAME_DIR/PlayersJoinNoCheckList.txt" ] && unlink "$GAME_DIR/PlayersJoinNoCheckList.txt"
-	[ -h "$GAME_DIR/ShooterGame.log" ] && unlink "$GAME_DIR/ShooterGame.log"
-	[ -e "$GAME_DIR/manage.py" ] && rm "$GAME_DIR/manage.py"
-	[ -e "$GAME_DIR/backup.sh" ] && rm "$GAME_DIR/backup.sh"
-	[ -e "$GAME_DIR/restore.sh" ] && rm "$GAME_DIR/restore.sh"
-	[ -e "$GAME_DIR/start_all.sh" ] && rm "$GAME_DIR/start_all.sh"
-	[ -e "$GAME_DIR/stop_all.sh" ] && rm "$GAME_DIR/stop_all.sh"
-	[ -e "$GAME_DIR/update.sh" ] && rm "$GAME_DIR/update.sh"
-	[ -e "$GAME_DIR/.venv" ] && rm "$GAME_DIR/.venv" -r
-	[ -e "$GAME_DIR/.settings.ini" ] && rm "$GAME_DIR/.settings.ini"
-	[ -e "$GAME_DIR/configs.yaml" ] && rm "$GAME_DIR/configs.yaml"
-
-	if [ -n "$WARLOCK_GUID" ]; then
-		echo "Removing Warlock registration"
-		[ -e "/var/lib/warlock/$WARLOCK_GUID.app" ] && rm "/var/lib/warlock/$WARLOCK_GUID.app"
-	fi
-
+	uninstall_application
 	exit
 fi
 
@@ -356,12 +438,18 @@ else
 	CLUSTERID="$(random_password 12)"
 fi
 
-
 echo ''
 if [ "$WHITELIST" -eq 1 ]; then
 	WHITELIST=$(prompt_yn --invert --default-no "? DISABLE whitelist for players?")
 else
 	WHITELIST=$(prompt_yn --default-no "? Enable whitelist for players?")
+fi
+
+# Admin pass, used on new installs and shared across all maps
+if [ -e "$GAME_DIR/services/ark-island.conf" ]; then
+	ADMIN_PASS="$(grep -Eo 'ServerAdminPassword=[^? ]*' "$GAME_DIR/services/ark-island.conf" | sed 's:ServerAdminPassword=::')"
+else
+	ADMIN_PASS="$(random_password)"
 fi
 
 echo ''
@@ -449,59 +537,6 @@ if [ $OPT_INSTALL_CUSTOM_MAP -eq 1 ]; then
 	GAME_MAPS="$GAME_MAPS CUSTOM"
 fi
 
-
-############################################
-## Dependency Installation and Setup
-############################################
-
-# Create a "steam" user account
-# This will create the account with no password, so if you need to log in with this user,
-# run `sudo passwd steam` to set a password.
-if [ -z "$(getent passwd $GAME_USER)" ]; then
-	useradd -m -U $GAME_USER
-fi
-# Setup the ssh directory for ths steam user; this will save some steps later
-# should the user want to access the files via SFTP.
-[ -d "/home/$GAME_USER/.ssh" ] || mkdir -p "/home/$GAME_USER/.ssh"
-[ -e "/home/$GAME_USER/.ssh/authorized_keys" ] || touch "/home/$GAME_USER/.ssh/authorized_keys"
-chown -R $GAME_USER:$GAME_USER "/home/$GAME_USER/.ssh"
-chmod 700 "/home/$GAME_USER/.ssh"
-chmod 600 "/home/$GAME_USER/.ssh/authorized_keys"
-
-# Ensure target directory exists and is writable by the target user
-# This generally isn't needed when using defaults, but is helpful if the GAME_DIR location is changed.
-[ -d "$GAME_DIR" ] || mkdir -p "$GAME_DIR"
-chown -R $GAME_USER:$GAME_USER "$GAME_DIR"
-
-# Preliminary requirements
-apt install -y curl sudo python3-venv
-
-if [ "$FIREWALL" == "1" ]; then
-	if [ "$(get_enabled_firewall)" == "none" ]; then
-		# No firewall installed, go ahead and install UFW
-		install_ufw
-	fi
-fi
-
-if [ "$MULTISERVER" -eq 1 ]; then
-	if [ "$ISPRIMARY" -eq 1 ]; then
-		apt install -y nfs-kernel-server nfs-common
-	else
-		apt install -y nfs-common
-	fi
-fi
-
-# Install steam binary and steamcmd
-install_steamcmd
-
-# Run Steamcmd to ensure it's available; fixes the ERROR! Failed to install app '...' (Missing configuration) issue
-sudo -u $GAME_USER /usr/games/steamcmd +login anonymous +quit
-sleep 5
-
-# Grab Proton from Glorious Eggroll
-install_proton "$PROTON_VERSION"
-
-
 ############################################
 ## Upgrade Checks
 ############################################
@@ -571,40 +606,9 @@ if [ $OPT_FORCE_REINSTALL -eq 1 ]; then
 	fi
 fi
 
-# Admin pass, used on new installs and shared across all maps
-if [ -e "$GAME_DIR/services/ark-island.conf" ]; then
-	ADMIN_PASS="$(grep -Eo 'ServerAdminPassword=[^? ]*' "$GAME_DIR/services/ark-island.conf" | sed 's:ServerAdminPassword=::')"
-else
-	ADMIN_PASS="$(random_password)"
-fi
 
 # Install ARK Survival Ascended Dedicated
-if [ $RUNNING -eq 1 ]; then
-	echo "WARNING - One or more game servers are currently running, this script will not update the game files."
-	echo "Skipping steam update"
-else
-	sudo -u $GAME_USER /usr/games/steamcmd +force_install_dir $GAME_DIR/AppFiles +login anonymous +app_update $STEAM_ID validate +quit
-    # STAGING / TESTING - skip ark because it's huge; AppID 90 is Team Fortress 1 (a tiny server useful for testing)
-    #sudo -u $GAME_USER /usr/games/steamcmd +force_install_dir $GAME_DIR/AppFiles +login anonymous +app_update 90 validate +quit
-    if [ $? -ne 0 ]; then
-    	echo "Could not install ARK Survival Ascended Dedicated Server, exiting" >&2
-    	exit 1
-    fi
-
-    # Version 74.24 released on Nov 4th 2025 with the comment "Fixed a crash" introduces a serious bug
-	# that causes the game to segfault when attempting to load the Steam API.
-	# Being Wildcard, they don't actually provide any reason as to why they're using the Steam API for an Epic game,
-	# but it seems to work without the Steam library available.
-	#
-	# In the logs you will see:
-	# Initializing Steam Subsystem for server validation.
-	# Steam Subsystem initialized: FAILED
-	#
-	if [ -e "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/steamclient64.dll" ]; then
-		echo "Removing broken Steam library to prevent segfault"
-		rm -f "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/steamclient64.dll"
-	fi
-fi
+install_application
 
 GAMEFLAGS="-servergamelog"
 # https://ark.wiki.gg/wiki/2023_official_server_save_files
@@ -772,10 +776,6 @@ EOF
 	chown $GAME_USER:$GAME_USER $GAME_DIR/stop_all.sh
 	chmod +x $GAME_DIR/stop_all.sh
 fi
-
-# Install the management script
-install_warlock_manager "$REPO" "$BRANCH"
-sudo -u $GAME_USER "$GAME_DIR/.venv/bin/pip" install rcon
 
 # Use the management utility to store some preferences from the installer
 # Save the preferences for the manager
