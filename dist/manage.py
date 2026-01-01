@@ -277,6 +277,7 @@ class Table:
 		"""
 		rows = []
 		col_lengths = []
+		terminal_width = shutil.get_terminal_size((80, 20)).columns
 
 		if self.header is not None:
 			row = []
@@ -297,6 +298,14 @@ class Table:
 				row.append(val)
 				col_lengths[i] = max(col_lengths[i], self._text_width(val))
 			rows.append(row)
+
+		# Check if the table fits in the terminal width, if not, adjust column widths proportionally
+		total_width = sum(col_lengths) + (3 * len(col_lengths)) + 5
+		if total_width > terminal_width:
+			available_width = terminal_width - (3 * len(col_lengths)) - 5
+			total_col_length = sum(col_lengths)
+			for i in range(len(col_lengths)):
+				col_lengths[i] = max(5, int(col_lengths[i] / total_col_length * available_width))
 
 		for row in rows:
 			vals = []
@@ -321,13 +330,20 @@ class Table:
 					else:
 						vals.append(' %s ' % ('-' * width,))
 				else:
-					width = col_lengths[i] - (self._text_width(row[i]) - len(row[i]))
+					str_val = row[i]
+					str_width = self._text_width(str_val)
+					width = col_lengths[i] - (str_width - len(str_val))
+
+					# Adjust content to fit within the column width if necessary
+					if col_lengths[i] < str_width:
+						str_val = str_val[:col_lengths[i]-1] + '…'
+
 					if align == 'r':
-						vals.append(row[i].rjust(width))
+						vals.append(str_val.rjust(width))
 					elif align == 'c':
-						vals.append(row[i].center(width))
+						vals.append(str_val.center(width))
 					else:
-						vals.append(row[i].ljust(width))
+						vals.append(str_val.ljust(width))
 
 			if self.borders:
 				if is_border:
@@ -2940,7 +2956,7 @@ class UnrealConfig(BaseConfig):
 							# Struct detected
 							struct_str = value[1:-1].strip()
 							struct_data = self._parse_struct(struct_str)
-							data = {'type': 'keystruct', 'key': key, 'value': struct_data}
+							data = {'type': 'keystruct', 'key': key, 'value': struct_data[0]}
 						else:
 							data = {'type': 'keyvalue', 'key': key, 'value': value}
 
@@ -2978,43 +2994,63 @@ class UnrealConfig(BaseConfig):
 					self._data.append(section)
 		self._is_changed = False
 
-	def _skip_escaping(self, s):
+	def _require_escaping(self, s):
 		"""
-		Simple check to see if a given value should have escaping skipped.
+		Simple check to see if a given value should require escaping.
 
 		:param s:
 		:return:
 		"""
-		if not isinstance(s, str):
-			# ints/floats do not require escaping
-			return isinstance(s, (int, float, bool))
 
-		if s == 'True' or s == 'False':
+		if isinstance(s, int):
+			# ints do not require escaping
+			return False
+		elif isinstance(s, float):
+			# floats do not require escaping
+			return False
+		elif isinstance(s, bool):
 			# Boolean values do not require escaping
-			return True
+			return False
+
+		# Strings that match basic numbers do not require quoting
+		if re.match(r'^[+-]?\d+(?:\.\d+)?$', s) is not None:
+			return False
 
 		if s == '':
 			# Empty values always require quoting
+			return True
+
+		if s == 'True' or s == 'False':
+			# Boolean strings do not require quoting
 			return False
 
-		# match integers and decimals (optional leading +/-)
-		return re.match(r'^[+-]?\d+(?:\.\d+)?$', s) is not None
+		if re.match(r'^[A-Za-z0-9]+$', s) is not None:
+			# Simple strings do not require quoting
+			return False
 
-	def _parse_struct(self, struct_str: str) -> dict:
+		# Default mode for strings is to escape them.
+		return True
+
+	def _parse_struct(self, struct_str: str) -> tuple[dict, int]:
 		"""
 		Parse a UE struct string into a dictionary
+
+		Returns a list with the dictionary and the number of characters parsed.
+
+		The dictionary is the parsed data and the characters parsed is suitable for jumping ahead in the parent string.
 
 		:param struct_str:
 		:return:
 		"""
 		result = {}
 		key = ''
-		sub_key = ''
 		buffer = ''
 		quote = None
-		group = None
-		vals = []
-		for c in struct_str:
+		in_key = False
+		counter = 0
+		while counter < len(struct_str):
+			c = struct_str[counter]
+			counter += 1
 			if c in ('"', "'") and quote is None:
 				# Quote start
 				quote = c
@@ -3029,61 +3065,60 @@ class UnrealConfig(BaseConfig):
 				continue
 
 			if c == '(':
-				group = c
-				continue
-			elif c == ')' and group is not None:
-				group = None
-				#if buffer != '':
-				if sub_key != '':
-					if isinstance(vals, list):
-						# This needs to be a dictionary in this case.
-						vals = {}
-					vals[sub_key] = buffer
-					sub_key = ''
-				else:
-					vals.append(buffer)
-
+				# Nested group start, recursively drop into it in a new parser.
+				sub_struct, jump = self._parse_struct(struct_str[counter:])
+				counter += jump
 				if key == '':
 					# This is a list of values, not a dictionary.
-					if isinstance(result, dict):
+					if isinstance(result, dict) and len(result) == 0:
 						result = []
-					result.append(vals)
-				else:
-					result[key] = vals
-				vals = []
-				buffer = ''
-				key = ''
-				continue
 
-			if c == '=' and buffer != '':
-				if group is not None:
-					# When inside a group, this indicates it's a dict.
-					sub_key = buffer
+					if isinstance(result, list):
+						result.append(sub_struct)
 				else:
-					key = buffer
+					result[key] = sub_struct
+
+				key = ''
+				in_key = False
+				continue
+			elif c == ')':
+				# End of group
+				if key == '' and buffer != '':
+					# This is a list of values, not a dictionary.
+					if isinstance(result, dict) and len(result) == 0:
+						result = []
+
+					if isinstance(result, list):
+						result.append(buffer)
+				elif in_key:
+					result[key] = buffer
+				# End of struct, this indicates the end of the current node we are scanning.
+				return result, counter
+			elif c == '=' and buffer != '':
+				key = buffer
 				buffer = ''
+				in_key = True
 			elif c == ',':
-				if sub_key != '':
-					if isinstance(vals, list):
-						# This needs to be a dictionary in this case.
-						vals = {}
-					vals[sub_key] = buffer
-					sub_key = ''
-				elif key != '':
-					if group is not None:
-						# Inside a group, usually a list
-						vals.append(buffer)
-					else:
-						result[key] = buffer
-						key = ''
+				if key == '' and buffer != '':
+					# This is a list of values, not a dictionary.
+					if isinstance(result, dict) and len(result) == 0:
+						result = []
+
+					if isinstance(result, list):
+						result.append(buffer)
+				elif in_key:
+					result[key] = buffer
+
+				in_key = False
+				key = ''
 				buffer = ''
 			else:
 				buffer += c
 		if key != '':
 			result[key] = buffer
-		return result
+		return result, counter
 
-	def _pack_struct(self, struct_data: dict) -> str:
+	def _pack_struct(self, struct_data: Union[dict, list]) -> str:
 		"""
 		Pack a dictionary into a UE struct string
 
@@ -3096,24 +3131,27 @@ class UnrealConfig(BaseConfig):
 			for value in struct_data:
 				if isinstance(value, dict):
 					val_str = self._pack_struct(value)
-				elif value == '' or ':' in value or ',' in value:
-					# Needs quoting
+				elif self._require_escaping(value):
+					# This string requires quoting
 					val_str = '"%s"' % value.replace('"', '\\"')
 				else:
-					val_str = value
+					# Default for structs is no quoted values.
+					val_str = str(value)
 				parts.append(val_str)
 			return '(' + ','.join(parts) + ')'
 		else:
 			for key in struct_data:
 				value = struct_data[key]
 				if isinstance(value, list):
-					val_str = '(' + ','.join(value) + ')'
-				elif self._skip_escaping(value):
-					# No quoting required
-					val_str = str(value)
-				else:
-					# Default for structs is to quote values.
+					val_str = self._pack_struct(value)
+				elif isinstance(value, dict):
+					val_str = self._pack_struct(value)
+				elif self._require_escaping(value):
+					# This string requires quoting
 					val_str = '"%s"' % value.replace('"', '\\"')
+				else:
+					# Default for structs is no quoted values.
+					val_str = str(value)
 				parts.append('%s=%s' % (key, val_str))
 			return '(' + ','.join(parts) + ')'
 
@@ -3400,6 +3438,7 @@ class GameService(RCONService):
 		self.configs['cli'] = CLIConfig('cli', self.file)
 		self.map = None
 		self.runner = None
+		self.bin = 'ArkAscendedServer'
 
 		with open(self.file, 'r') as f:
 			for line in f.readlines():
@@ -3408,14 +3447,15 @@ class GameService(RCONService):
 
 				# Extract out all the various info from the start line
 				extracted_keys = re.match(
-					(r'ExecStart=(?P<runner>[^ ]*) run ArkAscendedServer.exe'
+					(r'ExecStart=(?P<runner>[^ ]*) run (?P<binary>[a-zA-Z]*).exe'
 					 r'(?P<map>[^/?]*)\?listen\?(?P<args>.*)'
 					 ),
 					line
 				)
 				self.runner = extracted_keys.group('runner')
+				self.bin = extracted_keys.group('binary')
 				self.map = extracted_keys.group('map').strip()
-				self.configs['cli'].format = 'ExecStart=%s run ArkAscendedServer.exe %s?listen[OPTIONS]' % (self.runner, self.map)
+				self.configs['cli'].format = 'ExecStart=%s run %s.exe %s?listen[OPTIONS]' % (self.runner, self.bin, self.map)
 
 		self.load()
 

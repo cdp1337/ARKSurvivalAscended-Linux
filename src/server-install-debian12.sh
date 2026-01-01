@@ -40,6 +40,7 @@
 #   NONINTERACTIVE=--non-interactive - Run the installer in non-interactive mode (useful for scripted installs)
 #   OPT_SKIP_FIREWALL=--skip-firewall - Skip installing/configuring the firewall
 #   OPT_NEWFORMAT=--new-format - Use the new save format (Nitrado/Official server compatible) OPTIONAL
+#   BRANCH=--branch=<str> - Use a specific branch of the management script repository DEFAULT=main
 #
 # Changelog:
 #   20251219 - Add support for Lost Colony
@@ -144,50 +145,7 @@ PORT_CUSTOM_RCON=27101
 # scriptlet:bz_eval_tui/prompt_text.sh
 # scriptlet:bz_eval_tui/prompt_yn.sh
 # scriptlet:bz_eval_tui/print_header.sh
-
-
-##
-# Install the management script from the project's repo
-#
-# Expects the following variables:
-#   GAME_USER    - User account to install the game under
-#   GAME_DIR     - Directory to install the game into
-#
-function install_management() {
-	print_header "Performing install_management"
-
-	# Install management console and its dependencies
-	local SRC=""
-
-	SRC="https://raw.githubusercontent.com/${REPO}/refs/heads/main/dist/manage.py"
-
-	if ! download "$SRC" "$GAME_DIR/manage.py"; then
-		echo "Could not download management script!" >&2
-		exit 1
-	fi
-
-	chown $GAME_USER:$GAME_USER "$GAME_DIR/manage.py"
-	chmod +x "$GAME_DIR/manage.py"
-
-	# Install configuration definitions
-	cat > "$GAME_DIR/configs.yaml" <<EOF
-# script:configs.yaml
-EOF
-
-	# If a pyenv is required:
-	sudo -u $GAME_USER python3 -m venv "$GAME_DIR/.venv"
-	sudo -u $GAME_USER "$GAME_DIR/.venv/bin/pip" install --upgrade pip
-	sudo -u $GAME_USER "$GAME_DIR/.venv/bin/pip" install pyyaml
-	sudo -u $GAME_USER "$GAME_DIR/.venv/bin/pip" install rcon
-
-	# Use the management utility to store some preferences from the installer
-	# Save the preferences for the manager
-    if [ "$JOINEDSESSIONNAME" == "1" ]; then
-    	"$GAME_DIR/manage.py" --set-config "Joined Session Name" True
-    else
-    	"$GAME_DIR/manage.py" --set-config "Joined Session Name" False
-    fi
-}
+# scriptlet:warlock/install_warlock_manager.sh
 
 
 ############################################
@@ -815,9 +773,17 @@ EOF
 	chmod +x $GAME_DIR/stop_all.sh
 fi
 
+# Install the management script
+install_warlock_manager "$REPO" "$BRANCH"
+sudo -u $GAME_USER "$GAME_DIR/.venv/bin/pip" install rcon
 
-# Install a management script
-install_management
+# Use the management utility to store some preferences from the installer
+# Save the preferences for the manager
+if [ "$JOINEDSESSIONNAME" == "1" ]; then
+	"$GAME_DIR/manage.py" --set-config "Joined Session Name" True
+else
+	"$GAME_DIR/manage.py" --set-config "Joined Session Name" False
+fi
 
 # As of v2025.11.27 these scripts have been ported to the management console.
 if [ -e "$GAME_DIR/backup.sh" ]; then
@@ -963,6 +929,11 @@ if [ -n "$WARLOCK_GUID" ]; then
 	[ -d "/var/lib/warlock" ] || mkdir -p "/var/lib/warlock"
 	echo -n "$GAME_DIR" > "/var/lib/warlock/$WARLOCK_GUID.app"
 fi
+
+# Install installer (this script) for uninstallation or manual work
+download "https://raw.githubusercontent.com/${REPO}/refs/heads/${BRANCH}/dist/server-install-debian12.sh" "$GAME_DIR/installer.sh"
+chmod +x "$GAME_DIR/installer.sh"
+chown $GAME_USER:$GAME_USER "$GAME_DIR/installer.sh"
 
 
 # Create some helpful links for the user.

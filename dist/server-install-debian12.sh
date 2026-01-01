@@ -40,6 +40,7 @@
 #   --non-interactive  - Run the installer in non-interactive mode (useful for scripted installs)
 #   --skip-firewall  - Skip installing/configuring the firewall
 #   --new-format  - Use the new save format (Nitrado/Official server compatible) OPTIONAL
+#   --branch=<str> - Use a specific branch of the management script repository DEFAULT=main
 #
 # Changelog:
 #   20251219 - Add support for Lost Colony
@@ -147,6 +148,7 @@ Options:
     --non-interactive  - Run the installer in non-interactive mode (useful for scripted installs)
     --skip-firewall  - Skip installing/configuring the firewall
     --new-format  - Use the new save format (Nitrado/Official server compatible) OPTIONAL
+    --branch=<str> - Use a specific branch of the management script repository DEFAULT=main
 
 Installs ARK Survival Ascended Dedicated Server on Debian/Ubuntu systems
 
@@ -169,6 +171,7 @@ OPT_OVERRIDE_DIR=""
 NONINTERACTIVE=0
 OPT_SKIP_FIREWALL=0
 OPT_NEWFORMAT=0
+BRANCH="main"
 while [ "$#" -gt 0 ]; do
 	case "$1" in
 		--reset-proton) OPT_RESET_PROTON=1; shift 1;;
@@ -193,6 +196,11 @@ while [ "$#" -gt 0 ]; do
 		--non-interactive) NONINTERACTIVE=1; shift 1;;
 		--skip-firewall) OPT_SKIP_FIREWALL=1; shift 1;;
 		--new-format) OPT_NEWFORMAT=1; shift 1;;
+		--branch=*)
+			BRANCH="${1#*=}";
+			[ "${BRANCH:0:1}" == "'" ] && [ "${BRANCH:0-1}" == "'" ] && BRANCH="${BRANCH:1:-1}"
+			[ "${BRANCH:0:1}" == '"' ] && [ "${BRANCH:0-1}" == '"' ] && BRANCH="${BRANCH:1:-1}"
+			shift 1;;
 		-h|--help) usage;;
 	esac
 done
@@ -583,6 +591,15 @@ function os_version() {
 
 ##
 # Install SteamCMD
+#
+# CHANGELOG:
+#
+#   2025.12.16 - Ensure steam GPG key is readable by apt
+#   2025.11.09 - Switch to using download to support curl/wget abstraction
+#   2025.11.03 - Add support for Debian 13
+#   2024.12.23 - Add support for non-interactive acceptance of Steam license
+#   2024.12.22 - Initial version
+#
 function install_steamcmd() {
 	echo "Installing SteamCMD..."
 
@@ -950,6 +967,7 @@ function prompt_text() {
 #   1 for yes, 0 for no (or inverted if --invert is set)
 #
 # CHANGELOG:
+#   2025.12.16 - Add text output for non-interactive and empty responses
 #   2025.11.23 - Use is_noninteractive to handle non-interactive mode
 #   2025.11.09 - Add -q (quiet) option to suppress output after prompt (and use return value)
 #   2025.01.01 - Initial version
@@ -1036,8 +1054,6 @@ function print_header() {
 	printf "%*s\n" $(((${#header}+80)/2)) "$header"
     echo ""
 }
-
-
 ##
 # Install the management script from the project's repo
 #
@@ -1045,13 +1061,18 @@ function print_header() {
 #   GAME_USER    - User account to install the game under
 #   GAME_DIR     - Directory to install the game into
 #
-function install_management() {
+# @param $1 Repo Name (e.g., user/repo)
+# @param $2 Branch Name (default: main)
+#
+function install_warlock_manager() {
 	print_header "Performing install_management"
 
 	# Install management console and its dependencies
 	local SRC=""
+	local REPO="$1"
+	local BRANCH="${2:-main}"
 
-	SRC="https://raw.githubusercontent.com/${REPO}/refs/heads/main/dist/manage.py"
+	SRC="https://raw.githubusercontent.com/${REPO}/refs/heads/${BRANCH}/dist/manage.py"
 
 	if ! download "$SRC" "$GAME_DIR/manage.py"; then
 		echo "Could not download management script!" >&2
@@ -1136,6 +1157,11 @@ manager:
     type: str
     help: "The webhook URL for sending server status updates to a Discord channel."
 cli:
+  - key: allowicefox
+    section: flag
+    name: Allow Veilwyn Transfers
+    type: bool
+    default: false
   - key: CrossARKAllowForeignDinoDownloads
     section: option
     name: Cross ARK Allow Foreign Dino Downloads (Instance)
@@ -1728,12 +1754,6 @@ gus:
     section: ServerSettings
     name: Day Time Speed Scale
     help: Scaling factor for day-time speed relative to night.
-    type: float
-    default: 1.0
-  - key: DifficultyOffset
-    section: ServerSettings
-    name: Difficulty Offset
-    help: Server difficulty multiplier.
     type: float
     default: 1.0
   - key: DinoCharacterFoodDrainMultiplier
@@ -2369,12 +2389,6 @@ game:
     help: "If True, all game settings will be more balanced for an individual player experience."
     type: bool
     default: false
-  - key: ConfigAddNPCSpawnEntriesContainer
-    section: /script/shootergame.shootergamemode
-    name: "Config Add NPC Spawn Entries Container"
-    help: "Adds specific creatures in spawn areas."
-    type: any
-    default: "N/A"
   - key: CraftingSkillBonusMultiplier
     section: /script/shootergame.shootergamemode
     name: "Crafting Skill Bonus Multiplier"
@@ -2566,21 +2580,18 @@ game:
     type: float
     default: 1.0
 EOF
+	chown $GAME_USER:$GAME_USER "$GAME_DIR/configs.yaml"
+
+	# Most games use .settings.ini for manager settings
+	touch "$GAME_DIR/.settings.ini"
+	chown $GAME_USER:$GAME_USER "$GAME_DIR/.settings.ini"
 
 	# If a pyenv is required:
 	sudo -u $GAME_USER python3 -m venv "$GAME_DIR/.venv"
 	sudo -u $GAME_USER "$GAME_DIR/.venv/bin/pip" install --upgrade pip
 	sudo -u $GAME_USER "$GAME_DIR/.venv/bin/pip" install pyyaml
-	sudo -u $GAME_USER "$GAME_DIR/.venv/bin/pip" install rcon
-
-	# Use the management utility to store some preferences from the installer
-	# Save the preferences for the manager
-    if [ "$JOINEDSESSIONNAME" == "1" ]; then
-    	"$GAME_DIR/manage.py" --set-config "Joined Session Name" True
-    else
-    	"$GAME_DIR/manage.py" --set-config "Joined Session Name" False
-    fi
 }
+
 
 
 ############################################
@@ -3299,9 +3310,17 @@ EOF
 	chmod +x $GAME_DIR/stop_all.sh
 fi
 
+# Install the management script
+install_warlock_manager "$REPO" "$BRANCH"
+sudo -u $GAME_USER "$GAME_DIR/.venv/bin/pip" install rcon
 
-# Install a management script
-install_management
+# Use the management utility to store some preferences from the installer
+# Save the preferences for the manager
+if [ "$JOINEDSESSIONNAME" == "1" ]; then
+	"$GAME_DIR/manage.py" --set-config "Joined Session Name" True
+else
+	"$GAME_DIR/manage.py" --set-config "Joined Session Name" False
+fi
 
 # As of v2025.11.27 these scripts have been ported to the management console.
 if [ -e "$GAME_DIR/backup.sh" ]; then
@@ -3552,6 +3571,11 @@ if [ -n "$WARLOCK_GUID" ]; then
 	[ -d "/var/lib/warlock" ] || mkdir -p "/var/lib/warlock"
 	echo -n "$GAME_DIR" > "/var/lib/warlock/$WARLOCK_GUID.app"
 fi
+
+# Install installer (this script) for uninstallation or manual work
+download "https://raw.githubusercontent.com/${REPO}/refs/heads/${BRANCH}/dist/server-install-debian12.sh" "$GAME_DIR/installer.sh"
+chmod +x "$GAME_DIR/installer.sh"
+chown $GAME_USER:$GAME_USER "$GAME_DIR/installer.sh"
 
 
 # Create some helpful links for the user.

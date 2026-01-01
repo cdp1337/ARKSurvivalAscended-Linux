@@ -196,6 +196,7 @@ class GameService(RCONService):
 		self.configs['cli'] = CLIConfig('cli', self.file)
 		self.map = None
 		self.runner = None
+		self.bin = 'ArkAscendedServer'
 
 		with open(self.file, 'r') as f:
 			for line in f.readlines():
@@ -204,14 +205,15 @@ class GameService(RCONService):
 
 				# Extract out all the various info from the start line
 				extracted_keys = re.match(
-					(r'ExecStart=(?P<runner>[^ ]*) run ArkAscendedServer.exe'
+					(r'ExecStart=(?P<runner>[^ ]*) run (?P<binary>[a-zA-Z]*).exe'
 					 r'(?P<map>[^/?]*)\?listen\?(?P<args>.*)'
 					 ),
 					line
 				)
 				self.runner = extracted_keys.group('runner')
+				self.bin = extracted_keys.group('binary')
 				self.map = extracted_keys.group('map').strip()
-				self.configs['cli'].format = 'ExecStart=%s run ArkAscendedServer.exe %s?listen[OPTIONS]' % (self.runner, self.map)
+				self.configs['cli'].format = 'ExecStart=%s run %s.exe %s?listen[OPTIONS]' % (self.runner, self.bin, self.map)
 
 		self.load()
 
