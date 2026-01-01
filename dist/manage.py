@@ -3435,7 +3435,7 @@ class GameApp(SteamApp):
 		print('Installing Microsoft XAudio2 Redist DLL to fix build 77.34 crash...')
 		req = request.urlopen('https://www.nuget.org/api/v2/package/Microsoft.XAudio2.Redist/1.2.11', timeout=30)
 		package_data = req.read()
-		package_path = '/tmp/Microsoft.XAudio2.Redist.nupkg'
+		package_path = '/tmp/Microsoft.XAudio2.Redist.zip'
 		with open(package_path, 'wb') as f:
 			f.write(package_data)
 		shutil.unpack_archive(package_path, '/tmp/Microsoft.XAudio2.Redist')
