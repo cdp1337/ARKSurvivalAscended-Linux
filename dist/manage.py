@@ -2505,6 +2505,10 @@ class CLIConfig(BaseConfig):
 						flags.append('-%s' % key)
 					else:
 						opts.append('%s=True' % key)
+				elif section == 'option':
+					# Only include false options if they are options, not flags, since flags are just present or not.
+					# This fixes issues where a base config may set Key=True, but the user wants this instances to be Key=False.
+					opts.append('%s=False' % key)
 			else:
 				if '"' in raw_val:
 					raw_val = "'%s'" % raw_val
