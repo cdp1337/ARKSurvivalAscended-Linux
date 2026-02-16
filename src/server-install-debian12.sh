@@ -631,7 +631,7 @@ if [ "$GAME_VERSION" == "asaapi" ]; then
 	GAME_BIN="ArkAscendedServer.exe"
 	# Install the ASA API loader into the game directory; this is needed to run the ASA API version of the server.
 	_FILE="$(basename "$ASA_API_SOURCE")"
-	download --no-overwrite "$ASA_API_SOURCE" "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/$_FILE"
+	download "$ASA_API_SOURCE" "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/$_FILE" --no-overwrite
 	package_install "unzip"
 	unzip -o "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/$_FILE" -d "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/"
 else
