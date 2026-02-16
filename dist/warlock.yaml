@@ -19,6 +19,7 @@
     - "--non-interactive  - Run the installer in non-interactive mode (useful for scripted installs)"
     - "--skip-firewall  - Skip installing/configuring the firewall"
     - "--new-format  - Use the new save format (Nitrado/Official server compatible) OPTIONAL"
+    - "--game-version=<auto|official|asaapi> - Use either the official release or the latest ASA API version DEFAULT=auto OPTIONAL"
     - "--branch=<str> - Use a specific branch of the management script repository DEFAULT=main"
   image: images/asa-1920x1080.webp
   icon: images/ark-128x128.webp

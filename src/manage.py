@@ -349,11 +349,15 @@ class GameService(RCONService):
 		processes = subprocess.run([
 			'ps', 'axh', '-o', 'pid,cmd'
 		], stdout=subprocess.PIPE).stdout.decode().strip()
+		process = 0
 		for line in processes.split('\n'):
 			pid, cmd = line.strip().split(' ', 1)
-			if cmd.startswith('ArkAscendedServer.exe %s?listen' % self.map):
-				return int(line.strip().split(' ')[0])
-		return 0
+			if cmd.startswith('%s.exe %s?listen' % (self.bin, self.map)):
+				_p = int(line.strip().split(' ')[0])
+				# ASA API spawns 2 processes, the first handler then the second game executable.
+				# Grab the larger PID which should be the actual game process.
+				process = max(process, _p)
+		return process
 
 	def get_map_label(self) -> str:
 		if self.map == 'BobsMissions_WP':

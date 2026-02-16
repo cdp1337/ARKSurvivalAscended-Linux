@@ -40,6 +40,7 @@
 #   --non-interactive  - Run the installer in non-interactive mode (useful for scripted installs)
 #   --skip-firewall  - Skip installing/configuring the firewall
 #   --new-format  - Use the new save format (Nitrado/Official server compatible) OPTIONAL
+#   --game-version=<auto|official|asaapi> - Use either the official release or the latest ASA API version DEFAULT=auto OPTIONAL
 #   --branch=<str> - Use a specific branch of the management script repository DEFAULT=main
 #
 # Changelog:
@@ -105,6 +106,9 @@
 
 # https://github.com/GloriousEggroll/proton-ge-custom
 PROTON_VERSION="10-25"
+# https://ark-server-api.com/resources/asa-server-api.31/updates
+# (only when --game-version is set to "asaapi")
+ASA_API_SOURCE="https://github.com/ArkServerApi/AsaApi/releases/download/1.19/AsaApi_1.19.zip"
 WARLOCK_GUID="0c2de651-ec30-d4ac-c53f-ebdb67398324"
 GAME="ArkSurvivalAscended"
 GAME_USER="steam"
@@ -148,6 +152,7 @@ Options:
     --non-interactive  - Run the installer in non-interactive mode (useful for scripted installs)
     --skip-firewall  - Skip installing/configuring the firewall
     --new-format  - Use the new save format (Nitrado/Official server compatible) OPTIONAL
+    --game-version=<auto|official|asaapi> - Use either the official release or the latest ASA API version DEFAULT=auto OPTIONAL
     --branch=<str> - Use a specific branch of the management script repository DEFAULT=main
 
 Installs ARK Survival Ascended Dedicated Server on Debian/Ubuntu systems
@@ -171,38 +176,46 @@ OPT_OVERRIDE_DIR=""
 NONINTERACTIVE=0
 OPT_SKIP_FIREWALL=0
 OPT_NEWFORMAT=0
+GAME_VERSION="auto"
 BRANCH="main"
 while [ "$#" -gt 0 ]; do
 	case "$1" in
-		--reset-proton) OPT_RESET_PROTON=1; shift 1;;
-		--force-reinstall) OPT_FORCE_REINSTALL=1; shift 1;;
-		--uninstall) OPT_UNINSTALL=1; shift 1;;
-		--install-custom-map) OPT_INSTALL_CUSTOM_MAP=1; shift 1;;
-		--custom-map-id=*)
-			CUSTOM_MAP_ID="${1#*=}";
+		--reset-proton) OPT_RESET_PROTON=1;;
+		--force-reinstall) OPT_FORCE_REINSTALL=1;;
+		--uninstall) OPT_UNINSTALL=1;;
+		--install-custom-map) OPT_INSTALL_CUSTOM_MAP=1;;
+		--custom-map-id=*|--custom-map-id)
+			[ "$1" == "--custom-map-id" ] && shift 1 && CUSTOM_MAP_ID="$1" || CUSTOM_MAP_ID="${1#*=}"
 			[ "${CUSTOM_MAP_ID:0:1}" == "'" ] && [ "${CUSTOM_MAP_ID:0-1}" == "'" ] && CUSTOM_MAP_ID="${CUSTOM_MAP_ID:1:-1}"
 			[ "${CUSTOM_MAP_ID:0:1}" == '"' ] && [ "${CUSTOM_MAP_ID:0-1}" == '"' ] && CUSTOM_MAP_ID="${CUSTOM_MAP_ID:1:-1}"
-			shift 1;;
-		--custom-map-name=*)
-			CUSTOM_MAP_NAME="${1#*=}";
+			;;
+		--custom-map-name=*|--custom-map-name)
+			[ "$1" == "--custom-map-name" ] && shift 1 && CUSTOM_MAP_NAME="$1" || CUSTOM_MAP_NAME="${1#*=}"
 			[ "${CUSTOM_MAP_NAME:0:1}" == "'" ] && [ "${CUSTOM_MAP_NAME:0-1}" == "'" ] && CUSTOM_MAP_NAME="${CUSTOM_MAP_NAME:1:-1}"
 			[ "${CUSTOM_MAP_NAME:0:1}" == '"' ] && [ "${CUSTOM_MAP_NAME:0-1}" == '"' ] && CUSTOM_MAP_NAME="${CUSTOM_MAP_NAME:1:-1}"
-			shift 1;;
-		--dir=*)
-			OPT_OVERRIDE_DIR="${1#*=}";
+			;;
+		--dir=*|--dir)
+			[ "$1" == "--dir" ] && shift 1 && OPT_OVERRIDE_DIR="$1" || OPT_OVERRIDE_DIR="${1#*=}"
 			[ "${OPT_OVERRIDE_DIR:0:1}" == "'" ] && [ "${OPT_OVERRIDE_DIR:0-1}" == "'" ] && OPT_OVERRIDE_DIR="${OPT_OVERRIDE_DIR:1:-1}"
 			[ "${OPT_OVERRIDE_DIR:0:1}" == '"' ] && [ "${OPT_OVERRIDE_DIR:0-1}" == '"' ] && OPT_OVERRIDE_DIR="${OPT_OVERRIDE_DIR:1:-1}"
-			shift 1;;
-		--non-interactive) NONINTERACTIVE=1; shift 1;;
-		--skip-firewall) OPT_SKIP_FIREWALL=1; shift 1;;
-		--new-format) OPT_NEWFORMAT=1; shift 1;;
-		--branch=*)
-			BRANCH="${1#*=}";
+			;;
+		--non-interactive) NONINTERACTIVE=1;;
+		--skip-firewall) OPT_SKIP_FIREWALL=1;;
+		--new-format) OPT_NEWFORMAT=1;;
+		--game-version=*|--game-version)
+			[ "$1" == "--game-version" ] && shift 1 && GAME_VERSION="$1" || GAME_VERSION="${1#*=}"
+			[ "${GAME_VERSION:0:1}" == "'" ] && [ "${GAME_VERSION:0-1}" == "'" ] && GAME_VERSION="${GAME_VERSION:1:-1}"
+			[ "${GAME_VERSION:0:1}" == '"' ] && [ "${GAME_VERSION:0-1}" == '"' ] && GAME_VERSION="${GAME_VERSION:1:-1}"
+			;;
+		--branch=*|--branch)
+			[ "$1" == "--branch" ] && shift 1 && BRANCH="$1" || BRANCH="${1#*=}"
 			[ "${BRANCH:0:1}" == "'" ] && [ "${BRANCH:0-1}" == "'" ] && BRANCH="${BRANCH:1:-1}"
 			[ "${BRANCH:0:1}" == '"' ] && [ "${BRANCH:0-1}" == '"' ] && BRANCH="${BRANCH:1:-1}"
-			shift 1;;
+			;;
 		-h|--help) usage;;
+		*) echo "Unknown argument: $1" >&2; usage;;
 	esac
+	shift 1
 done
 
 ##
@@ -2593,6 +2606,54 @@ EOF
 }
 
 
+##
+# Install Xvfb and (optionally) a daemon helper
+#
+# Syntax:
+#   install_xvfb [--no-daemon] [--display <int>] [--service <name>]
+#
+# Changelog:
+#   20260216 - Initial version
+#
+function install_xvfb() {
+	local SERVICE_DISPLAY=99
+	local SERVICE_NAME="xvfb"
+	local NO_DAEMON=0
+
+	while [ $# -ge 1 ]; do
+		case $1 in
+			--no-daemon) NO_DAEMON=1;;
+			--display) shift; SERVICE_DISPLAY="$1";;
+			--service) shift; SERVICE_NAME="$1";;
+		esac
+		shift
+	done
+
+	package_install xvfb
+
+	if [ "$NO_DAEMON" -eq 0 ]; then
+		# Install the daemon helper script
+		cat > /etc/systemd/system/${SERVICE_NAME}.service <<EOL
+[Unit]
+Description=Virtual Frame Buffer (Xvfb)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/Xvfb :${SERVICE_DISPLAY} -screen 0 1024x768x16 -nolisten tcp
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOL
+		systemctl daemon-reload
+		systemctl enable ${SERVICE_NAME}.service
+		systemctl start ${SERVICE_NAME}.service
+
+		echo "Xvfb service '${SERVICE_NAME}' installed and started on display :${SERVICE_DISPLAY}."
+	fi
+}
+
 
 ##
 # Install the game server
@@ -2783,6 +2844,15 @@ elif [ $(egrep -q "^[0-9\.]*:$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" /etc
 else
 	MULTISERVER=0
 	ISPRIMARY=0
+fi
+
+if [ "$GAME_VERSION" == "auto" ]; then
+	# Detect if this is official or ASA API.
+	if [ "$INSTALLTYPE" == "upgrade" ] && [ ! $(grep -q 'AsaApiLoader.exe' '/etc/systemd/system/ark-island.service.d/override.conf') ]; then
+		GAME_VERSION="asaapi"
+	else
+		GAME_VERSION="official"
+	fi
 fi
 
 
@@ -3056,6 +3126,20 @@ fi
 # Install ARK Survival Ascended Dedicated
 install_application
 
+
+if [ "$GAME_VERSION" == "asaapi" ]; then
+	# ASA API requires xvfb to run.
+	install_xvfb
+	GAME_BIN="ArkAscendedServer.exe"
+	# Install the ASA API loader into the game directory; this is needed to run the ASA API version of the server.
+	_FILE="$(basename "$ASA_API_SOURCE")"
+	download --no-overwrite "$ASA_API_SOURCE" "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/$_FILE"
+	package_install "unzip"
+	unzip -o "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/$_FILE" -d "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/"
+else
+	GAME_BIN="AsaApiLoader.exe"
+fi
+
 GAMEFLAGS="-servergamelog"
 # https://ark.wiki.gg/wiki/2023_official_server_save_files
 if [ $NEWFORMAT -eq 1 ]; then
@@ -3151,7 +3235,35 @@ for MAP in $GAME_MAPS; do
 
 
 	# Install system service file to be loaded by systemd
-	cat > /etc/systemd/system/${MAP}.service <<EOF
+	if [ "$GAME_VERSION" == "asaapi" ]; then
+		cat > /etc/systemd/system/${MAP}.service <<EOF
+[Unit]
+# DYNAMICALLY GENERATED FILE! Edit at your own risk
+Description=ARK Survival Ascended Dedicated Server (${DESC})
+After=network.target
+
+[Service]
+Type=simple
+LimitNOFILE=10000
+User=$GAME_USER
+Group=$GAME_USER
+WorkingDirectory=$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64
+Environment=XDG_RUNTIME_DIR=/run/user/$(id -u $GAME_USER)
+Environment="STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_DIR"
+Environment="STEAM_COMPAT_DATA_PATH=$GAME_DIR/prefixes/$MAP"
+Environment="DISPLAY=:99"
+ExecStop=$GAME_DIR/manage.py --pre-stop --service=${MAP}
+ExecStartPost=$GAME_DIR/manage.py --post-start --service=${MAP}
+TimeoutSec=600s
+# Check $GAME_DIR/services to adjust the CLI arguments
+Restart=on-failure
+RestartSec=20s
+
+[Install]
+WantedBy=multi-user.target
+EOF
+	else
+		cat > /etc/systemd/system/${MAP}.service <<EOF
 [Unit]
 # DYNAMICALLY GENERATED FILE! Edit at your own risk
 Description=ARK Survival Ascended Dedicated Server (${DESC})
@@ -3176,6 +3288,7 @@ RestartSec=20s
 [Install]
 WantedBy=multi-user.target
 EOF
+	fi
 
 	if [ -e /etc/systemd/system/${MAP}.service.d/override.conf ]; then
 		# Override exists, check if it needs upgraded
@@ -3185,6 +3298,13 @@ EOF
 			echo "Upgrading Proton binary for $MAP from $CURRENT_PROTON_BIN to $PROTON_BIN"
 			sed -i "s:^ExecStart=[^ ]*:ExecStart=$PROTON_BIN:" /etc/systemd/system/${MAP}.service.d/override.conf
 		fi
+
+		CURRENT_GAME_BIN="$(grep ExecStart /etc/systemd/system/${MAP}.service.d/override.conf | sed sed 's:.*proton run \([^ ]*\) .*:\1:')"
+		if [ "$CURRENT_GAME_BIN" != "$GAME_BIN" ]; then
+			# Game binary has changed, update the override
+			echo "Swapping game binary for $MAP from $CURRENT_GAME_BIN to $GAME_BIN"
+			sed -i "s:proton run [^ ]* :proton run $GAME_BIN :" /etc/systemd/system/${MAP}.service.d/override.conf
+		fi
 	else
 		# Override does not exist yet, create boilerplate file.
 		# This is the main file that the admin will use to modify CLI arguments,
@@ -3193,7 +3313,7 @@ EOF
 [Service]
 # Edit this line to adjust start parameters of the server
 # After modifying, please remember to run \`sudo systemctl daemon-reload\` to apply changes to the system.
-ExecStart=$PROTON_BIN run ArkAscendedServer.exe ${NAME}?listen?SessionName="${SESSIONNAME}"?RCONPort=${RCONPORT}?ServerAdminPassword=${ADMIN_PASS}?RCONEnabled=True -port=${GAMEPORT} ${GAMEFLAGS} ${MODS_LINE}
+ExecStart=$PROTON_BIN run ${GAME_BIN} ${NAME}?listen?SessionName="${SESSIONNAME}"?RCONPort=${RCONPORT}?ServerAdminPassword=${ADMIN_PASS}?RCONEnabled=True -port=${GAMEPORT} ${GAMEFLAGS} ${MODS_LINE}
 EOF
     fi
 

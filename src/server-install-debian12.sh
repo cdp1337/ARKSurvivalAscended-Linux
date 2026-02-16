@@ -40,6 +40,7 @@
 #   NONINTERACTIVE=--non-interactive - Run the installer in non-interactive mode (useful for scripted installs)
 #   OPT_SKIP_FIREWALL=--skip-firewall - Skip installing/configuring the firewall
 #   OPT_NEWFORMAT=--new-format - Use the new save format (Nitrado/Official server compatible) OPTIONAL
+#   GAME_VERSION=--game-version=<auto|official|asaapi> - Use either the official release or the latest ASA API version DEFAULT=auto OPTIONAL
 #   BRANCH=--branch=<str> - Use a specific branch of the management script repository DEFAULT=main
 #
 # Changelog:
@@ -105,6 +106,9 @@
 
 # https://github.com/GloriousEggroll/proton-ge-custom
 PROTON_VERSION="10-25"
+# https://ark-server-api.com/resources/asa-server-api.31/updates
+# (only when --game-version is set to "asaapi")
+ASA_API_SOURCE="https://github.com/ArkServerApi/AsaApi/releases/download/1.19/AsaApi_1.19.zip"
 WARLOCK_GUID="0c2de651-ec30-d4ac-c53f-ebdb67398324"
 GAME="ArkSurvivalAscended"
 GAME_USER="steam"
@@ -146,6 +150,7 @@ PORT_CUSTOM_RCON=27101
 # scriptlet:bz_eval_tui/prompt_yn.sh
 # scriptlet:bz_eval_tui/print_header.sh
 # scriptlet:warlock/install_warlock_manager.sh
+# scriptlet:xvfb/install.sh
 
 
 ##
@@ -337,6 +342,15 @@ elif [ $(egrep -q "^[0-9\.]*:$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" /etc
 else
 	MULTISERVER=0
 	ISPRIMARY=0
+fi
+
+if [ "$GAME_VERSION" == "auto" ]; then
+	# Detect if this is official or ASA API.
+	if [ "$INSTALLTYPE" == "upgrade" ] && [ ! $(grep -q 'AsaApiLoader.exe' '/etc/systemd/system/ark-island.service.d/override.conf') ]; then
+		GAME_VERSION="asaapi"
+	else
+		GAME_VERSION="official"
+	fi
 fi
 
 
@@ -610,6 +624,20 @@ fi
 # Install ARK Survival Ascended Dedicated
 install_application
 
+
+if [ "$GAME_VERSION" == "asaapi" ]; then
+	# ASA API requires xvfb to run.
+	install_xvfb
+	GAME_BIN="ArkAscendedServer.exe"
+	# Install the ASA API loader into the game directory; this is needed to run the ASA API version of the server.
+	_FILE="$(basename "$ASA_API_SOURCE")"
+	download --no-overwrite "$ASA_API_SOURCE" "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/$_FILE"
+	package_install "unzip"
+	unzip -o "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/$_FILE" -d "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/"
+else
+	GAME_BIN="AsaApiLoader.exe"
+fi
+
 GAMEFLAGS="-servergamelog"
 # https://ark.wiki.gg/wiki/2023_official_server_save_files
 if [ $NEWFORMAT -eq 1 ]; then
@@ -705,9 +733,15 @@ for MAP in $GAME_MAPS; do
 
 
 	# Install system service file to be loaded by systemd
-	cat > /etc/systemd/system/${MAP}.service <<EOF
+	if [ "$GAME_VERSION" == "asaapi" ]; then
+		cat > /etc/systemd/system/${MAP}.service <<EOF
+# script:ark-template-asaapi.service
+EOF
+	else
+		cat > /etc/systemd/system/${MAP}.service <<EOF
 # script:ark-template.service
 EOF
+	fi
 
 	if [ -e /etc/systemd/system/${MAP}.service.d/override.conf ]; then
 		# Override exists, check if it needs upgraded
@@ -716,6 +750,13 @@ EOF
 			# Proton binary has changed, update the override
 			echo "Upgrading Proton binary for $MAP from $CURRENT_PROTON_BIN to $PROTON_BIN"
 			sed -i "s:^ExecStart=[^ ]*:ExecStart=$PROTON_BIN:" /etc/systemd/system/${MAP}.service.d/override.conf
+		fi
+
+		CURRENT_GAME_BIN="$(grep ExecStart /etc/systemd/system/${MAP}.service.d/override.conf | sed sed 's:.*proton run \([^ ]*\) .*:\1:')"
+		if [ "$CURRENT_GAME_BIN" != "$GAME_BIN" ]; then
+			# Game binary has changed, update the override
+			echo "Swapping game binary for $MAP from $CURRENT_GAME_BIN to $GAME_BIN"
+			sed -i "s:proton run [^ ]* :proton run $GAME_BIN :" /etc/systemd/system/${MAP}.service.d/override.conf
 		fi
 	else
 		# Override does not exist yet, create boilerplate file.
