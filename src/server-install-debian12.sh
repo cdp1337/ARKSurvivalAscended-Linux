@@ -752,7 +752,7 @@ EOF
 			sed -i "s:^ExecStart=[^ ]*:ExecStart=$PROTON_BIN:" /etc/systemd/system/${MAP}.service.d/override.conf
 		fi
 
-		CURRENT_GAME_BIN="$(grep ExecStart /etc/systemd/system/${MAP}.service.d/override.conf | sed sed 's:.*proton run \([^ ]*\) .*:\1:')"
+		CURRENT_GAME_BIN="$(grep ExecStart /etc/systemd/system/${MAP}.service.d/override.conf | sed 's:.*proton run \([^ ]*\) .*:\1:')"
 		if [ "$CURRENT_GAME_BIN" != "$GAME_BIN" ]; then
 			# Game binary has changed, update the override
 			echo "Swapping game binary for $MAP from $CURRENT_GAME_BIN to $GAME_BIN"
