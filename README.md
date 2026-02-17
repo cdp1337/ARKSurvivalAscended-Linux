@@ -66,16 +66,30 @@ even if they are on different physical servers.
 
 In addition to the base maps, modded maps are supported too!
 
+---
+
 ![Discord Logo](images/discord-logo.webp)
 
 Supports integration with Discord to send messages on start, stop, and restart events.
 
 [Read more about enabling Discord integration](docs/integrate-discord.md).
 
+---
+
 ![Beacon App](images/beacon.svg)
 
 Supports fine-grained management of game configuration via [Beacon App](https://usebeacon.app/)
 thanks to their SFTP deployment feature.  [Read about using Beacon with this installer](docs/using-beacon.md).
+
+---
+
+![ARK Server API](images/arkapi_xenforo_logo_white.webp)
+
+Supports the [ARK: Server API from XenForo](https://ark-server-api.com/) and the server plugins available from that platform.
+Kudos to [Baws Deep](https://github.com/bawsdeep) for finding a workaround to get the API working on Linux
+and for helping to test the installer.
+
+---
 
 Imports from Nitrado server backups are SUPPORTED, including all player and tribe data.
 
@@ -96,7 +110,7 @@ The easiest way to install ARK Survival Ascended Dedicated Server on Linux is to
 [![Warlock ARK Support](images/warlock.webp)](https://github.com/BitsNBytes25/Warlock)
 
 
-## Installation on Debian 12/13 or Ubuntu 24.04
+## Manual Installation on Debian 12/13 or Ubuntu 24.04
 
 To install ARK Survival Ascended Dedicated Server on Debian 12 or Ubuntu 24.04,
 download and run [server-install-debian12.sh](dist/server-install-debian12.sh)
@@ -506,6 +520,31 @@ and can be started/stopped/managed like any other map.
 | 8  | Valguero_WP      | BitsNBytes Test (Valguero)   | 7709 | 27009 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |
 | 9  | Ragnarok_WP      | BitsNBytes Test (Ragnarok)   | 7708 | 27008 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |
 | 10 | Amissa_WP        | BitsNBytes Test (Amissa)     | 7801 | 27101 | ❌ Disabled  | ❌ Stopped  | N/A     | N/A     |
+```
+
+## Installing ARK Server API
+
+To install the ARK Server API version of the game server, 
+run the installer with `--game-version=asaapi`.
+
+```bash
+sudo /home/steam/ArkSurvivalAscended/installer.sh --game-version=asaapi
+```
+
+This will install the base server, the [ASA API executables](https://github.com/ArkServerApi/AsaApi)
+required for running the API version of the server, and the necessary system packages for running
+their library.
+
+This also swaps the default server executable to the API version within systemd.
+
+If installing from within Warlock, simply select "asaapi" as the Game Version during installation.
+
+### Reverting to Official
+
+The installer also allows you to switch back to the official binary.
+
+```bash
+sudo /home/steam/ArkSurvivalAscended/installer.sh --game-version=official
 ```
 
 ## Accessing Files
