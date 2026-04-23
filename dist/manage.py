@@ -140,6 +140,10 @@ class GameApp(SteamApp):
 		self.load()
 
 	def first_run(self) -> bool:
+
+		# Update with Steam (or install on first install)
+		self.update()
+
 		services = self.get_services()
 		if len(services) == 0:
 			# No services exist, auto-create the various maps supported for convenience.
