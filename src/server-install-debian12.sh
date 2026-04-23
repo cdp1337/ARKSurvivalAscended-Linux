@@ -101,7 +101,7 @@
 ############################################
 
 # https://github.com/GloriousEggroll/proton-ge-custom
-PROTON_VERSION="10-25"
+PROTON_VERSION="10-34"
 WARLOCK_GUID="0c2de651-ec30-d4ac-c53f-ebdb67398324"
 GAME="ArkSurvivalAscended"
 GAME_USER="steam"
@@ -239,7 +239,7 @@ function install_application() {
     sleep 5
 
     # Install the management script
-    install_warlock_manager "$REPO" "$BRANCH" 2.2.7
+    install_warlock_manager "$REPO" "$BRANCH" 2.2.8
 
     # Grab Proton from Glorious Eggroll
     PROTON_PATH="$(install_proton "$PROTON_VERSION")"
