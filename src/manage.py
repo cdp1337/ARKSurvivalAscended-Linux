@@ -1,78 +1,54 @@
 #!/usr/bin/env python3
-import argparse
-import configparser
-import json
-import math
-import shutil
-import time
-import datetime
-from urllib import request
-from urllib import error as urllib_error
-from scriptlets._common.firewall_allow import *
-from scriptlets._common.firewall_remove import *
-from scriptlets.bz_eval_tui.prompt_yn import *
-from scriptlets.bz_eval_tui.prompt_text import *
-from scriptlets.bz_eval_tui.table import *
-from scriptlets.bz_eval_tui.print_header import *
-from scriptlets._common.get_wan_ip import *
-from scriptlets.steam.steamcmd_check_app_update import *
+import os
+
+# To allow running as a standalone script without installing the package, include the venv path for imports.
+# This will set the include path for this path to .venv to allow packages installed therein to be utilized.
+#
+# IMPORTANT - any imports that are needed for the script to run must be after this,
+# otherwise the imports will fail when running as a standalone script.
 # import:org_python/venv_path_include.py
-from scriptlets.warlock.steam_app import *
-from scriptlets.warlock.base_service import *
-from scriptlets.warlock.cli_config import *
-from scriptlets.warlock.ini_config import *
-from scriptlets.warlock.rcon_service import *
-from scriptlets.warlock.unreal_config import *
 
+import logging
+import zipfile
 
-here = os.path.dirname(os.path.realpath(__file__))
+# Import the appropriate type of handler for the game installer.
+# Common options are:
+# from warlock_manager.apps.base_app import BaseApp
+from warlock_manager.apps.steam_app import SteamApp
 
-GAME_DESC = 'ARK: Survival Ascended'
-REPO = 'cdp1337/ARKSurvivalAscended-Linux'
-FUNDING = 'https://ko-fi.com/bitsandbytes'
+# Import the appropriate type of handler for the game services.
+# Common options are:
+# from warlock_manager.services.base_service import BaseService
+from warlock_manager.services.rcon_service import RCONService
+# from warlock_manager.services.socket_service import SocketService
+# from warlock_manager.services.http_service import HTTPService
 
-GAME_USER = 'steam'
-STEAM_DIR = '/home/%s/.local/share/Steam' % GAME_USER
+# Import the various configuration handlers used by this game.
+# Common options are:
+# from warlock_manager.config.cli_config import CLIConfig
+from warlock_manager.config.ini_config import INIConfig
+# from warlock_manager.config.json_config import JSONConfig
+from warlock_manager.config.properties_config import PropertiesConfig
+from warlock_manager.config.unreal_config import UnrealConfig
 
-ICON_ENABLED = '✅'
-ICON_STOPPED = '🛑'
-ICON_DISABLED = '❌'
-ICON_WARNING = '⛔'
-ICON_STARTING = '⌛'
+# Load the application runner responsible for interfacing with CLI arguments
+# and providing default functionality for running the manager.
+from warlock_manager.libs.app_runner import app_runner
 
-# Require sudo / root for starting/stopping the service
-IS_SUDO = os.geteuid() == 0
+# If your script manages the firewall, (recommended), import the Firewall library
+from warlock_manager.libs.firewall import Firewall
 
+# Utilities provided by Warlock that are common to many applications
+from warlock_manager.libs import utils
+from warlock_manager.libs.proton import get_proton_paths
+from warlock_manager.libs.download import download_json, download_file
 
-def format_seconds(seconds: int) -> dict:
-	hours = int(seconds // 3600)
-	minutes = int((seconds - (hours * 3600)) // 60)
-	seconds = int(seconds % 60)
+# Useful in some games
+from warlock_manager.formatters.cli_formatter import cli_formatter
 
-	short_minutes = ('0' + str(minutes)) if minutes < 10 else str(minutes)
-	short_seconds = ('0' + str(seconds)) if seconds < 10 else str(seconds)
-
-	if hours > 0:
-		short = '%s:%s:%s' % (str(hours), short_minutes, short_seconds)
-	else:
-		short = '%s:%s' % (str(minutes), short_seconds)
-
-	return {
-		'h': hours,
-		'm': minutes,
-		's': seconds,
-		'full': '%s hrs %s min %s sec' % (str(hours), str(minutes), str(seconds)),
-		'short': short
-	}
-
-def format_filesize(size_bytes: int) -> str:
-	if size_bytes == 0:
-		return '0 B'
-	size_name = ('B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB')
-	i = int(math.floor(math.log(size_bytes, 1024)))
-	p = math.pow(1024, i)
-	s = round(size_bytes / p, 2)
-	return '%s %s' % (s, size_name[i])
+# Select the baseline for mod support
+# from warlock_manager.mods.base_mod import BaseMod
+from warlock_manager.mods.warlock_nexus_mod import WarlockNexusMod
 
 
 class ModLibrary(object):
@@ -126,20 +102,149 @@ class GameApp(SteamApp):
 		self.name = 'ARK:SA'
 		self.desc = 'ARK: Survival Ascended'
 		self.steam_id = '2430930'
-		# Find services for this game within systemd
-		res = subprocess.run(['grep', '-lr', os.path.join(here, 'AppFiles'), '/etc/systemd/system/'], stdout=subprocess.PIPE)
-		for line in res.stdout.decode().strip().split('\n'):
-			if line.endswith('.service'):
-				service_name = os.path.basename(line)[:-8]
-				if os.path.exists(os.path.join('/etc/systemd/system/', service_name + '.service.d/override.conf')):
-					self.services.append(service_name)
+		self.service_prefix = 'ark-'
 
 		self.configs = {
-			'game': UnrealConfig('game', os.path.join(here, 'AppFiles', 'ShooterGame', 'Saved', 'Config', 'WindowsServer', 'Game.ini')),
-			'gus': UnrealConfig('gus', os.path.join(here, 'AppFiles', 'ShooterGame', 'Saved', 'Config', 'WindowsServer', 'GameUserSettings.ini')),
-			'manager': INIConfig('manager', os.path.join(here, '.settings.ini'))
+			'game': UnrealConfig(
+				'game',
+				os.path.join(utils.get_base_directory(), 'AppFiles/ShooterGame/Saved/Config/WindowsServer/Game.ini')
+			),
+			'gus': UnrealConfig(
+				'gus',
+				os.path.join(utils.get_base_directory(), 'AppFiles/ShooterGame/Saved/Config/WindowsServer/GameUserSettings.ini')
+			),
+			'manager': INIConfig(
+				'manager',
+				os.path.join(utils.get_base_directory(), '.settings.ini')
+			)
 		}
 		self.load()
+
+	def first_run(self) -> bool:
+		services = self.get_services()
+		if len(services) == 0:
+			# No services exist, auto-create the various maps supported for convenience.
+			maps = {
+				'ark-island': ('Island', 'TheIsland_WP', []),
+				'ark-aberration': ('Aberration', 'Aberration_WP', []),
+				'ark-club': ('Club', 'BobsMissions_WP', ['1005639']),
+				'ark-scorched': ('Scorched', 'ScorchedEarth_WP', []),
+				'ark-thecenter': ('The Center', 'TheCenter_WP', []),
+				'ark-extinction': ('Extinction', 'Extinction_WP', []),
+				'ark-astraeos': ('Astraeos', 'Astraeos_WP', []),
+				'ark-ragnarok': ('Ragnarok', 'Ragnarok_WP', []) ,
+				'ark-valguero': ('Valguero', 'Valguero_WP', []),
+				'ark-lostcolony': ('Lost Colony', 'LostColony_WP', [])
+			}
+			for map_name in maps.keys():
+				logging.info('Creating service for map %s' % (map_name,))
+				svc = self.create_service(map_name)
+				svc.set_option('Session Name', maps[map_name][0])
+				svc.set_option('Map Name', maps[map_name][1])
+				if len(maps[map_name][2]) > 0:
+					svc.set_option('Mods', ','.join(maps[map_name][2]))
+			return True
+		return False
+
+	def get_option_options(self, option: str):
+		"""
+		Get the list of possible options for a configuration option
+		:param option:
+		:return:
+		"""
+		if option == 'Default Proton Path':
+			return get_proton_paths()
+		elif option == 'ASA API Loader':
+			return self.get_asa_api_loader_versions()
+		else:
+			return super().get_option_options(option)
+
+	def option_value_updated(self, option: str, previous_value, new_value) -> bool | None:
+		"""
+		Handle any special actions needed when an option value is updated
+
+		:param option:
+		:param previous_value:
+		:param new_value:
+		:return:
+		"""
+		if option == 'Default Cluster ID':
+			# Update any service with the old value to the new one.
+			# Do NOT change any service with a different cluster ID, as the user may have changed that explicitly.
+			for svc in self.get_services():
+				if svc.get_option_value('Cluster ID') == previous_value:
+					svc.set_option('Cluster ID', new_value)
+			return True
+		elif option == 'Default Proton Path':
+			# Update the Proton path in the service config
+			for svc in self.get_services():
+				if svc.get_option_value('Proton Path') == previous_value:
+					svc.set_option('Proton Path', new_value)
+			return True
+
+		return None
+
+	def get_asa_api_loader_versions(self) -> list:
+		"""
+		Get the list of versions available for the ASA API Loader
+		:return:
+		"""
+		versions = ["None"]
+		url = "https://api.github.com/repos/ArkServerApi/AsaApi/releases"
+		data = download_json(url)
+		for release in data:
+			versions.append(release['tag_name'])
+		return versions
+
+	def get_latest_asa_api_loader(self) -> str | None:
+		"""
+		Get the latest ASA API Loader version
+		:return:
+		"""
+		url = "https://api.github.com/repos/ArkServerApi/AsaApi/releases"
+		data = download_json(url)
+		for release in data:
+			return release['tag_name']
+		return None
+
+	def download_asa_api_loader(self):
+		"""
+		Download and install ASA API Loader
+
+		:return:
+		"""
+
+		version = self.get_option_value('ASA API Loader')
+		if version == 'None':
+			version = self.get_latest_asa_api_loader()
+			if version is None:
+				raise GameAPIException('Unable to determine latest ASA API Loader version')
+			# Store this in the config so the operator knows the version used.
+			self.set_option('ASA API Loader', version)
+
+		url = f"https://github.com/ArkServerApi/AsaApi/releases/download/{version}/AsaApi_{version}.zip"
+		zip = os.path.join(utils.get_base_directory(), 'Packages', f"AsaApi_{version}.zip")
+		target_path = os.path.join(utils.get_base_directory(), 'AppFiles/ShooterGame/Binaries/Win64/')
+		download_file(url, zip)
+		with zipfile.ZipFile(zip, 'r') as zip_ref:
+			zip_ref.extractall(target_path)
+
+	def ensure_asa_api_loader(self):
+		"""
+		Ensure the ASA API Loader is installed and ready to use
+		:return:
+		"""
+		version = self.get_option_value('ASA API Loader')
+		if version == 'None':
+			# Not set yet, the download will handle everything.
+			self.download_asa_api_loader()
+		else:
+			# Version is set, double check that it's available
+			zip = os.path.join(utils.get_base_directory(), 'Packages', f"AsaApi_{version}.zip")
+			target = os.path.join(utils.get_base_directory(), 'AppFiles/ShooterGame/Binaries/Win64/AsaApiLoader.exe')
+			if not (os.path.exists(zip) and os.path.exists(target)):
+				# Either not downloaded or not extracted yet.
+				self.download_asa_api_loader()
 
 	def get_save_directory(self):
 		"""
@@ -215,32 +320,70 @@ class GameService(RCONService):
 	"""
 	def __init__(self, service: str, game: GameApp):
 		super().__init__(service, game)
-		self.file = '/etc/systemd/system/%s.service.d/override.conf' % service
-		self.configs['cli'] = CLIConfig('cli', self.file)
+
+		self.configs = {
+			'service': INIConfig('service', os.path.join(utils.get_base_directory(), 'Configs', 'service.%s.ini' % self.service))
+		}
 		self.map = None
 		self.runner = None
 		self.bin = 'ArkAscendedServer'
 
-		with open(self.file, 'r') as f:
-			for line in f.readlines():
-				if not line.startswith('ExecStart='):
-					continue
-
-				# Extract out all the various info from the start line
-				extracted_keys = re.match(
-					(r'ExecStart=(?P<runner>[^ ]*) run (?P<binary>[a-zA-Z]*).exe'
-					 r'(?P<map>[^/?]*)\?listen\?(?P<args>.*)'
-					 ),
-					line
-				)
-				self.runner = extracted_keys.group('runner')
-				self.bin = extracted_keys.group('binary')
-				self.map = extracted_keys.group('map').strip()
-				self.configs['cli'].format = 'ExecStart=%s run %s.exe %s?listen[OPTIONS]' % (self.runner, self.bin, self.map)
-
 		self.load()
 
-	def set_option(self, option: str, value: Union[str, int, bool]):
+	def create_service(self):
+		"""
+		Create the systemd service for this game, including the service file and environment file
+		:return:
+		"""
+		super().create_service()
+
+		if self.game.get_option_value('Default New Save Format'):
+			# This triggers the new save options for a single database.
+			# https://ark.wiki.gg/wiki/2023_official_server_save_files
+			self.set_option('Use Store', True)
+			self.set_option('New Save Format', True)
+
+		# New instances should by default share the group cluster.
+		self.set_option('Cluster ID', self.game.get_option_value('Default Cluster ID'))
+
+	def get_environment(self) -> dict:
+		"""
+		Get the environment variables for this service as a dictionary
+
+		:return:
+		"""
+		ret = {
+			'XDG_RUNTIME_DIR': '/run/user/%s' % utils.get_app_uid(),
+			'STEAM_COMPAT_CLIENT_INSTALL_PATH': os.path.join(utils.get_home_directory(), '.local/share/Steam'),
+			'STEAM_COMPAT_DATA_PATH': os.path.join(utils.get_base_directory(), 'prefixes', self.service),
+		}
+		if self.get_option_value('ASA API Loader') != 'None':
+			ret['DISPLAY'] = ':99'
+
+		return ret
+
+	def get_executable(self) -> str:
+		"""
+		Get the full executable for this game service
+		:return:
+		"""
+
+		proton_path = self.get_option_value('Proton Path')
+		binary = 'AsaApiLoader.exe' if self.get_option_value('Mod Loader') == 'ASA API Loader' else 'ArkAscendedServer.exe'
+		map = self.get_option_value('Map Name')
+		options = cli_formatter(self.configs['service'], 'option', prefix='', sep='=', joiner='?')
+		options = map + '?listen?' + options
+		flags = cli_formatter(self.configs['service'], 'flag', prefix='-', sep='=', joiner=' ')
+
+		return ' '.join([
+			proton_path,
+			'run',
+			binary,
+			options,
+			flags
+		])
+
+	def set_option(self, option: str, value: str | int | bool):
 		"""
 		Set a configuration option in the service config
 		:param option:
@@ -253,7 +396,18 @@ class GameService(RCONService):
 
 		super().set_option(option, value)
 
-	def option_value_updated(self, option: str, previous_value, new_value):
+	def get_option_options(self, option: str):
+		"""
+		Get the list of possible options for a configuration option
+		:param option:
+		:return:
+		"""
+		if option == 'Proton Path':
+			return get_proton_paths()
+		else:
+			return super().get_option_options(option)
+
+	def option_value_updated(self, option: str, previous_value, new_value) -> bool | None:
 		"""
 		Handle any special actions needed when an option value is updated
 		:param option:
@@ -261,19 +415,26 @@ class GameService(RCONService):
 		:param new_value:
 		:return:
 		"""
+		rebuild = False
+		success = None
 
 		# Special option actions
 		if option == 'Port':
 			# Update firewall for game port change
 			if previous_value:
-				firewall_remove(int(previous_value), 'udp')
-			firewall_allow(int(new_value), 'udp', '%s game port - %s' % (self.game.desc, self.get_map_label()))
+				Firewall.remove(int(previous_value), 'udp')
+			Firewall.allow(int(new_value), 'udp', '%s game port - %s' % (self.game.name, self.get_map_label()))
+			success = True
+		elif option == 'Mod Loader':
+			if new_value == 'ASA API Loader':
+				self.game.ensure_asa_api_loader()
+			success = True
+			rebuild = True
 
 		# Reload the service
-		if os.geteuid() != 0:
-			print('WARNING: Please run sudo systemctl daemon-reload to apply changes to the service.', file=sys.stderr)
-		else:
-			subprocess.run(['systemctl', 'daemon-reload'])
+		if rebuild:
+			self.build_systemd_config()
+		return success
 
 	def is_api_enabled(self) -> bool:
 		"""
@@ -300,7 +461,7 @@ class GameService(RCONService):
 		"""
 		return self.get_option_value('Server Admin Password')
 
-	def get_player_max(self) -> Union[int, None]:
+	def get_player_max(self) -> int | None:
 		"""
 		Get the maximum player count on the server, or None if the API is unavailable
 		:return:
@@ -310,7 +471,7 @@ class GameService(RCONService):
 		else:
 			return 70
 
-	def get_player_count(self) -> Union[int, None]:
+	def get_player_count(self) -> int | None:
 		"""
 		Get the current player count on the server, or None if the API is unavailable
 		:return:
@@ -525,891 +686,3 @@ class GameService(RCONService):
 			('Port', 'udp', '%s game port - %s' % (self.game.desc, self.get_map_label())),
 			('RCON Port', 'tcp', '%s RCON port - %s' % (self.game.desc, self.get_map_label()))
 		]
-
-
-def menu_service_options(service: GameService):
-	"""
-	Interface for managing service options
-	:param service:
-	:return:
-	"""
-	while True:
-		print_header('Service Options')
-		print('')
-		table = Table(['#', 'Option', 'Value'])
-		table.align = ['r', 'l', 'l']
-		options = service.get_options()
-		opts = []
-		counter = 0
-		for opt in options:
-			if opt in ['Session Name', 'Server Admin Password', 'Mods', 'Cluster ID']:
-				# Skip some options that are configurable elsewhere
-				continue
-
-			counter += 1
-			opts.append(opt)
-			table.add([str(counter), opt, str(service.get_option_value(opt))])
-		table.render()
-		print('')
-
-		opt = input('Enter option number to edit | [B]ack: ').strip()
-		if opt.lower() == 'b':
-			return
-		elif opt.isdigit() and 1 <= int(opt) <= len(opts):
-			service.prompt_option(opts[int(opt) - 1])
-		else:
-			print('Invalid option')
-
-def menu_game_options(game: GameApp):
-	"""
-	Interface for managing game options
-	:param game:
-	:return:
-	"""
-	while True:
-		print_header('Game Options')
-		print('')
-		table = Table(['#', 'Option', 'Value'])
-		table.align = ['r', 'l', 'l']
-		options = game.get_options()
-		opts = []
-		counter = 0
-		for opt in options:
-			if opt in ['Session Name', 'Server Admin Password', 'Mods', 'Cluster ID']:
-				# Skip some options that are configurable elsewhere
-				continue
-
-			counter += 1
-			opts.append(opt)
-			table.add([str(counter), opt, str(game.get_option_value(opt))])
-		table.render()
-		print('')
-
-		opt = input('Enter option number to edit | [B]ack: ').strip()
-		if opt.lower() == 'b':
-			return
-		elif opt.isdigit() and 1 <= int(opt) <= len(opts):
-			game.prompt_option(opts[int(opt) - 1])
-		else:
-			print('Invalid option')
-
-def menu_service(service: GameService):
-	"""
-	Interface for managing an individual service
-	:param service:
-	:return:
-	"""
-	while True:
-		ModLibrary.refresh_data()
-
-		print_header('Service Details')
-		running = service.is_running()
-		if service.is_api_enabled() and running:
-			players = service.get_player_count()
-			if players is None:
-				players = 'N/A (unable to retrieve player count)'
-		else:
-			players = 'N/A'
-
-		# Retrieve the WAN IP of this instance; can be useful for direct access.
-		wan = get_wan_ip() or 'N/A'
-
-		print('Map:         %s' % service.map)
-		print('Session:     %s' % service.get_option_value('Session Name'))
-		print('WAN IP:      %s' % wan)
-		print('Port:        %s (UDP)' % service.get_option_value('Port'))
-		print('RCON:        %s (TCP)' % service.get_option_value('RCON Port'))
-		print('Auto-Start:  %s' % ('Yes' if service.is_enabled() else 'No'))
-		print('Status:      %s' % ('Running' if running else 'Stopped'))
-		print('Players:     %s' % players)
-		print('Mods:        %s' % '\n             '.join(service.get_mod_names()))
-		print('Cluster ID:  %s' % service.get_option_value('Cluster ID'))
-		if running:
-			print('Memory:      %s' % service.get_memory_usage())
-			print('CPU:         %s' % service.get_cpu_usage())
-			print('Map Size:    %s' % format_filesize(service.get_map_file_size()))
-			connect_pw = service.get_option_value('Server Password')
-			if connect_pw == '':
-				print('Connect Cmd: open %s:%s' % (wan, service.get_option_value('Port')))
-			else:
-				print('Connect Cmd: open %s:%s?%s' % (wan, service.get_option_value('Port'), connect_pw))
-		print('')
-
-		# Check for common recent issues with the server
-		log = service.get_logs()
-		if 'oom-kill' in log:
-			print('❗⛔❗ WARNING - Service was recently killed by the OOM killer')
-			print('This may indicate that your server ran out of memory!')
-			print('')
-
-		options = []
-		if service.is_enabled():
-			options.append('[D]isable')
-		else:
-			options.append('[E]nable')
-
-		if running:
-			print('Map is currently running, please stop to make changes.')
-		else:
-			options.append('[M]ods | [C]luster | re[N]ame | [O]ptions')
-
-		if running:
-			options.append('s[T]op')
-			options.append('[R]estart')
-		else:
-			options.append('[S]tart')
-
-		options.append('[B]ack')
-		opt = input(' | '.join(options) + ': ').lower()
-
-		if opt == 'b':
-			return
-		elif opt == 'e':
-			if not service.is_enabled():
-				service.enable()
-		elif opt == 'd':
-			if service.is_enabled():
-				service.disable()
-		elif opt == 'm':
-			val = input('Enter the mod ID to toggle: ').strip()
-			if val != '':
-				service.toggle_mod(val)
-		elif opt == 'c':
-			service.prompt_option('Cluster ID')
-		elif opt == 'n':
-			name = service.get_option_value('Session Name')
-			if '(' in name and service.game.get_option_value('Joined Session Name'):
-				name = name[:name.index('(')]
-			val = prompt_text('Please enter new name: ', default=name, prefill=True)
-			service.set_option('Session Name', val)
-		elif opt == 'o':
-			menu_service_options(service)
-		elif opt == 's':
-			service.start()
-		elif opt == 't':
-			service.stop()
-		elif opt == 'r':
-			service.restart()
-		else:
-			print('Invalid option')
-
-
-def menu_monitor(service: GameService):
-	"""
-	Monitor the game server status in real time
-
-	:param service:
-	:return:
-	"""
-
-	try:
-		while True:
-			status = service.get_status()
-			weather = service.get_weather()
-			players = status['onlinePlayers']
-
-			os.system('clear')
-			print_header('Game Server Monitor - Press Ctrl+C to exit')
-			if not service.is_running():
-				print('Game is not currently running!')
-				time.sleep(20)
-				continue
-
-			if status is None:
-				print('Unable to connect to game API!')
-			else:
-				uptime = format_seconds(status['uptime'])
-				print('Players Online: %s/%s' % (str(len(status['onlinePlayers'])), str(service.game.get_option_value('MaxPlayers'))))
-				print('Direct Connect: %s:%s' % (get_wan_ip() or 'N/A', service.game.get_option_value('GamePort')))
-				print('Server Uptime:  %s' % uptime['full'])
-
-				if weather is not None:
-					print('Temperature:       %.1f °C' % weather['temperature'])
-					print('Precipitation:     %d' % weather['precipitation'])
-					print('Cloudiness:        %d' % weather['cloudiness'])
-					print('Fog:               %d' % weather['fog'])
-					print('Pressure:          %.1f hPa' % weather['pressure'])
-					print('Relative Humidity: %d%%' % weather['relativeHumidity'])
-					print('Wind Force:        %.1f m/s' % weather['windForce'])
-
-				print('')
-				if len(players) > 0:
-					table = Table(['Player Name', 'Online For'])
-					for p in players:
-						table.add([players[p]['name'], format_seconds(players[p]['timeConnected'])['short']])
-					table.render()
-				else:
-					print('No players currently online.')
-
-			time.sleep(5)
-	except KeyboardInterrupt:
-		print('\nExiting monitor...')
-
-
-def menu_get_services(game: GameApp):
-	services = game.get_services()
-	stats = {}
-	for g in services:
-		if g.is_starting():
-			status = 'starting'
-		elif g.is_stopping():
-			status = 'stopping'
-		elif g.is_running():
-			status = 'running'
-		else:
-			status = 'stopped'
-
-		pre_exec = g.get_exec_start_pre_status()
-		start_exec = g.get_exec_start_status()
-		if pre_exec and pre_exec['start_time']:
-			pre_exec['start_time'] = int(pre_exec['start_time'].timestamp())
-		if pre_exec and pre_exec['stop_time']:
-			pre_exec['stop_time'] = int(pre_exec['stop_time'].timestamp())
-		if start_exec and start_exec['start_time']:
-			start_exec['start_time'] = int(start_exec['start_time'].timestamp())
-		if start_exec and start_exec['stop_time']:
-			start_exec['stop_time'] = int(start_exec['stop_time'].timestamp())
-
-		svc_stats = {
-			'service': g.service,
-			'name': g.get_option_value('Session Name'),
-			'ip': get_wan_ip(),
-			'port': g.get_option_value('Port'),
-			'status': status,
-			'enabled': g.is_enabled(),
-			'player_count': g.get_player_count(),
-			'max_players': g.get_player_max(),
-			'memory_usage': g.get_memory_usage(),
-			'cpu_usage': g.get_cpu_usage(),
-			'game_pid': g.get_game_pid(),
-			'service_pid': g.get_pid(),
-			'pre_exec': pre_exec,
-			'start_exec': start_exec,
-		}
-		stats[g.service] = svc_stats
-	print(json.dumps(stats))
-
-
-def menu_check_update(game: GameApp):
-	if game.check_update_available():
-		print('An update is available for %s!' % game.desc)
-		sys.exit(0)
-	else:
-		print('%s is up to date.' % game.desc)
-		sys.exit(1)
-
-
-def menu_get_game_configs(game: GameApp):
-	"""
-	List the available configuration files for this game (JSON encoded)
-	:param game:
-	:return:
-	"""
-	opts = []
-	# Get global configs
-	for opt in game.get_options():
-		opts.append({
-			'option': opt,
-			'default': game.get_option_default(opt),
-			'value': game.get_option_value(opt),
-			'type': game.get_option_type(opt),
-			'help': game.get_option_help(opt)
-		})
-
-	print(json.dumps(opts))
-	sys.exit(0)
-
-
-def menu_get_service_configs(service: GameService):
-	"""
-	List the available configuration files for this game (JSON encoded)
-	:param game:
-	:param service:
-	:return:
-	"""
-	opts = []
-	# Get per-service configs
-	for opt in service.get_options():
-		opts.append({
-			'option': opt,
-			'default': service.get_option_default(opt),
-			'value': service.get_option_value(opt),
-			'type': service.get_option_type(opt),
-			'help': service.get_option_help(opt)
-		})
-
-	print(json.dumps(opts))
-	sys.exit(0)
-
-
-def menu_mods(game: GameApp):
-	"""
-	Interface to manage mods across all maps
-	:return:
-	"""
-	while True:
-		# Pull mod data to know which mods are unused
-		ModLibrary.refresh_data()
-		mods_installed = ModLibrary.get_mods()
-		mods_used = []
-
-		running = game.is_active()
-		services = game.get_services()
-		print_header('Mods Configuration')
-		table = Table(['Session', 'Mods', 'Status'])
-		for service in services:
-			service.add_to_table(table)
-			for modid in service.get_option_value('Mods').split(','):
-				modid = modid.strip()
-				if modid != '' and modid not in mods_used:
-					mods_used.append(modid)
-		table.render()
-		print('')
-
-		print('Installed Mods:')
-		for mod_id in mods_installed:
-			used = ' (In Use)' if mod_id in mods_used else ' (Not In Use)'
-			print(' - %s: %s%s' % (mod_id, mods_installed[mod_id]['name'], used))
-		print('')
-		if running:
-			print('⚠️  At least one map is running - unable to change mods while a map is active')
-			opt = input('[B]ack: ').lower()
-		else:
-			opt = input('[E]nable mod on all maps | [D]isable mod on all maps | [B]ack: ').lower()
-
-		if opt == 'b':
-			return
-		elif opt == 'e':
-			val = input('Enter the mod ID to enable: ').strip()
-			if val != '':
-				for s in services:
-					s.enable_mod(val)
-		elif opt == 'd':
-			val = input('Enter the mod ID to disable: ').strip()
-			if val != '':
-				for s in services:
-					s.disable_mod(val)
-		else:
-			print('Invalid option')
-
-
-def menu_cluster(game):
-	while True:
-		running = game.is_active()
-		services = game.get_services()
-		print_header('Cluster Configuration')
-		table = Table(['Session', 'Cluster ID', 'Status'])
-		for service in services:
-			service.add_to_table(table)
-		table.render()
-		print('')
-
-		if running:
-			print('⚠️  At least one map is running - unable to change cluster while a map is active')
-			opt = input('[B]ack: ').lower()
-		else:
-			opt = input('[C]hange cluster id on all maps | [B]ack: ').lower()
-
-		if opt == 'b':
-			return
-		elif opt == 'c' and not running:
-			print('WARNING - changing the cluster ID may result in loss of data!')
-			vals = []
-			for s in services:
-				c_id = s.get_option_value('Cluster ID')
-				if c_id and c_id not in vals:
-					vals.append(c_id)
-			if len(vals) == 1:
-				val = prompt_text('Cluster ID: ', default=vals[0], prefill=True)
-			else:
-				val = prompt_text('Cluster ID: ')
-			for s in services:
-				s.set_option('Cluster ID', val)
-		else:
-			print('Invalid option')
-
-
-def menu_admin_password(game: GameApp):
-	"""
-	Interface to manage rcon and administration password
-	:return:
-	"""
-	while True:
-		running = game.is_active()
-		services = game.get_services()
-		print_header('Admin and RCON Configuration')
-		table = Table(['Session', 'Admin Password', 'RCON', 'Status'])
-		for service in services:
-			service.add_to_table(table)
-		table.render()
-		print('')
-
-		if running:
-			print('⚠️  At least one map is running - unable to change settings while a map is active')
-			opt = input('[B]ack: ').lower()
-		else:
-			opt = input('[C]hange admin password on all | [E]nable RCON on all | [D]isable RCON on all | [B]ack: ').lower()
-
-		if opt == 'b':
-			return
-		elif opt == 'e' and not running:
-			for s in services:
-				s.set_option('RCON Enabled', True)
-		elif opt == 'd' and not running:
-			print('WARNING - disabling RCON may prevent clean shutdowns!')
-			for s in services:
-				s.set_option('RCON Enabled', False)
-		elif opt == 'c' and not running:
-			vals = []
-			for s in services:
-				v = s.get_option_value('Server Admin Password')
-				if v and v not in vals:
-					vals.append(v)
-			if len(vals) == 1:
-				val = prompt_text('Server Admin Password: ', default=vals[0], prefill=True)
-			else:
-				val = prompt_text('Server Admin Password: ')
-
-			for s in services:
-				s.set_option('Server Admin Password', val)
-		else:
-			print('Invalid option')
-
-
-def menu_discord(game: GameApp):
-	while True:
-		print_header('Discord Integration')
-		enabled = game.get_option_value('Discord Enabled')
-		webhook = game.get_option_value('Discord Webhook URL')
-		if webhook == '':
-			print('Discord has not been integrated yet.')
-			print('')
-			print('If you would like to send shutdown / startup notifications to Discord, you can')
-			print('do so by adding a Webhook (Discord -> Settings -> Integrations -> Webhooks -> Create Webhook)')
-			print('and pasting the generated URL here.')
-			print('')
-			print('URL or just the character "b" to go [B]ack.')
-			opt = input(': ')
-
-			if 'https://' in opt:
-				game.set_option('Discord Enabled', True)
-				game.set_option('Discord Webhook URL', opt)
-			else:
-				return
-		else:
-			discord_channel = None
-			discord_guild = None
-			discord_name = None
-			req = request.Request(webhook, headers={'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0'}, method='GET')
-			try:
-				with request.urlopen(req) as resp:
-					data = json.loads(resp.read().decode('utf-8'))
-					discord_channel = data['channel_id']
-					discord_guild = data['guild_id']
-					discord_name = data['name']
-			except urllib_error.HTTPError as e:
-				print('Error: %s' % e)
-			except json.JSONDecodeError as e:
-				print('Error: %s' % e)
-
-			if enabled and discord_name:
-				print('Discord integration is currently available and enabled!')
-			elif discord_name:
-				print('Discord integration is currently DISABLED.')
-			else:
-				print('Discord integration is currently unavailable, bad Webhook URL?')
-			print('')
-			print('Discord Webhook URL:  %s' % webhook[0:webhook.rindex('/')+5] + '************' + webhook[-4:])
-			print('Discord Channel ID:   %s' % discord_channel)
-			print('Discord Guild ID:     %s' % discord_guild)
-			print('Discord Webhook Name: %s' % discord_name)
-			print('')
-
-			options = []
-			if enabled:
-				options.append('[D]isable')
-			else:
-				options.append('[E]nable')
-
-			options.append('[C]hange Discord webhook URL')
-			options.append('[B]ack')
-			print(' | '.join(options))
-			opt = input(': ').lower()
-
-			if opt == 'b':
-				return
-			elif opt == 'c':
-				print('do so by adding a Webhook (Discord -> Settings -> Integrations -> Webhooks -> Create Webhook)')
-				print('and pasting the generated URL here.')
-				val = input('Enter new Discord webhook URL: ').strip()
-				if val != '':
-					game.set_option('Discord Webhook URL', val)
-			elif opt == 'e':
-				game.set_option('Discord Enabled', True)
-			elif opt == 'd':
-				game.set_option('Discord Enabled', False)
-			else:
-				print('Invalid option')
-
-
-def menu_wipe(game):
-	while True:
-		print_header('Wipe User Data')
-		print('Wiping user data will remove all player progress, including characters, items, and structures.')
-		print('This action is irreversible and will reset the game to its initial state.')
-		print('')
-		table = Table(['#', 'Map', 'Map Size'])
-		services = game.get_services()
-		for service in services:
-			service.add_to_table(table)
-		table.render()
-
-		print('')
-		print('1-%s to reset individual map' % len(services))
-		print('or [A]ll to wipe all user data across all maps, [B]ack to return')
-		opt = input(': ').lower()
-
-		if opt == 'b':
-			return
-
-		if opt.isdigit() and 1 <= int(opt) <= len(services):
-			path = services[int(opt)-1].get_saved_location()
-		elif opt == 'a':
-			path = os.path.join(here, 'AppFiles', 'ShooterGame', 'Saved', 'SavedArks')
-		else:
-			print('Invalid option!')
-			return
-
-		print('Are you sure you want to proceed? This action cannot be undone! type DELETE to confirm.')
-		confirm = input(': ')
-		if confirm == 'DELETE':
-			# Instead of doing a simple shutil.rmtree, manually walk through the target directory
-			# and delete individual files.  This avoids issues with symlinks that may exist in the SavedArks folder.
-			for root, dir, files in os.walk(path, followlinks=True):
-				for f in files:
-					file_path = os.path.join(root, f)
-					print('Removing %s...' % file_path)
-					os.remove(file_path)
-		else:
-			print('Wipe operation cancelled.')
-
-
-def menu_main(game: GameApp):
-	stay = True
-	while stay:
-		running = game.is_active()
-		services = game.get_services()
-		print_header('Welcome to the %s Server Manager' % game.desc)
-		if REPO:
-			print('Find an issue? https://github.com/%s/issues' % REPO)
-		if FUNDING:
-			print('Want to help support this project? %s' % FUNDING)
-		print('')
-		table = Table(['#', 'Map', 'Session', 'Port', 'RCON', 'Auto-Start', 'Status', 'Mem', 'Players'])
-		for service in services:
-			service.add_to_table(table)
-		table.render()
-
-		print('')
-		print('1-%s to manage individual map settings' % len(services))
-		print('Configure: [M]ods | [C]luster | [A]dmin password/RCON | re[N]ame | [D]iscord integration | [O]ptions')
-		print('Control: [S]tart all | s[T]op all | [R]estart all | [U]pdate')
-		if running:
-			print('Manage Data: (please stop all maps to manage game data)')
-		else:
-			print('Manage Data: [B]ackup | [W]ipe User Data')
-		print('or [Q]uit to exit')
-		opt = input(': ').lower()
-
-		if opt == 'a':
-			menu_admin_password(game)
-		elif opt == 'b':
-			if running:
-				print('⚠️  Please stop all maps before managing backups.')
-			else:
-				game.backup()
-		elif opt == 'c':
-			menu_cluster(game)
-		elif opt == 'd':
-			menu_discord(game)
-		elif opt == 'm':
-			menu_mods(game)
-		elif opt == 'n':
-			if running:
-				print('⚠️  Please stop all maps before renaming.')
-			else:
-				val = input('Please enter new name: ').strip()
-				if val != '':
-					for s in services:
-						s.set_option('Session Name', val)
-		elif opt == 'o':
-			menu_game_options(game)
-		elif opt == 'p':
-			print('Player messages are now managed from [O]ptions.')
-			time.sleep(2)
-			menu_game_options(game)
-		elif opt == 'q':
-			stay = False
-		elif opt == 'r':
-			for s in services:
-				s.restart()
-		elif opt == 's':
-			for s in services:
-				if s.is_enabled():
-					s.start()
-				else:
-					print('Skipping %s as it is not enabled for auto-start.' % s.service)
-		elif opt == 't':
-			for s in services:
-				s.stop()
-		elif opt == 'u':
-			if running:
-				print('⚠️ Please stop all maps prior to updating.')
-			else:
-				game.update()
-		elif opt == 'w':
-			if running:
-				print('⚠️  Please stop all maps before wiping user data.')
-			else:
-				menu_wipe(game)
-		elif opt.isdigit() and 1 <= int(opt) <= len(services):
-			menu_service(services[int(opt)-1])
-
-parser = argparse.ArgumentParser('manage.py')
-parser.add_argument(
-	'--service',
-	help='Specify the service instance to manage (default: ALL)',
-	type=str,
-	default='ALL'
-)
-parser.add_argument(
-	'--pre-stop',
-	help='Send notifications to game players and Discord and save the world',
-	action='store_true'
-)
-parser.add_argument(
-	'--post-start',
-	help='Send notifications to game players and Discord after starting the server',
-	action='store_true'
-)
-parser.add_argument(
-	'--stop',
-	help='Stop the game server',
-	action='store_true'
-)
-parser.add_argument(
-	'--start',
-	help='Start the game server',
-	action='store_true'
-)
-parser.add_argument(
-	'--restart',
-	help='Restart the game server',
-	action='store_true'
-)
-parser.add_argument(
-	'--monitor',
-	help='Monitor the game server status in real time',
-	action='store_true'
-)
-parser.add_argument(
-	'--backup',
-	help='Backup the game server files',
-	action='store_true'
-)
-parser.add_argument(
-	'--max-backups',
-	help='Maximum number of backups to keep when creating a new backup (default: 0 = unlimited)',
-	type=int,
-	default=0
-)
-parser.add_argument(
-	'--restore',
-	help='Restore the game server files from a backup archive',
-	type=str,
-	default=''
-)
-parser.add_argument(
-	'--check-update',
-	help='Check for game updates via SteamCMD and report the status',
-	action='store_true'
-)
-parser.add_argument(
-	'--update',
-	help='Update the game server via SteamCMD',
-	action='store_true'
-)
-parser.add_argument(
-	'--get-services',
-	help='List the available service instances for this game (JSON encoded)',
-	action='store_true'
-)
-parser.add_argument(
-	'--get-configs',
-	help='List the available configuration files for this game (JSON encoded)',
-	action='store_true'
-)
-parser.add_argument(
-	'--set-config',
-	help='Set a configuration option for the game',
-	type=str,
-	nargs=2
-)
-parser.add_argument(
-	'--get-ports',
-	help='Get the list of ports used by the game server (JSON encoded)',
-	action='store_true'
-)
-parser.add_argument(
-	'--is-running',
-	help='Check if any game service is currently running (exit code 0 = yes, 1 = no)',
-	action='store_true'
-)
-parser.add_argument(
-	'--has-players',
-	help='Check if any players are currently connected to any game service (exit code 0 = yes, 1 = no)',
-	action='store_true'
-)
-parser.add_argument(
-	'--logs',
-	help='Print the latest logs from the game service',
-	action='store_true'
-)
-parser.add_argument(
-	'--first-run',
-	help='Perform first-run configuration for setting up the game server initially',
-	action='store_true'
-)
-args = parser.parse_args()
-
-game = GameApp()
-services = game.get_services()
-
-
-if args.service != 'ALL':
-	# User opted to manage only a single game instance
-	service = None
-	for svc in services:
-		if svc.service == args.service:
-			service = svc
-			break
-
-	if service is None:
-		print('Service instance %s not found!' % args.service, file=sys.stderr)
-		sys.exit(1)
-	else:
-		services = [ service ]
-
-if args.pre_stop:
-	if len(services) > 1:
-		print('ERROR: --pre-stop can only be used with a single service instance at a time.', file=sys.stderr)
-		sys.exit(1)
-	g = services[0]
-	sys.exit(0 if g.pre_stop() else 1)
-elif args.post_start:
-	if len(services) > 1:
-		print('ERROR: --post-start can only be used with a single service instance at a time.', file=sys.stderr)
-		sys.exit(1)
-	g = services[0]
-	sys.exit(0 if g.post_start() else 1)
-elif args.stop:
-	for svc in services:
-		svc.stop()
-elif args.start:
-	if len(services) > 1:
-		# Start any enabled instance
-		for svc in services:
-			if svc.is_enabled():
-				svc.start()
-			else:
-				print('Skipping %s as it is not enabled for auto-start.' % svc.service)
-	else:
-		for svc in services:
-			svc.start()
-elif args.restart:
-	for svc in services:
-		svc.restart()
-elif args.monitor:
-	if len(services) > 1:
-		print('ERROR: --monitor can only be used with a single service instance at a time.', file=sys.stderr)
-		sys.exit(1)
-	g = services[0]
-	menu_monitor(g)
-elif args.logs:
-	if len(services) > 1:
-		print('ERROR: --log can only be used with a single service instance at a time.', file=sys.stderr)
-		sys.exit(1)
-	g = services[0]
-	g.print_logs()
-elif args.backup:
-	sys.exit(0 if game.backup(args.max_backups) else 1)
-elif args.restore != '':
-	sys.exit(0 if game.restore(args.restore) else 1)
-elif args.check_update:
-	menu_check_update(game)
-elif args.update:
-	sys.exit(0 if game.update() else 1)
-elif args.get_services:
-	menu_get_services(game)
-elif args.get_configs:
-	if args.service == 'ALL':
-		menu_get_game_configs(game)
-	else:
-		g = services[0]
-		menu_get_service_configs(g)
-elif args.set_config != None:
-	option, value = args.set_config
-	if args.service == 'ALL':
-		game.set_option(option, value)
-	else:
-		g = services[0]
-		g.set_option(option, value)
-elif args.get_ports:
-	ports = []
-	for svc in services:
-		if not getattr(svc, 'get_port_definitions', None):
-			continue
-
-		for port_dat in svc.get_port_definitions():
-			port_def = {}
-			if isinstance(port_dat[0], int):
-				# Port statically assigned and cannot be changed
-				port_def['value'] = port_dat[0]
-				port_def['config'] = None
-			else:
-				port_def['value'] = svc.get_option_value(port_dat[0])
-				port_def['config'] = port_dat[0]
-
-			port_def['service'] = svc.service
-			port_def['protocol'] = port_dat[1]
-			port_def['description'] = port_dat[2]
-			ports.append(port_def)
-	print(json.dumps(ports))
-	sys.exit(0)
-elif args.has_players:
-	has_players = False
-	for svc in services:
-		c = svc.get_player_count()
-		if c is not None and c > 0:
-			has_players = True
-			break
-	sys.exit(0 if has_players else 1)
-elif args.is_running:
-	is_running = False
-	for svc in services:
-		if svc.is_running():
-			is_running = True
-			break
-	sys.exit(0 if is_running else 1)
-elif args.first_run:
-	menu_first_run(game, False)
-else:
-	# Default mode - interactive menu
-	if not game.configured:
-		menu_first_run(game, True)
-
-	if len(services) > 1:
-		menu_main(game)
-	else:
-		g = list(services.values())[0]
-		menu_service(g)

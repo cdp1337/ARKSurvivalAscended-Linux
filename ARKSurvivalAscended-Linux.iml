@@ -2,13 +2,15 @@
 <module type="WEB_MODULE" version="4">
   <component name="FacetManager">
     <facet type="Python" name="Python">
-      <configuration sdkName="Python 3.11" />
+      <configuration sdkName="Python 3.13 (ARKSurvivalAscended-Linux)" />
     </facet>
   </component>
   <component name="NewModuleRootManager" inherit-compiler-output="true">
     <exclude-output />
-    <content url="file://$MODULE_DIR$" />
+    <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/.venv" />
+    </content>
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" name="Python 3.11 interpreter library" level="application" />
+    <orderEntry type="library" name="Python 3.13 (ARKSurvivalAscended-Linux) interpreter library" level="application" />
   </component>
 </module>

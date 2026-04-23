@@ -59,6 +59,10 @@ manager:
     type: bool
     default: true
     help: "Enables joining the map name to the session name when viewing in the server browser."
+  - name: Community Name
+    section: Manager
+    type: str
+    help: Shared community name for instances, has no effect unless "Joined Session Name" is enabled.
   - name: Discord Enabled
     section: Discord
     key: enabled
@@ -70,7 +74,33 @@ manager:
     key: webhook
     type: str
     help: "The webhook URL for sending server status updates to a Discord channel."
-cli:
+  - name: Default New Save Format
+    key: defaultnewsaveformat
+    section: Environment
+    type: bool
+    default: true
+    help: Defaults new maps to use the new save format, a single file for all player data and maps
+  - name: Default Cluster ID
+    key: defaultclusterid
+    section: Cluster
+    type: str
+    help: "The default cluster ID to use for new servers."
+  - name: Default Proton Path
+    key: defaultprotonpath
+    section: Environment
+    type: str
+    help: "The default Proton path to use for new servers."
+  - name: ASA API Loader
+    section: system
+    key: asaapiloader
+    type: str
+    default: "None"
+service:
+  - name: Map Name
+    section: system
+    key: system_mapname
+    type: str
+    group: Basic
   - key: allowicefox
     section: flag
     name: Allow Veilwyn Transfers
@@ -414,6 +444,20 @@ cli:
     type: float
     default: 1.0
     help: "Sets the experience points multiplier for players on the server."
+  - name: Mod Loader
+    section: system
+    key: modloader
+    type: str
+    default: "None"
+    options:
+      - "None"
+      - "ASA API Loader"
+  - name: Proton Path
+    key: protonpath
+    section: system
+    group: Settings
+    type: str
+    help: "The Proton path to use for this instance."
 gus:
   - key: LimitBunkersPerTribe
     section: ServerSettings
@@ -1038,7 +1082,7 @@ gus:
     default: 1.0
   - key: ServerAdminPassword
     section: ServerSettings
-    name: Server Admin Password
+    name: Default Server Admin Password
     help: Admin password (clients use via console to gain admin access).
   - key: ServerCrosshair
     section: ServerSettings
