@@ -522,8 +522,6 @@ function os_like_macos() {
 function install_proton() {
 	VERSION="${1:-9-21}"
 
-	echo "Installing Glorious Eggroll's Proton $VERSION..."
-
 	PROTON_URL="https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton${VERSION}/GE-Proton${VERSION}.tar.gz"
 	PROTON_TGZ="$(basename "$PROTON_URL")"
 	PROTON_NAME="$(basename "$PROTON_TGZ" ".tar.gz")"
@@ -1216,6 +1214,20 @@ EOF
 	# Install configuration definitions
 	cat > "$GAME_DIR/configs.yaml" <<EOF
 manager:
+  - name: Steam Branch
+    section: Steam
+    key: steam_branch
+    type: str
+    default: public
+    help: "The Steam branch to install the server from (e.g., stable, experimental)."
+    group: Settings
+  - name: Steam Branch Password
+    section: Steam
+    key: steam_branch_password
+    type: str
+    default: ""
+    help: "The password for accessing a private Steam branch, if applicable."
+    group: Settings
   - name: Shutdown Warning 5 Minutes
     section: Messages
     key: shutdown_5min
