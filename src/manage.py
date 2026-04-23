@@ -105,9 +105,10 @@ class GameApp(SteamApp):
 
 		self.name = 'ARK:SA'
 		self.desc = 'ARK: Survival Ascended'
-		#self.steam_id = '2430930'
-		self.steam_id = '90'  # TESTING - Use Half-Life Dedicated Server since it's only 90MB
+		self.steam_id = '2430930'
+		#self.steam_id = '90'  # TESTING - Use Half-Life Dedicated Server since it's only 90MB
 		self.service_prefix = 'ark-'
+		self.service_handler = GameService
 
 		self.configs = {
 			'game': UnrealConfig(
@@ -157,10 +158,20 @@ class GameApp(SteamApp):
 				migration_file = os.path.join(utils.get_base_directory(), 'Migrations/%s.json' % svc.service)
 				if os.path.exists(migration_file):
 					logging.info('Migrating service %s configurations' % svc.service)
-					with open(migration_file, 'r', encoding='utf-8') as f:
-						migration = json.load(f)
-						for option in migration['options']:
-							svc.set_option(option['name'], option['value'])
+					migration_data = {}
+					try:
+						with open(migration_file, 'r', encoding='utf-8') as f:
+							migration_data = json.load(f)
+					except Exception as e:
+						logging.error('Failed to load migration file for service %s: %s' % (svc.service, e))
+
+					if 'options' in migration_data:
+						for option in migration_data['options']:
+							try:
+								svc.set_option(option['name'], option['value'])
+							except Exception as e:
+								logging.error('Failed to migrate option %s for service %s: %s' % (option['name'], svc.service, e))
+
 					# Move the migration file to mark it as completed
 					os.rename(
 						migration_file,
@@ -280,6 +291,19 @@ class GameApp(SteamApp):
 				# Either not downloaded or not extracted yet.
 				self.download_asa_api_loader()
 
+	def get_proton_path(self) -> str | None:
+		"""
+		Get the path to Proton as configured.
+		:return:
+		"""
+		proton_path = self.get_option_value('Default Proton Path')
+		if proton_path:
+			return proton_path
+		else:
+			# It's not set yet!  Just return the first one found.
+			paths = get_proton_paths()
+			return paths[0] if len(paths) > 0 else None
+
 	def get_save_directory(self):
 		"""
 		Get the save directory for the game server
@@ -374,7 +398,14 @@ class GameService(RCONService):
 		self.set_option('Cluster ID', self.game.get_option_value('Default Cluster ID'))
 
 		# New instances should use a separate save directory to allow the same map to run on separate instances
-		self.set_option('AltSaveDirectoryName', self.service)
+		self.set_option('Alt Save Directory', self.service)
+
+		# New instances need the proton prefix
+		proton_prefix = self.game.get_option_value('Default Proton Path')
+		if proton_prefix:
+			self.set_option('Proton Path', proton_prefix)
+		else:
+			self.set_option('Proton Path', self.game.get_proton_path())
 
 		# Ensure the prefix exists for this instance.
 		prefix_path = os.path.join(utils.get_base_directory(), 'prefixes', self.service)
@@ -412,10 +443,19 @@ class GameService(RCONService):
 		"""
 
 		proton_path = self.get_option_value('Proton Path')
+		if not proton_path:
+			# This needs something, so try to pull whatever path is available from the game manager.
+			proton_path = self.game.get_proton_path()
+
+		if not proton_path:
+			logging.error('Unable to determine Proton path for %s' % self.service)
+			return '/bin/false'
+
 		binary = self.get_binary()
-		map = self.get_option_value('Map Name')
+		map_name = self.get_option_value('Map Name')
 		options = cli_formatter(self.configs['service'], 'option', prefix='', sep='=', joiner='?')
-		options = map + '?listen?' + options
+		if map_name:
+			options = map_name + '?listen?' + options
 		flags = cli_formatter(self.configs['service'], 'flag', prefix='-', sep='=', joiner=' ')
 
 		return ' '.join([
@@ -557,10 +597,10 @@ class GameService(RCONService):
 		map_name = self.get_option_value('Map Name')
 		if map_name == 'BobsMissions_WP':
 			return 'Club'
+		elif map_name is None or map_name == '':
+			return self.service
 		elif map_name.endswith('_WP'):
 			return map_name[:-3]
-		elif map_name == '':
-			return self.service
 		else:
 			return map_name
 
@@ -649,6 +689,20 @@ class GameService(RCONService):
 			('Port', 'udp', '%s game port - %s' % (self.game.name, self.get_map_label())),
 			('RCON Port', 'tcp', '%s RCON port - %s' % (self.game.name, self.get_map_label()))
 		]
+
+	def get_port(self) -> int | None:
+		"""
+		Get the primary port of the service, or None if not applicable
+		:return:
+		"""
+		return self.get_option_value('Port')
+
+	def get_name(self) -> str:
+		"""
+		Get the name of this game server instance
+		:return:
+		"""
+		return self.get_option_value('Session Name')
 
 if __name__ == '__main__':
 	app = app_runner(GameApp())

@@ -1277,6 +1277,7 @@ manager:
     default: true
     help: "Enables joining the map name to the session name when viewing in the server browser."
   - name: Community Name
+    key: communityname
     section: Manager
     type: str
     help: Shared community name for instances, has no effect unless "Joined Session Name" is enabled.
