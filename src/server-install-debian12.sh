@@ -102,9 +102,6 @@
 
 # https://github.com/GloriousEggroll/proton-ge-custom
 PROTON_VERSION="10-25"
-# https://ark-server-api.com/resources/asa-server-api.31/updates
-# (only when --game-version is set to "asaapi")
-ASA_API_SOURCE="https://github.com/ArkServerApi/AsaApi/releases/download/1.19/AsaApi_1.19.zip"
 WARLOCK_GUID="0c2de651-ec30-d4ac-c53f-ebdb67398324"
 GAME="ArkSurvivalAscended"
 GAME_USER="steam"
@@ -112,26 +109,8 @@ GAME_DIR="/home/$GAME_USER/$GAME"
 REPO="cdp1337/ARKSurvivalAscended-Linux"
 DISCORD="https://discord.gg/jyFsweECPb"
 FUNDING="https://ko-fi.com/bitsandbytes"
-# Force installation directory for game
-# steam produces varying results, sometimes in ~/.local/share/Steam, other times in ~/Steam
-STEAM_DIR="/home/$GAME_USER/.local/share/Steam"
-# Specific "filesystem" directory for installed version of Proton
-GAME_COMPAT_DIR="/opt/script-collection/GE-Proton${PROTON_VERSION}/files/share/default_pfx"
-# Binary path for Proton
-PROTON_BIN="/opt/script-collection/GE-Proton${PROTON_VERSION}/proton"
-# Steam ID of the game
-STEAM_ID="2430930"
-# List of game maps currently available
+# List of game maps currently available (LEGACY SUPPORT ONLY)
 GAME_MAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter ark-extinction ark-astraeos ark-ragnarok ark-valguero ark-lostcolony"
-# How many base maps are installed by default (needed for the custom map logic)
-BASE_MAP_COUNT=10
-# Range of game ports to enable in the firewall
-PORT_GAME_START=7701
-PORT_GAME_END=7710
-PORT_RCON_START=27001
-PORT_RCON_END=27010
-PORT_CUSTOM_GAME=7801
-PORT_CUSTOM_RCON=27101
 
 # compile:usage
 # compile:argparse
@@ -209,7 +188,6 @@ function setup_nfs() {
 # Expects the following variables:
 #   GAME_USER    - User account to install the game under
 #   GAME_DIR     - Directory to install the game into
-#   STEAM_ID     - Steam App ID of the game
 #   GAME_DESC    - Description of the game (for logging purposes)
 #   GAME_SERVICE - Service name to install with Systemd
 #   SAVE_DIR     - Directory to store game save files
@@ -260,11 +238,12 @@ function install_application() {
     sudo -u $GAME_USER /usr/games/steamcmd +login anonymous +quit
     sleep 5
 
-    # Grab Proton from Glorious Eggroll
-    install_proton "$PROTON_VERSION"
-
     # Install the management script
     install_warlock_manager "$REPO" "$BRANCH" 2.2.7
+
+    # Grab Proton from Glorious Eggroll
+    PROTON_PATH="$(install_proton "$PROTON_VERSION")"
+    "$GAME_DIR/manage.py" set-config "Default Proton Path" "${PROTON_PATH}"
 
     # Install installer (this script) for uninstallation or manual work
 	download "https://raw.githubusercontent.com/${REPO}/refs/heads/${BRANCH}/dist/server-install-debian12.sh" "$GAME_DIR/installer.sh"
@@ -415,6 +394,26 @@ function clear_game_binaries() {
 		echo "Removing Steam meta files..."
 		rm -fr "$GAME_DIR/AppFiles/steamapps"
 	fi
+}
+
+##
+# Clear Proton prefix directories
+#
+# Useful in some edge cases to fix weird Proton issues.
+#
+function clear_proton_prefix() {
+	if [ -e "$GAME_DIR/Environments" ]; then
+    	# Check for existing service files to determine if the service is running.
+    	# This is important to prevent conflicts with the installer trying to modify files while the service is running.
+    	for envfile in "$GAME_DIR/Environments/"*.env; do
+    		SERVICE=$(basename "$envfile" .env)
+    		# If there are no services, this will just be '*.env'.
+    		if [ "$SERVICE" != "*" ]; then
+    			echo "Resetting proton prefix for $SERVICE"
+				rm "$GAME_DIR/prefixes/$SERVICE" -r
+    		fi
+    	done
+    fi
 }
 
 ############################################
@@ -569,6 +568,10 @@ if [ "$MODE" == "reinstall" ]; then
     	clear_game_binaries
     fi
 
+    if [ $OPT_RESET_PROTON -eq 1 ]; then
+    	clear_proton_prefix
+	fi
+
 	FIREWALL=0
 
 	if [ -e "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/PlayersJoinNoCheckList.txt" ]; then
@@ -639,72 +642,8 @@ fi
 ## Game Installation
 ############################################
 
-
-# Install the systemd service files for ARK Survival Ascended Dedicated Server
-for MAP in $GAME_MAPS; do
-
-	if [ "$JOINEDSESSIONNAME" == "1" ]; then
-		SESSIONNAME="${COMMUNITYNAME} (${DESC})"
-	else
-		SESSIONNAME="${COMMUNITYNAME}"
-	fi
-
-	if [ -e /etc/systemd/system/${MAP}.service.d/override.conf ]; then
-		# Override exists, check if it needs upgraded
-		CURRENT_PROTON_BIN="$(grep ExecStart /etc/systemd/system/${MAP}.service.d/override.conf | sed 's:^ExecStart=\([^ ]*\) .*:\1:')"
-		if [ "$CURRENT_PROTON_BIN" != "$PROTON_BIN" ]; then
-			# Proton binary has changed, update the override
-			echo "Upgrading Proton binary for $MAP from $CURRENT_PROTON_BIN to $PROTON_BIN"
-			sed -i "s:^ExecStart=[^ ]*:ExecStart=$PROTON_BIN:" /etc/systemd/system/${MAP}.service.d/override.conf
-		fi
-
-		CURRENT_GAME_BIN="$(grep ExecStart /etc/systemd/system/${MAP}.service.d/override.conf | sed 's:.*proton run \([^ ]*\) .*:\1:')"
-		if [ "$CURRENT_GAME_BIN" != "$GAME_BIN" ]; then
-			# Game binary has changed, update the override
-			echo "Swapping game binary for $MAP from $CURRENT_GAME_BIN to $GAME_BIN"
-			sed -i "s:proton run [^ ]* :proton run $GAME_BIN :" /etc/systemd/system/${MAP}.service.d/override.conf
-		fi
-	else
-		# Override does not exist yet, create boilerplate file.
-		# This is the main file that the admin will use to modify CLI arguments,
-		# so we do not want to overwrite their work if they have already modified it.
-		cat > /etc/systemd/system/${MAP}.service.d/override.conf <<EOF
-# script:ark-override-template.service
-EOF
-    fi
-
-    # Set the owner of the override to steam so that user account can modify it.
-    chown $GAME_USER:$GAME_USER /etc/systemd/system/${MAP}.service.d/override.conf
-
-    if [ $OPT_RESET_PROTON -eq 1 -a -e $GAME_DIR/prefixes/$MAP ]; then
-    	echo "Resetting proton prefix for $MAP"
-    	rm $GAME_DIR/prefixes/$MAP -r
-	fi
-
-    if [ ! -e $GAME_DIR/prefixes/$MAP ]; then
-    	# Install a new prefix for this specific map
-    	# Proton 9 seems to have issues with launching multiple binaries in the same prefix.
-    	[ -d $GAME_DIR/prefixes ] || sudo -u $GAME_USER mkdir -p $GAME_DIR/prefixes
-		sudo -u $GAME_USER cp $GAME_COMPAT_DIR $GAME_DIR/prefixes/$MAP -r
-	fi
-done
-
-
-systemctl daemon-reload
-
-
-# Reload systemd to pick up the new service files
-systemctl daemon-reload
-
 # Ensure cluster resources exist
 [ -d "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" ] || sudo -u $GAME_USER mkdir -p "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters"
-
-
-############################################
-## NFS Configuration
-############################################
-
-
 
 # Ensure cluster and game resources exist
 sudo -u $GAME_USER touch "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters/PlayersJoinNoCheckList.txt"
@@ -713,18 +652,6 @@ if [ ! -e "$GAME_DIR/AppFiles/ShooterGame/Saved/Config/WindowsServer" ]; then
 	sudo -u $GAME_USER mkdir -p "$GAME_DIR/AppFiles/ShooterGame/Saved/Config/WindowsServer"
 fi
 sudo -u $GAME_USER touch "$GAME_DIR/AppFiles/ShooterGame/Saved/Config/WindowsServer/Game.ini"
-
-############################################
-## Security Configuration
-############################################
-
-firewall_allow --port "${PORT_GAME_START}:${PORT_GAME_END}" --udp
-firewall_allow --port "${PORT_RCON_START}:${PORT_RCON_END}" --tcp
-
-if [ $OPT_INSTALL_CUSTOM_MAP -eq 1 ]; then
-	firewall_allow --port "$CUSTOM_MAP_PORT" --udp
-	firewall_allow --port "$CUSTOM_RCON_PORT" --tcp
-fi
 
 
 ############################################
@@ -735,7 +662,7 @@ fi
 # Setup whitelist
 WL_GAME="$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/PlayersJoinNoCheckList.txt"
 WL_CLUSTER="$GAME_DIR/AppFiles/ShooterGame/Saved/clusters/PlayersJoinNoCheckList.txt"
-if [ -e "$WL_GAME" -a ! -h "$WL_GAME" ]; then
+if [ -e "$WL_GAME" ] && [ ! -h "$WL_GAME" ]; then
 	# Whitelist already exists in the game directory, either move it to the cluster directory
 	# or back it up.  This is because this script will manage the whitelist via a symlink.
 	if [ -s "$WL_CLUSTER" ]; then
@@ -771,13 +698,6 @@ fi
 
 
 # Create some helpful links for the user.
-[ -e "$GAME_DIR/services" ] || sudo -u $GAME_USER mkdir -p "$GAME_DIR/services"
-for MAP in $GAME_MAPS; do
-	if [ "$MAP" == "CUSTOM" ]; then
-		MAP="$CUSTOM_MAP_MAP"
-	fi
-	[ -h "$GAME_DIR/services/${MAP}.conf" ] || sudo -u $GAME_USER ln -s /etc/systemd/system/${MAP}.service.d/override.conf "$GAME_DIR/services/${MAP}.conf"
-done
 [ -h "$GAME_DIR/GameUserSettings.ini" ] || sudo -u $GAME_USER ln -s $GAME_DIR/AppFiles/ShooterGame/Saved/Config/WindowsServer/GameUserSettings.ini "$GAME_DIR/GameUserSettings.ini"
 [ -h "$GAME_DIR/Game.ini" ] || sudo -u $GAME_USER ln -s $GAME_DIR/AppFiles/ShooterGame/Saved/Config/WindowsServer/Game.ini "$GAME_DIR/Game.ini"
 [ -h "$GAME_DIR/ShooterGame.log" ] || sudo -u $GAME_USER ln -s $GAME_DIR/AppFiles/ShooterGame/Saved/Logs/ShooterGame.log "$GAME_DIR/ShooterGame.log"

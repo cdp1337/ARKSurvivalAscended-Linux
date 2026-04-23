@@ -33,14 +33,10 @@
 #   --reset-proton  - Reset proton directories back to default
 #   --force-reinstall  - Force a reinstall of the game binaries, mods, and engine
 #   --uninstall  - Uninstall the game server
-#   --install-custom-map  - Install a custom map (in addition to the defaults)
-#   --custom-map-id=<int> - Mod ID of the custom map to install (use with --install-custom-map) OPTIONAL
-#   --custom-map-name=<string> - Map Name of the custom map to install, refer to Curseforge description page (use with --install-custom-map) OPTIONAL
 #   --dir=<string> - Use a custom installation directory instead of the default OPTIONAL
 #   --non-interactive  - Run the installer in non-interactive mode (useful for scripted installs)
 #   --skip-firewall  - Skip installing/configuring the firewall
 #   --new-format  - Use the new save format (Nitrado/Official server compatible) OPTIONAL
-#   --game-version=<auto|official|asaapi> - Use either the official release or the latest ASA API version DEFAULT=auto OPTIONAL
 #   --branch=<str> - Use a specific branch of the management script repository DEFAULT=main
 #
 # Changelog:
@@ -106,9 +102,6 @@
 
 # https://github.com/GloriousEggroll/proton-ge-custom
 PROTON_VERSION="10-25"
-# https://ark-server-api.com/resources/asa-server-api.31/updates
-# (only when --game-version is set to "asaapi")
-ASA_API_SOURCE="https://github.com/ArkServerApi/AsaApi/releases/download/1.19/AsaApi_1.19.zip"
 WARLOCK_GUID="0c2de651-ec30-d4ac-c53f-ebdb67398324"
 GAME="ArkSurvivalAscended"
 GAME_USER="steam"
@@ -116,26 +109,8 @@ GAME_DIR="/home/$GAME_USER/$GAME"
 REPO="cdp1337/ARKSurvivalAscended-Linux"
 DISCORD="https://discord.gg/jyFsweECPb"
 FUNDING="https://ko-fi.com/bitsandbytes"
-# Force installation directory for game
-# steam produces varying results, sometimes in ~/.local/share/Steam, other times in ~/Steam
-STEAM_DIR="/home/$GAME_USER/.local/share/Steam"
-# Specific "filesystem" directory for installed version of Proton
-GAME_COMPAT_DIR="/opt/script-collection/GE-Proton${PROTON_VERSION}/files/share/default_pfx"
-# Binary path for Proton
-PROTON_BIN="/opt/script-collection/GE-Proton${PROTON_VERSION}/proton"
-# Steam ID of the game
-STEAM_ID="2430930"
-# List of game maps currently available
+# List of game maps currently available (LEGACY SUPPORT ONLY)
 GAME_MAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter ark-extinction ark-astraeos ark-ragnarok ark-valguero ark-lostcolony"
-# How many base maps are installed by default (needed for the custom map logic)
-BASE_MAP_COUNT=10
-# Range of game ports to enable in the firewall
-PORT_GAME_START=7701
-PORT_GAME_END=7710
-PORT_RCON_START=27001
-PORT_RCON_END=27010
-PORT_CUSTOM_GAME=7801
-PORT_CUSTOM_RCON=27101
 
 function usage() {
   cat >&2 <<EOD
@@ -145,14 +120,10 @@ Options:
     --reset-proton  - Reset proton directories back to default
     --force-reinstall  - Force a reinstall of the game binaries, mods, and engine
     --uninstall  - Uninstall the game server
-    --install-custom-map  - Install a custom map (in addition to the defaults)
-    --custom-map-id=<int> - Mod ID of the custom map to install (use with --install-custom-map) OPTIONAL
-    --custom-map-name=<string> - Map Name of the custom map to install, refer to Curseforge description page (use with --install-custom-map) OPTIONAL
     --dir=<string> - Use a custom installation directory instead of the default OPTIONAL
     --non-interactive  - Run the installer in non-interactive mode (useful for scripted installs)
     --skip-firewall  - Skip installing/configuring the firewall
     --new-format  - Use the new save format (Nitrado/Official server compatible) OPTIONAL
-    --game-version=<auto|official|asaapi> - Use either the official release or the latest ASA API version DEFAULT=auto OPTIONAL
     --branch=<str> - Use a specific branch of the management script repository DEFAULT=main
 
 Installs ARK Survival Ascended Dedicated Server on Debian/Ubuntu systems
@@ -169,44 +140,24 @@ EOD
 OPT_RESET_PROTON=0
 OPT_FORCE_REINSTALL=0
 OPT_UNINSTALL=0
-OPT_INSTALL_CUSTOM_MAP=0
-CUSTOM_MAP_ID=""
-CUSTOM_MAP_NAME=""
 OPT_OVERRIDE_DIR=""
 NONINTERACTIVE=0
-OPT_SKIP_FIREWALL=0
+SKIP_FIREWALL=0
 OPT_NEWFORMAT=0
-GAME_VERSION="auto"
 BRANCH="main"
 while [ "$#" -gt 0 ]; do
 	case "$1" in
 		--reset-proton) OPT_RESET_PROTON=1;;
 		--force-reinstall) OPT_FORCE_REINSTALL=1;;
 		--uninstall) OPT_UNINSTALL=1;;
-		--install-custom-map) OPT_INSTALL_CUSTOM_MAP=1;;
-		--custom-map-id=*|--custom-map-id)
-			[ "$1" == "--custom-map-id" ] && shift 1 && CUSTOM_MAP_ID="$1" || CUSTOM_MAP_ID="${1#*=}"
-			[ "${CUSTOM_MAP_ID:0:1}" == "'" ] && [ "${CUSTOM_MAP_ID:0-1}" == "'" ] && CUSTOM_MAP_ID="${CUSTOM_MAP_ID:1:-1}"
-			[ "${CUSTOM_MAP_ID:0:1}" == '"' ] && [ "${CUSTOM_MAP_ID:0-1}" == '"' ] && CUSTOM_MAP_ID="${CUSTOM_MAP_ID:1:-1}"
-			;;
-		--custom-map-name=*|--custom-map-name)
-			[ "$1" == "--custom-map-name" ] && shift 1 && CUSTOM_MAP_NAME="$1" || CUSTOM_MAP_NAME="${1#*=}"
-			[ "${CUSTOM_MAP_NAME:0:1}" == "'" ] && [ "${CUSTOM_MAP_NAME:0-1}" == "'" ] && CUSTOM_MAP_NAME="${CUSTOM_MAP_NAME:1:-1}"
-			[ "${CUSTOM_MAP_NAME:0:1}" == '"' ] && [ "${CUSTOM_MAP_NAME:0-1}" == '"' ] && CUSTOM_MAP_NAME="${CUSTOM_MAP_NAME:1:-1}"
-			;;
 		--dir=*|--dir)
 			[ "$1" == "--dir" ] && shift 1 && OPT_OVERRIDE_DIR="$1" || OPT_OVERRIDE_DIR="${1#*=}"
 			[ "${OPT_OVERRIDE_DIR:0:1}" == "'" ] && [ "${OPT_OVERRIDE_DIR:0-1}" == "'" ] && OPT_OVERRIDE_DIR="${OPT_OVERRIDE_DIR:1:-1}"
 			[ "${OPT_OVERRIDE_DIR:0:1}" == '"' ] && [ "${OPT_OVERRIDE_DIR:0-1}" == '"' ] && OPT_OVERRIDE_DIR="${OPT_OVERRIDE_DIR:1:-1}"
 			;;
 		--non-interactive) NONINTERACTIVE=1;;
-		--skip-firewall) OPT_SKIP_FIREWALL=1;;
+		--skip-firewall) SKIP_FIREWALL=1;;
 		--new-format) OPT_NEWFORMAT=1;;
-		--game-version=*|--game-version)
-			[ "$1" == "--game-version" ] && shift 1 && GAME_VERSION="$1" || GAME_VERSION="${1#*=}"
-			[ "${GAME_VERSION:0:1}" == "'" ] && [ "${GAME_VERSION:0-1}" == "'" ] && GAME_VERSION="${GAME_VERSION:1:-1}"
-			[ "${GAME_VERSION:0:1}" == '"' ] && [ "${GAME_VERSION:0-1}" == '"' ] && GAME_VERSION="${GAME_VERSION:1:-1}"
-			;;
 		--branch=*|--branch)
 			[ "$1" == "--branch" ] && shift 1 && BRANCH="$1" || BRANCH="${1#*=}"
 			[ "${BRANCH:0:1}" == "'" ] && [ "${BRANCH:0-1}" == "'" ] && BRANCH="${BRANCH:1:-1}"
@@ -259,6 +210,7 @@ function cmd_exists() {
 #   --no-overwrite       Skip download if destination file already exists
 #
 # CHANGELOG:
+#   2026.04.21 - Add retry in curl to retry on connection issues, (looking at you Github)
 #   2025.12.15 - Use cmd_exists to fix regression bug
 #   2025.12.04 - Add --no-overwrite option to allow skipping download if the destination file exists
 #   2025.11.23 - Download to a temp location to verify download was successful
@@ -293,7 +245,7 @@ function download() {
 	fi
 
 	if cmd_exists curl; then
-		if curl -fsL "$SOURCE" -o "$TMP"; then
+		if curl --connect-timeout 10 --retry 3 --retry-delay 10 -fsL "$SOURCE" -o "$TMP"; then
 			mv $TMP "$DESTINATION"
 			return 0
 		else
@@ -313,6 +265,244 @@ function download() {
 		return 1
 	fi
 }
+##
+# Check if the OS is "like" a certain type
+#
+# Returns 0 if true, 1 if false
+#
+# Usage:
+#   if os_like debian; then ... ; fi
+#
+function os_like() {
+	local OS="$1"
+
+	if [ -f '/etc/os-release' ]; then
+		ID="$(egrep '^ID=' /etc/os-release | sed 's:ID=::')"
+		LIKE="$(egrep '^ID_LIKE=' /etc/os-release | sed 's:ID_LIKE=::')"
+
+		if [[ "$LIKE" =~ "$OS" ]] || [ "$ID" == "$OS" ]; then
+			return 0;
+		fi
+	fi
+	return 1
+}
+
+##
+# Check if the OS is "like" a certain type
+#
+# ie: "ubuntu" will be like "debian"
+#
+# Returns 0 if true, 1 if false
+# Prints 1 if true, 0 if false
+#
+# Usage:
+#   if [ "$(os_like_debian)" -eq 1 ]; then ... ; fi
+#   if os_like_debian -q; then ... ; fi
+#
+function os_like_debian() {
+	local QUIET=0
+	while [ $# -ge 1 ]; do
+		case $1 in
+			-q)
+				QUIET=1;;
+		esac
+		shift
+	done
+
+	if os_like debian || os_like ubuntu; then
+		if [ $QUIET -eq 0 ]; then echo 1; fi
+		return 0;
+	fi
+
+	if [ $QUIET -eq 0 ]; then echo 0; fi
+	return 1
+}
+
+##
+# Check if the OS is "like" a certain type
+#
+# ie: "ubuntu" will be like "debian"
+#
+# Returns 0 if true, 1 if false
+# Prints 1 if true, 0 if false
+#
+# Usage:
+#   if [ "$(os_like_ubuntu)" -eq 1 ]; then ... ; fi
+#   if os_like_ubuntu -q; then ... ; fi
+#
+function os_like_ubuntu() {
+	local QUIET=0
+	while [ $# -ge 1 ]; do
+		case $1 in
+			-q)
+				QUIET=1;;
+		esac
+		shift
+	done
+
+	if os_like ubuntu; then
+		if [ $QUIET -eq 0 ]; then echo 1; fi
+		return 0;
+	fi
+
+	if [ $QUIET -eq 0 ]; then echo 0; fi
+	return 1
+}
+
+##
+# Check if the OS is "like" a certain type
+#
+# ie: "ubuntu" will be like "debian"
+#
+# Returns 0 if true, 1 if false
+# Prints 1 if true, 0 if false
+#
+# Usage:
+#   if [ "$(os_like_rhel)" -eq 1 ]; then ... ; fi
+#   if os_like_rhel -q; then ... ; fi
+#
+function os_like_rhel() {
+	local QUIET=0
+	while [ $# -ge 1 ]; do
+		case $1 in
+			-q)
+				QUIET=1;;
+		esac
+		shift
+	done
+
+	if os_like rhel || os_like fedora || os_like rocky || os_like centos; then
+		if [ $QUIET -eq 0 ]; then echo 1; fi
+		return 0;
+	fi
+
+	if [ $QUIET -eq 0 ]; then echo 0; fi
+	return 1
+}
+
+##
+# Check if the OS is "like" a certain type
+#
+# ie: "ubuntu" will be like "debian"
+#
+# Returns 0 if true, 1 if false
+# Prints 1 if true, 0 if false
+#
+# Usage:
+#   if [ "$(os_like_suse)" -eq 1 ]; then ... ; fi
+#   if os_like_suse -q; then ... ; fi
+#
+function os_like_suse() {
+	local QUIET=0
+	while [ $# -ge 1 ]; do
+		case $1 in
+			-q)
+				QUIET=1;;
+		esac
+		shift
+	done
+
+	if os_like suse; then
+		if [ $QUIET -eq 0 ]; then echo 1; fi
+		return 0;
+	fi
+
+	if [ $QUIET -eq 0 ]; then echo 0; fi
+	return 1
+}
+
+##
+# Check if the OS is "like" a certain type
+#
+# ie: "ubuntu" will be like "debian"
+#
+# Returns 0 if true, 1 if false
+# Prints 1 if true, 0 if false
+#
+# Usage:
+#   if [ "$(os_like_arch)" -eq 1 ]; then ... ; fi
+#   if os_like_arch -q; then ... ; fi
+#
+function os_like_arch() {
+	local QUIET=0
+	while [ $# -ge 1 ]; do
+		case $1 in
+			-q)
+				QUIET=1;;
+		esac
+		shift
+	done
+
+	if os_like arch; then
+		if [ $QUIET -eq 0 ]; then echo 1; fi
+		return 0;
+	fi
+
+	if [ $QUIET -eq 0 ]; then echo 0; fi
+	return 1
+}
+
+##
+# Check if the OS is "like" a certain type
+#
+# ie: "ubuntu" will be like "debian"
+#
+# Returns 0 if true, 1 if false
+# Prints 1 if true, 0 if false
+#
+# Usage:
+#   if [ "$(os_like_bsd)" -eq 1 ]; then ... ; fi
+#   if os_like_bsd -q; then ... ; fi
+#
+function os_like_bsd() {
+	local QUIET=0
+	while [ $# -ge 1 ]; do
+		case $1 in
+			-q)
+				QUIET=1;;
+		esac
+		shift
+	done
+
+	if [ "$(uname -s)" == 'FreeBSD' ]; then
+		if [ $QUIET -eq 0 ]; then echo 1; fi
+		return 0;
+	else
+		if [ $QUIET -eq 0 ]; then echo 0; fi
+		return 1
+	fi
+}
+
+##
+# Check if the OS is "like" a certain type
+#
+# ie: "ubuntu" will be like "debian"
+#
+# Returns 0 if true, 1 if false
+# Prints 1 if true, 0 if false
+#
+# Usage:
+#   if [ "$(os_like_macos)" -eq 1 ]; then ... ; fi
+#   if os_like_macos -q; then ... ; fi
+#
+function os_like_macos() {
+	local QUIET=0
+	while [ $# -ge 1 ]; do
+		case $1 in
+			-q)
+				QUIET=1;;
+		esac
+		shift
+	done
+
+	if [ "$(uname -s)" == 'Darwin' ]; then
+		if [ $QUIET -eq 0 ]; then echo 1; fi
+		return 0;
+	else
+		if [ $QUIET -eq 0 ]; then echo 0; fi
+		return 1
+	fi
+}
 
 ##
 # Install Glorious Eggroll's Proton fork on a requested version
@@ -325,6 +515,7 @@ function download() {
 # @arg $1 string Proton version to install
 #
 # CHANGELOG:
+#   2026.04.23 - Register proton path in alternatives to /usr/local/bin/proton
 #   2025.11.23 - Use download scriptlet for downloading
 #   2024.12.22 - Initial version
 #
@@ -341,17 +532,26 @@ function install_proton() {
 	[ -d /opt/script-collection ] || mkdir -p /opt/script-collection
 
 	# Grab Proton from Glorious Eggroll
-	if [ ! -e "/opt/script-collection/$PROTON_TGZ" ]; then
-		if ! download "$PROTON_URL" "/opt/script-collection/$PROTON_TGZ"; then
-			echo "install_proton: Cannot download Proton from ${PROTON_URL}!" >&2
-			return 1
-		fi
+	if ! download "$PROTON_URL" "/opt/script-collection/$PROTON_TGZ" --no-overwrite; then
+		echo "install_proton: Cannot download Proton from ${PROTON_URL}!" >&2
+		return 1
 	fi
 
 	# Extract GE Proton into /opt
 	if [ ! -e "/opt/script-collection/$PROTON_NAME" ]; then
 		tar -x -C /opt/script-collection/ -f "/opt/script-collection/$PROTON_TGZ"
 	fi
+
+	# Update distro registrations for alternative software.
+	if os_like debian; then
+		update-alternatives --install "/usr/local/bin/proton" "proton" "/opt/script-collection/$PROTON_NAME/proton" 1
+	elif os_like rhel; then
+		alternatives --install "/usr/local/bin/proton" "proton" "/opt/script-collection/$PROTON_NAME/proton" 1
+	elif os_like suse; then
+		update-alternatives --install "/usr/local/bin/proton" "proton" "/opt/script-collection/$PROTON_NAME/proton" 1
+	fi
+
+	echo "/opt/script-collection/$PROTON_NAME"
 }
 
 ##
@@ -385,180 +585,6 @@ function get_available_firewall() {
 		echo "iptables"
 	else
 		echo "none"
-	fi
-}
-##
-# Check if the OS is "like" a certain type
-#
-# ie: "ubuntu" will be like "debian"
-#
-# Returns 0 if true, 1 if false
-# Prints 1 if true, 0 if false
-#
-# Usage:
-#   if [ "$(os_like_debian)" -eq 1 ]; then ... ; fi
-#   if os_like_debian; then ... ; fi
-#
-function os_like_debian() {
-	if [ -f '/etc/os-release' ]; then
-		ID="$(egrep '^ID=' /etc/os-release | sed 's:ID=::')"
-		LIKE="$(egrep '^ID_LIKE=' /etc/os-release | sed 's:ID_LIKE=::')"
-
-		if [[ "$LIKE" =~ 'debian' ]]; then echo 1; return 0; fi
-		if [[ "$LIKE" =~ 'ubuntu' ]]; then echo 1; return 0; fi
-		if [ "$ID" == 'debian' ]; then echo 1; return 0; fi
-		if [ "$ID" == 'ubuntu' ]; then echo 1; return 0; fi
-	fi
-
-	echo 0
-	return 1
-}
-
-##
-# Check if the OS is "like" a certain type
-#
-# ie: "ubuntu" will be like "debian"
-#
-# Returns 0 if true, 1 if false
-# Prints 1 if true, 0 if false
-#
-# Usage:
-#   if [ "$(os_like_ubuntu)" -eq 1 ]; then ... ; fi
-#   if os_like_ubuntu; then ... ; fi
-#
-function os_like_ubuntu() {
-	if [ -f '/etc/os-release' ]; then
-		ID="$(egrep '^ID=' /etc/os-release | sed 's:ID=::')"
-		LIKE="$(egrep '^ID_LIKE=' /etc/os-release | sed 's:ID_LIKE=::')"
-
-		if [[ "$LIKE" =~ 'ubuntu' ]]; then echo 1; return 0; fi
-		if [ "$ID" == 'ubuntu' ]; then echo 1; return 0; fi
-	fi
-
-	echo 0
-	return 1
-}
-
-##
-# Check if the OS is "like" a certain type
-#
-# ie: "ubuntu" will be like "debian"
-#
-# Returns 0 if true, 1 if false
-# Prints 1 if true, 0 if false
-#
-# Usage:
-#   if [ "$(os_like_rhel)" -eq 1 ]; then ... ; fi
-#   if os_like_rhel; then ... ; fi
-#
-function os_like_rhel() {
-	if [ -f '/etc/os-release' ]; then
-		ID="$(egrep '^ID=' /etc/os-release | sed 's:ID=::')"
-		LIKE="$(egrep '^ID_LIKE=' /etc/os-release | sed 's:ID_LIKE=::')"
-
-		if [[ "$LIKE" =~ 'rhel' ]]; then echo 1; return 0; fi
-		if [[ "$LIKE" =~ 'fedora' ]]; then echo 1; return 0; fi
-		if [[ "$LIKE" =~ 'centos' ]]; then echo 1; return 0; fi
-		if [ "$ID" == 'rhel' ]; then echo 1; return 0; fi
-		if [ "$ID" == 'fedora' ]; then echo 1; return 0; fi
-		if [ "$ID" == 'centos' ]; then echo 1; return 0; fi
-	fi
-
-	echo 0
-	return 1
-}
-
-##
-# Check if the OS is "like" a certain type
-#
-# ie: "ubuntu" will be like "debian"
-#
-# Returns 0 if true, 1 if false
-# Prints 1 if true, 0 if false
-#
-# Usage:
-#   if [ "$(os_like_suse)" -eq 1 ]; then ... ; fi
-#   if os_like_suse; then ... ; fi
-#
-function os_like_suse() {
-	if [ -f '/etc/os-release' ]; then
-		ID="$(egrep '^ID=' /etc/os-release | sed 's:ID=::')"
-		LIKE="$(egrep '^ID_LIKE=' /etc/os-release | sed 's:ID_LIKE=::')"
-
-		if [[ "$LIKE" =~ 'suse' ]]; then echo 1; return 0; fi
-		if [ "$ID" == 'suse' ]; then echo 1; return 0; fi
-	fi
-
-	echo 0
-	return 1
-}
-
-##
-# Check if the OS is "like" a certain type
-#
-# ie: "ubuntu" will be like "debian"
-#
-# Returns 0 if true, 1 if false
-# Prints 1 if true, 0 if false
-#
-# Usage:
-#   if [ "$(os_like_arch)" -eq 1 ]; then ... ; fi
-#   if os_like_arch; then ... ; fi
-#
-function os_like_arch() {
-	if [ -f '/etc/os-release' ]; then
-		ID="$(egrep '^ID=' /etc/os-release | sed 's:ID=::')"
-		LIKE="$(egrep '^ID_LIKE=' /etc/os-release | sed 's:ID_LIKE=::')"
-
-		if [[ "$LIKE" =~ 'arch' ]]; then echo 1; return 0; fi
-		if [ "$ID" == 'arch' ]; then echo 1; return 0; fi
-	fi
-
-	echo 0
-	return 1
-}
-
-##
-# Check if the OS is "like" a certain type
-#
-# ie: "ubuntu" will be like "debian"
-#
-# Returns 0 if true, 1 if false
-# Prints 1 if true, 0 if false
-#
-# Usage:
-#   if [ "$(os_like_bsd)" -eq 1 ]; then ... ; fi
-#   if os_like_bsd; then ... ; fi
-#
-function os_like_bsd() {
-	if [ "$(uname -s)" == 'FreeBSD' ]; then
-		echo 1
-		return 0
-	else
-		echo 0
-		return 1
-	fi
-}
-
-##
-# Check if the OS is "like" a certain type
-#
-# ie: "ubuntu" will be like "debian"
-#
-# Returns 0 if true, 1 if false
-# Prints 1 if true, 0 if false
-#
-# Usage:
-#   if [ "$(os_like_macos)" -eq 1 ]; then ... ; fi
-#   if os_like_macos; then ... ; fi
-#
-function os_like_macos() {
-	if [ "$(uname -s)" == 'Darwin' ]; then
-		echo 1
-		return 0
-	else
-		echo 0
-		return 1
 	fi
 }
 ##
@@ -699,30 +725,29 @@ function install_steamcmd() {
 #
 #
 # CHANGELOG:
+#   2026.01.09 - Cleanup os_like a bit and add support for RHEL 9's dnf
 #   2025.04.10 - Set Debian frontend to noninteractive
 #
 function package_install (){
 	echo "package_install: Installing $*..."
 
-	TYPE_BSD="$(os_like_bsd)"
-	TYPE_DEBIAN="$(os_like_debian)"
-	TYPE_RHEL="$(os_like_rhel)"
-	TYPE_ARCH="$(os_like_arch)"
-	TYPE_SUSE="$(os_like_suse)"
-
-	if [ "$TYPE_BSD" == 1 ]; then
+	if os_like_bsd -q; then
 		pkg install -y $*
-	elif [ "$TYPE_DEBIAN" == 1 ]; then
+	elif os_like_debian -q; then
 		DEBIAN_FRONTEND="noninteractive" apt-get -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" install -y $*
-	elif [ "$TYPE_RHEL" == 1 ]; then
-		yum install -y $*
-	elif [ "$TYPE_ARCH" == 1 ]; then
+	elif os_like_rhel -q; then
+		if [ "$(os_version)" -ge 9 ]; then
+			dnf install -y $*
+		else
+			yum install -y $*
+		fi
+	elif os_like_arch -q; then
 		pacman -Syu --noconfirm $*
-	elif [ "$TYPE_SUSE" == 1 ]; then
+	elif os_like_suse -q; then
 		zypper install -y $*
 	else
 		echo 'package_install: Unsupported or unknown OS' >&2
-		echo 'Please report this at https://github.com/cdp1337/ScriptsCollection/issues' >&2
+		echo 'Please report this at https://github.com/eVAL-Agency/ScriptsCollection/issues' >&2
 		exit 1
 	fi
 }
@@ -747,6 +772,50 @@ function install_ufw() {
 	local TTY_IP="$(who am i | awk '{print $NF}' | sed 's/[()]//g')"
 	if [ -n "$TTY_IP" ]; then
 		ufw allow from $TTY_IP comment 'Anti-lockout rule based on first install of UFW'
+	fi
+}
+
+##
+# Install firewalld
+#
+# CHANGELOG:
+#   2026.03.16 - Switch awk to use $NF for better support
+#
+function install_firewalld() {
+	package_install firewalld
+
+	# Auto-add the current user's remote IP to the whitelist (anti-lockout rule)
+	local TTY_IP="$(who am i | awk '{print $NF}' | sed 's/[()]//g')"
+	if [ -n "$TTY_IP" ]; then
+		# Anti-lockout rule based on first install of firewalld
+		firewall-cmd --zone=trusted --add-source=$TTY_IP --permanent
+	fi
+}
+
+##
+# Install the system default firewall based on the OS type
+#
+# For Debian/Ubuntu, this installs UFW
+# For RHEL/CentOS, this installs firewalld
+# For SUSE, this installs firewalld
+# For other OS types, this defaults to installing UFW
+#
+function firewall_install() {
+	local FIREWALL
+
+	FIREWALL=$(get_available_firewall)
+	if [ "$FIREWALL" != "none" ]; then
+		return
+	fi
+
+	if os_like_debian -q; then
+		install_ufw
+	elif os_like_rhel -q; then
+		install_firewalld
+	elif os_like_suse -q; then
+		install_firewalld
+	else
+		install_ufw
 	fi
 }
 ##
@@ -1073,17 +1142,46 @@ function print_header() {
 # Expects the following variables:
 #   GAME_USER    - User account to install the game under
 #   GAME_DIR     - Directory to install the game into
+#   WARLOCK_GUID - Warlock GUID for this game
 #
-# @param $1 Repo Name (e.g., user/repo)
-# @param $2 Branch Name (default: main)
+# @param $1 Application Repo Name (e.g., user/repo)
+# @param $2 Application Branch Name (default: main)
+# @param $3 Warlock Manager Branch to use (default: release-v2)
+#
+# CHANGELOG:
+#   20260326 - Add support for full version strings
+#   20260325 - Update to install warlock-manager from PyPI if a version number is specified instead of a branch name
+#   20260319 - Add third option to specify the version of Warlock Manager to use as the base
+#   20260301 - Update to install warlock-manager from github (along with its dependencies) as a pip package
 #
 function install_warlock_manager() {
 	print_header "Performing install_management"
 
 	# Install management console and its dependencies
+
+	# Source URL to download the application from
 	local SRC=""
+	# Github repository of the source application
 	local REPO="$1"
+	# Branch of the source application to download from (default: main)
 	local BRANCH="${2:-main}"
+	# Branch of Warlock Manager to install (default: release-v2)
+	local MANAGER_BRANCH="${3:-release-v2}"
+	local MANAGER_SOURCE
+	local MANAGER_SHA
+
+	if [[ "$MANAGER_BRANCH" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+		# Support 1.2.3 version strings; indicates at least .3 of the revision.
+		MANAGER_SOURCE="pip"
+		MANAGER_BRANCH=">=${MANAGER_BRANCH},<=$(echo $MANAGER_BRANCH | sed 's:\.[0-9]*$:.9999:')"
+	elif [[ "$MANAGER_BRANCH" =~ ^[0-9]+\.[0-9]+$ ]]; then
+		# Support 1.2 version strings; indicates it just must be within this API version
+        MANAGER_SOURCE="pip"
+        MANAGER_BRANCH=">=${MANAGER_BRANCH}.0,<=${MANAGER_BRANCH}.9999"
+    else
+    	# Not a version string, probably a branch name instead.
+        MANAGER_SOURCE="github"
+    fi
 
 	SRC="https://raw.githubusercontent.com/${REPO}/refs/heads/${BRANCH}/dist/manage.py"
 
@@ -1094,6 +1192,26 @@ function install_warlock_manager() {
 
 	chown $GAME_USER:$GAME_USER "$GAME_DIR/manage.py"
 	chmod +x "$GAME_DIR/manage.py"
+
+	# Record the hash of the install and branch name for display in the management UI and checking for updates.
+	# We use the direct hash because installation scripts may not necessarily use tagged versions.
+	MANAGER_SHA="$(curl -s "https://api.github.com/repos/${REPO}/commits/${BRANCH}" \
+        | grep '"sha":' \
+        | head -n 1 \
+        | sed -E 's/.*"sha": *"([^"]+)".*/\1/')"
+
+	# Record this hash along with the branch into a file accessible by the manager.
+	# This will be read by the Python, so JSON is fine.
+	cat > "$GAME_DIR/.manage.json" <<EOF
+{
+	"source": "github",
+	"repo": "${REPO}",
+	"branch": "${BRANCH}",
+	"commit": "${MANAGER_SHA}",
+	"game": "${WARLOCK_GUID}"
+}
+EOF
+	chown $GAME_USER:$GAME_USER "$GAME_DIR/.manage.json"
 
 	# Install configuration definitions
 	cat > "$GAME_DIR/configs.yaml" <<EOF
@@ -1158,6 +1276,10 @@ manager:
     type: bool
     default: true
     help: "Enables joining the map name to the session name when viewing in the server browser."
+  - name: Community Name
+    section: Manager
+    type: str
+    help: Shared community name for instances, has no effect unless "Joined Session Name" is enabled.
   - name: Discord Enabled
     section: Discord
     key: enabled
@@ -1169,7 +1291,33 @@ manager:
     key: webhook
     type: str
     help: "The webhook URL for sending server status updates to a Discord channel."
-cli:
+  - name: Default New Save Format
+    key: defaultnewsaveformat
+    section: Environment
+    type: bool
+    default: true
+    help: Defaults new maps to use the new save format, a single file for all player data and maps
+  - name: Default Cluster ID
+    key: defaultclusterid
+    section: Cluster
+    type: str
+    help: "The default cluster ID to use for new servers."
+  - name: Default Proton Path
+    key: defaultprotonpath
+    section: Environment
+    type: str
+    help: "The default Proton path to use for new servers."
+  - name: ASA API Loader
+    section: system
+    key: asaapiloader
+    type: str
+    default: "None"
+service:
+  - name: Map Name
+    section: system
+    key: system_mapname
+    type: str
+    group: Basic
   - key: allowicefox
     section: flag
     name: Allow Veilwyn Transfers
@@ -1513,6 +1661,20 @@ cli:
     type: float
     default: 1.0
     help: "Sets the experience points multiplier for players on the server."
+  - name: Mod Loader
+    section: system
+    key: modloader
+    type: str
+    default: "None"
+    options:
+      - "None"
+      - "ASA API Loader"
+  - name: Proton Path
+    key: protonpath
+    section: system
+    group: Settings
+    type: str
+    help: "The Proton path to use for this instance."
 gus:
   - key: LimitBunkersPerTribe
     section: ServerSettings
@@ -2137,7 +2299,7 @@ gus:
     default: 1.0
   - key: ServerAdminPassword
     section: ServerSettings
-    name: Server Admin Password
+    name: Default Server Admin Password
     help: Admin password (clients use via console to gain admin access).
   - key: ServerCrosshair
     section: ServerSettings
@@ -2599,10 +2761,25 @@ EOF
 	touch "$GAME_DIR/.settings.ini"
 	chown $GAME_USER:$GAME_USER "$GAME_DIR/.settings.ini"
 
-	# If a pyenv is required:
+	# A python virtual environment is now required by Warlock-based managers.
 	sudo -u $GAME_USER python3 -m venv "$GAME_DIR/.venv"
 	sudo -u $GAME_USER "$GAME_DIR/.venv/bin/pip" install --upgrade pip
-	sudo -u $GAME_USER "$GAME_DIR/.venv/bin/pip" install pyyaml
+	if [ "$MANAGER_SOURCE" == "pip" ]; then
+		# Install from PyPI with version specifier
+		sudo -u $GAME_USER "$GAME_DIR/.venv/bin/pip" install "warlock-manager${MANAGER_BRANCH}"
+	else
+		# Install directly from GitHub
+		sudo -u $GAME_USER "$GAME_DIR/.venv/bin/pip" install warlock-manager@git+https://github.com/BitsNBytes25/Warlock-Manager.git@$MANAGER_BRANCH
+	fi
+
+	# Ensure warlock lib directory exists for supplemental data
+	[ -d "/var/lib/warlock" ] || mkdir -p "/var/lib/warlock"
+	[ -e /var/lib/warlock/.auth ] || touch /var/lib/warlock/.auth
+    # Ensure it's a valid 64-character hash
+    if [ "$(cat /var/lib/warlock/.auth | wc -c)" != "64" ]; then
+    	cat /dev/urandom | tr -dc 'a-f0-9' | fold -w 64 | head -n 1 | tr -d '\n' > "/var/lib/warlock/.auth"
+    fi
+	[ -e "/var/lib/warlock/.email" ] || touch /var/lib/warlock/.email
 }
 
 
@@ -2655,13 +2832,66 @@ EOL
 }
 
 
+## Handle NFS setup
+#
+function setup_nfs() {
+	if [ "$MULTISERVER" -eq 1 ]; then
+		if [ "$ISPRIMARY" -eq 1 ]; then
+			apt install -y nfs-kernel-server nfs-common
+		else
+			apt install -y nfs-common
+		fi
+
+		# Enable / ensure enabled shared directory for multi-server support
+		if [ "$ISPRIMARY" -eq 1 ]; then
+			systemctl enable nfs-server
+			for IP in $SECONDARYIPS; do
+				# Ensure the cluster folder is shared with the various child servers
+				if [ ! $(grep -q "Saved/clusters $IP" /etc/exports) ]; then
+					echo "Adding $IP to NFS access for $GAME_DIR/AppFiles/ShooterGame/Saved/clusters"
+					echo "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters $IP/32(rw,sync,no_subtree_check)" >> /etc/exports
+				fi
+
+				# Allow NFS access from secondary servers
+				firewall_allow --port "111,2049" --tcp --zone internal --source $IP/32
+				firewall_allow --port "111,2049" --udp --zone internal --source $IP/32
+			done
+			systemctl restart nfs-server
+		else
+			if [ ! $(grep -q "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" /etc/fstab) ]; then
+				echo "Adding NFS mount to $PRIMARYIP for $GAME_DIR/AppFiles/ShooterGame/Saved/clusters"
+				echo "$PRIMARYIP:$GAME_DIR/AppFiles/ShooterGame/Saved/clusters $GAME_DIR/AppFiles/ShooterGame/Saved/clusters nfs defaults,rw,sync,soft,intr 0 0" >> /etc/fstab
+				mount -a
+			fi
+		fi
+    else
+    	# Disable / ensure disabled shared directory for multi-server support
+    	if [ -n "$(grep "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" /etc/exports 2>/dev/null)" ]; then
+    		echo "Disabling cluster share"
+    		BAK="/etc/exports.bak-$(date +%Y%m%d%H%M%S)"
+    		cp /etc/exports $BAK
+    		cat $BAK | grep -v "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" > /etc/exports
+    		systemctl restart nfs-server
+    	fi
+    	if [ -n "$(mount | grep "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" | grep nfs)" ]; then
+    		echo "Unmounting cluster share"
+    		umount "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters"
+    	fi
+    	if [ $(egrep -q "^[0-9\.]*:$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" /etc/fstab) ]; then
+    		echo "Removing NFS mount from fstab"
+    		BAK="/etc/fstab.bak-$(date +%Y%m%d%H%M%S)"
+    		cp /etc/fstab $BAK
+    		cat $BAK | grep -v "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" > /etc/fstab
+    	fi
+    fi
+}
+
 ##
 # Install the game server
 #
 # Expects the following variables:
 #   GAME_USER    - User account to install the game under
 #   GAME_DIR     - Directory to install the game into
-#   STEAM_ID     - Steam App ID of the game
 #   GAME_DESC    - Description of the game (for logging purposes)
 #   GAME_SERVICE - Service name to install with Systemd
 #   SAVE_DIR     - Directory to store game save files
@@ -2674,23 +2904,28 @@ function install_application() {
     	useradd -m -U $GAME_USER
     fi
 
+    # Ensure the target directory exists and is owned by the game user
+	if [ ! -d "$GAME_DIR" ]; then
+		mkdir -p "$GAME_DIR"
+		chown $GAME_USER:$GAME_USER "$GAME_DIR"
+	fi
+
     # Preliminary requirements
     apt install -y curl sudo python3-venv
+
+    # ASA API requires xvfb to run.
+	install_xvfb
 
     if [ "$FIREWALL" == "1" ]; then
     	if [ "$(get_enabled_firewall)" == "none" ]; then
     		# No firewall installed, go ahead and install UFW
-    		install_ufw
+    		firewall_install
     	fi
     fi
 
-    if [ "$MULTISERVER" -eq 1 ]; then
-    	if [ "$ISPRIMARY" -eq 1 ]; then
-    		apt install -y nfs-kernel-server nfs-common
-    	else
-    		apt install -y nfs-common
-    	fi
-    fi
+    [ -e "$GAME_DIR/AppFiles" ] || sudo -u $GAME_USER mkdir -p "$GAME_DIR/AppFiles"
+    [ -e "$GAME_DIR/Configs" ] || sudo -u $GAME_USER mkdir -p "$GAME_DIR/Configs"
+    [ -e "$GAME_DIR/Packages" ] || sudo -u $GAME_USER mkdir -p "$GAME_DIR/Packages"
 
     # Setup the ssh directory for ths steam user; this will save some steps later
     # should the user want to access the files via SFTP.
@@ -2700,11 +2935,6 @@ function install_application() {
     chmod 700 "/home/$GAME_USER/.ssh"
     chmod 600 "/home/$GAME_USER/.ssh/authorized_keys"
 
-    # Ensure target directory exists and is writable by the target user
-    # This generally isn't needed when using defaults, but is helpful if the GAME_DIR location is changed.
-    [ -d "$GAME_DIR" ] || mkdir -p "$GAME_DIR"
-    chown -R $GAME_USER:$GAME_USER "$GAME_DIR"
-
     # Install steam binary and steamcmd
     install_steamcmd
 
@@ -2712,18 +2942,79 @@ function install_application() {
     sudo -u $GAME_USER /usr/games/steamcmd +login anonymous +quit
     sleep 5
 
-    # Grab Proton from Glorious Eggroll
-    install_proton "$PROTON_VERSION"
-
     # Install the management script
-    install_warlock_manager "$REPO" "$BRANCH"
-    sudo -u $GAME_USER "$GAME_DIR/.venv/bin/pip" install rcon
+    install_warlock_manager "$REPO" "$BRANCH" 2.2.7
 
-    # Use the management script to install the game server
-	if ! $GAME_DIR/manage.py --update; then
-		echo "Could not install $GAME_DESC, exiting" >&2
-		exit 1
+    # Grab Proton from Glorious Eggroll
+    PROTON_PATH="$(install_proton "$PROTON_VERSION")"
+    "$GAME_DIR/manage.py" set-config "Default Proton Path" "${PROTON_PATH}"
+
+    # Install installer (this script) for uninstallation or manual work
+	download "https://raw.githubusercontent.com/${REPO}/refs/heads/${BRANCH}/dist/server-install-debian12.sh" "$GAME_DIR/installer.sh"
+	chmod +x "$GAME_DIR/installer.sh"
+	chown $GAME_USER:$GAME_USER "$GAME_DIR/installer.sh"
+
+	# Register this application install with Warlock so it can be picked up by the web manager.
+	if [ -n "$WARLOCK_GUID" ]; then
+		[ -d "/var/lib/warlock" ] || mkdir -p "/var/lib/warlock"
+		echo -n "$GAME_DIR" > "/var/lib/warlock/${WARLOCK_GUID}.app"
 	fi
+}
+
+##
+# Upgrade logic for 1.0 to 2.2 to handle migration of ENV and overrides
+#
+function upgrade_application_1_0() {
+	local SERVICE_PATH
+
+	# Migrate existing service to new format
+	# This gets overwrote by the manager, but is needed to tell the system that the service is here.
+	if [ ! -e "$GAME_DIR/Environments" ]; then
+		sudo -u $GAME_USER mkdir -p "$GAME_DIR/Environments"
+		sudo -u $GAME_USER mkdir -p "$GAME_DIR/Migrations"
+
+		for MAP in $GAME_MAPS; do
+			SERVICE_PATH="/etc/systemd/system/${MAP}.service"
+
+			# Export this configuration so the new system can re-obtain all the configuration values
+			# This is important because v1 to v2.2 changed CLI parameters.
+			if [ ! -e "$GAME_DIR/Migrations/${MAP}.json" ]; then
+				"$GAME_DIR/manage.py" --service "$MAP" --get-configs > "$GAME_DIR/Migrations/${MAP}.json"
+			fi
+
+			# Extract out current environment variables from the systemd file into their own dedicated file
+			egrep '^Environment' "${SERVICE_PATH}" | sed 's:^Environment=::' > "$GAME_DIR/Environments/${MAP}.env"
+			chown $GAME_USER:$GAME_USER "$GAME_DIR/Environments/${MAP}.env"
+			# Trim out those envs now that they're not longer required
+			cat "${SERVICE_PATH}" | egrep -v '^Environment=' > "${SERVICE_PATH}.new"
+			mv "${SERVICE_PATH}.new" "${SERVICE_PATH}"
+
+			[ -e "${SERVICE_PATH}.d/override.conf" ] && rm -fr "${SERVICE_PATH}.d/override.conf"
+			[ -e "${SERVICE_PATH}.d" ] && rm -fr "${SERVICE_PATH}.d"
+		done
+	fi
+}
+
+##
+# Perform any steps necessary for upgrading an existing installation.
+#
+function upgrade_application() {
+	print_header "Existing installation detected, performing upgrade"
+
+	# Uncomment if you need this
+	upgrade_application_1_0
+}
+
+##
+# Perform any operations necessary after the dependency installation is complete.
+#
+# Generally this will use the management API to perform the actual installation.
+#
+function postinstall() {
+	print_header "Performing postinstall"
+
+	# First run setup
+	$GAME_DIR/manage.py first-run
 }
 
 ##
@@ -2774,325 +3065,12 @@ function uninstall_application() {
 	fi
 }
 
-############################################
-## Pre-exec Checks
-############################################
-
-
-# This script can run on an existing server, but should not update the game if a map is actively running.
-# Check if any maps are running; do not update an actively running server.
-RUNNING=0
-for MAP in $GAME_MAPS; do
-	if [ "$(systemctl is-active $MAP)" == "active" ]; then
-		RUNNING=1
-	fi
-done
-
-if [ $RUNNING -eq 1 -a $OPT_RESET_PROTON -eq 1 ]; then
-	echo "Game server is still running, proton reset CAN NOT PROCEED"
-	exit 1
-fi
-
-if [ $RUNNING -eq 1 -a $OPT_FORCE_REINSTALL -eq 1 ]; then
-	echo "Game server is still running, force reinstallation CAN NOT PROCEED"
-	exit 1
-fi
-
-if [ $RUNNING -eq 1 -a $OPT_UNINSTALL -eq 1 ]; then
-	echo "Game server is still running, uninstallation CAN NOT PROCEED"
-	exit 1
-fi
-
-echo "================================================================================"
-echo "         	  ARK Survival Ascended *unofficial* Installer"
-echo ""
-
-# Determine if this is a new installation or an upgrade (/repair)
-if [ -e /etc/systemd/system/ark-island.service ]; then
-	INSTALLTYPE="upgrade"
-else
-	INSTALLTYPE="new"
-	echo "No existing installation detected, proceeding with new installation"
-fi
-
-if [ -n "$OPT_OVERRIDE_DIR" ]; then
-	# User requested to change the install dir!
-	# This changes the GAME_DIR from the default location to wherever the user requested.
-	GAME_DIR="$OPT_OVERRIDE_DIR"
-	echo "Using ${GAME_DIR} as the installation directory based on explicit argument"
-elif [ "$INSTALLTYPE" == "upgrade" ]; then
-	# Check for existing installation directory based on service file
-	GAME_DIR="$(egrep '^WorkingDirectory' /etc/systemd/system/ark-island.service | sed 's:.*=\(.*\)/AppFiles/ShooterGame/.*:\1:')"
-	echo "Detected installation directory of ${GAME_DIR} based on service registration"
-else
-	echo "Using default installation directory of ${GAME_DIR}"
-fi
-
-if [ -e "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/PlayersJoinNoCheckList.txt" ]; then
-	WHITELIST=1
-else
-	WHITELIST=0
-fi
-
-if [ -n "$(grep "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" /etc/exports 2>/dev/null)" ]; then
-	MULTISERVER=1
-	ISPRIMARY=1
-elif [ $(egrep -q "^[0-9\.]*:$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" /etc/fstab) ]; then
-	MULTISERVER=1
-	ISPRIMARY=0
-	PRIMARYIP="$(grep "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" /etc/fstab | sed 's#^\(.*\):.*#\1#')"
-else
-	MULTISERVER=0
-	ISPRIMARY=0
-fi
-
-if [ "$GAME_VERSION" == "auto" ]; then
-	# Detect if this is official or ASA API.
-	if [ "$INSTALLTYPE" == "upgrade" ] && [ ! $(grep -q 'AsaApiLoader.exe' '/etc/systemd/system/ark-island.service.d/override.conf') ]; then
-		GAME_VERSION="asaapi"
-	else
-		GAME_VERSION="official"
-	fi
-fi
-
-
-
-############################################
-## Uninstallation
-############################################
-if [ $OPT_UNINSTALL -eq 1 ]; then
-	if [ $NONINTERACTIVE -eq 1 ]; then
-		echo "Non-interactive uninstall selected, proceeding without confirmation"
-	else
-		echo "WARNING - You have chosen to uninstall ARK Survival Ascended Dedicated Server"
-		echo "This process will remove ALL game data, including player data, maps, and binaries."
-		echo "This action is IRREVERSIBLE."
-		echo ''
-
-		if prompt_yn -q --invert --default-no "? This will remove all game binary content"; then
-			exit
-		fi
-
-		if prompt_yn -q --invert --default-no "? This will remove all player and map data"; then
-			exit
-		fi
-
-		if prompt_yn -q --invert --default-no "? This will remove all service registration files"; then
-			exit
-		fi
-	fi
-
-
-	if [ -e "$GAME_DIR/manage.py" ]; then
-		if prompt_yn -q --default-yes "? Would you like to perform a backup before everything is wiped?"; then
-			$GAME_DIR/manage.py --backup
-		fi
-	fi
-
-	uninstall_application
-	exit
-fi
-
-
-############################################
-## User Prompts (pre setup)
-############################################
-
-# Ask the user some information before installing.
-if [ "$INSTALLTYPE" == "new" ]; then
-	COMMUNITYNAME="$(prompt_text --default="My Awesome ARK Server" "? What is the community name of the server?")"
-elif [ -e "$GAME_DIR/services/ark-island.conf" ]; then
-	# To support custom maps, load the existing community name from the island map service file.
-	COMMUNITYNAME="$(egrep '^ExecStart' "$GAME_DIR/services/ark-island.conf" | sed 's:.*SessionName="\([^"]*\) (.*:\1:')"
-else
-	COMMUNITYNAME="My Awesome ARK Server"
-fi
-
-if [ "$INSTALLTYPE" == "new" ]; then
-	JOINEDSESSIONNAME=$(prompt_yn --default-yes "? Include map names in instance name? e.g. My Awesome ARK Server (Island)")
-elif [ -e "$GAME_DIR/.settings.ini" ] && grep -q "joinedsessionname = False" "$GAME_DIR/.settings.ini" ; then
-	# Explicitly disabled
-	JOINEDSESSIONNAME=0
-else
-	# Enabled by default
-	JOINEDSESSIONNAME=1
-fi
-
-# Support legacy vs newsave formats
-# https://ark.wiki.gg/wiki/2023_official_server_save_files
-# Legacy formats use individual files for each character whereas
-# "new" formats save all characters along with the map.
-echo ''
-if [ -e "$GAME_DIR/services/ark-island.conf" ]; then
-	if grep -q '-newsaveformat' "$GAME_DIR/services/ark-island.conf"; then
-		echo "Using new save format for existing installation"
-		NEWFORMAT=1
-	else
-		echo "Using legacy save format for existing installation"
-		NEWFORMAT=0
-	fi
-elif [ $OPT_NEWFORMAT -eq 1 ]; then
-	echo "Using new save format for existing installation based on explicit argument"
-	NEWFORMAT=1
-elif [ "$INSTALLTYPE" == "new" ]; then
-  	echo "Nitrado and official servers are using a new save format"
-  	echo "which combines all player data into the map save files."
-  	echo ""
-  	echo "If you plan on migrating existing content from those servers,"
-  	echo "it is highly recommended to use the new save format."
-
-  	NEWFORMAT=$(prompt_yn --default-no "? Use new save format?")
-else
-	echo "Using legacy save format for existing installation"
-	NEWFORMAT=0
-fi
-
-# Load or generate a cluster ID as users usually want to cluster their maps together
-if [ -e "$GAME_DIR/services/ark-island.conf" ] && grep -q 'clusterid=' "$GAME_DIR/services/ark-island.conf"; then
-	CLUSTERID="$(grep -Eo 'clusterid=[^ ]*' "$GAME_DIR/services/ark-island.conf" | sed 's:.*=::')"
-else
-	CLUSTERID="$(random_password 12)"
-fi
-
-echo ''
-if [ "$WHITELIST" -eq 1 ]; then
-	WHITELIST=$(prompt_yn --invert --default-no "? DISABLE whitelist for players?")
-else
-	WHITELIST=$(prompt_yn --default-no "? Enable whitelist for players?")
-fi
-
-# Admin pass, used on new installs and shared across all maps
-if [ -e "$GAME_DIR/services/ark-island.conf" ]; then
-	ADMIN_PASS="$(grep -Eo 'ServerAdminPassword=[^? ]*' "$GAME_DIR/services/ark-island.conf" | sed 's:ServerAdminPassword=::')"
-else
-	ADMIN_PASS="$(random_password)"
-fi
-
-echo ''
-echo 'Multi-server support is provided via NFS by default,'
-echo 'but other file synchronization are possible if you prefer a custom solution.'
-echo ''
-echo 'This ONLY affects the default NFS, (do not enable if you are using a custom solution like VirtIO-FS or Gluster).'
-if [ "$MULTISERVER" -eq 1 ]; then
-	MULTISERVER=$(prompt_yn --invert --default-no "? DISABLE multi-server NFS cluster support? (Maps spread across different servers)")
-
-	if [ "$MULTISERVER" -eq 1 ] && [ "$ISPRIMARY" -eq 1 ]; then
-		echo ''
-		SECONDARYIPS="$(prompt_text --default="" "? Add more secondary IPs to the cluster? (Separate different IPs with spaces, enter to just skip)")"
-	fi
-else
-	MULTISERVER=$(prompt_yn --default-no "? Enable multi-server NFS cluster support? (Maps spread across different servers)")
-
-	if [ "$MULTISERVER" -eq 1 ]; then
-		echo ''
-		ISPRIMARY=$(prompt_yn --default-no "? Is this the first (primary) server?")
-
-		if [ "$ISPRIMARY" -eq 1 ]; then
-			echo ''
-			SECONDARYIPS="$(prompt_text --default="" "? What are the IPs of the secondary servers? (Separate different IPs with spaces)")"
-		else
-			echo ''
-			PRIMARYIP="$(prompt_text --default="" "? What is the IP of the primary server?")"
-		fi
-	fi
-fi
-
-if [ "$INSTALLTYPE" == "new" ]; then
-	if [ $OPT_SKIP_FIREWALL -eq 1 ]; then
-		FIREWALL=0
-	else
-		echo ''
-		FIREWALL=$(prompt_yn --default-yes "? Enable system firewall (UFW by default)?")
-	fi
-else
-	# Existing installations will either have UFW installed or not.
-	# Don't change after the first install.
-	FIREWALL=0
-fi
-
-if [ $OPT_INSTALL_CUSTOM_MAP -eq 1 ]; then
-	echo ''
-	echo "Please enter the Mod ID of the custom map to install."
-	echo "This is also called 'Project ID' on Curseforge."
-	CUSTOM_MAP_ID="$(prompt_text --default="$CUSTOM_MAP_ID" "? Mod/Project ID: ")"
-
-	if [ -z "$CUSTOM_MAP_ID" ]; then
-		echo "No Mod ID specified, cannot continue with custom map installation."
-		exit 1
-	fi
-
-	echo ''
-	echo "Please enter the Map Name to install."
-	echo "This is usually listed on the Curseforge description page."
-	CUSTOM_MAP_NAME="$(prompt_text --default="$CUSTOM_MAP_NAME" "? Mod Name: ")"
-
-	if [ -z "$CUSTOM_MAP_NAME" ]; then
-		echo "No Map Name specified, cannot continue with custom map installation."
-		exit 1
-	fi
-
-	# Custom maps usually end in "_WP", so trim that for the description if it's set.
-	if [ "${CUSTOM_MAP_NAME:${#CUSTOM_MAP_NAME}-3}" == "_WP" ]; then
-		CUSTOM_MAP_DESC="${CUSTOM_MAP_NAME:0:${#CUSTOM_MAP_NAME}-3}"
-	else
-		CUSTOM_MAP_DESC="${CUSTOM_MAP_NAME}"
-	fi
-
-	CUSTOM_MAP_MAP="ark-$(echo "$CUSTOM_MAP_DESC" | tr '[:upper:]' '[:lower:]')"
-
-	if [ -e "$GAME_DIR/services" ]; then
-		C=$(ls "$GAME_DIR/services" -1 | wc -l)
-		let "CUSTOM_MAP_PORT=$C-$BASE_MAP_COUNT+$PORT_CUSTOM_GAME"
-		let "CUSTOM_RCON_PORT=$C-$BASE_MAP_COUNT+$PORT_CUSTOM_RCON"
-	else
-		CUSTOM_MAP_PORT=$PORT_CUSTOM_GAME
-		CUSTOM_RCON_PORT=$PORT_CUSTOM_RCON
-	fi
-
-	# Add the custom map to the list of maps to install
-	GAME_MAPS="$GAME_MAPS CUSTOM"
-fi
-
-############################################
-## Upgrade Checks
-############################################
-
-## Release 2023.10.31 - Issue #8
-# Preserve customizations to service file
-for MAP in $GAME_MAPS; do
-	if [ "$MAP" == "CUSTOM" ]; then
-		MAP="$CUSTOM_MAP_MAP"
-	fi
-
-	# Ensure the override directory exists for the admin modifications to the CLI arguments.
-	[ -e /etc/systemd/system/${MAP}.service.d ] || mkdir -p /etc/systemd/system/${MAP}.service.d
-
-	if [ -e /etc/systemd/system/${MAP}.service ]; then
-		# Check if the service is already installed and move any modifications to the override.
-		# This is important for existing installs so the admin modifications to CLI arguments do not get overwritten.
-
-		if [ ! -e /etc/systemd/system/${MAP}.service.d/override.conf ]; then
-			# Override does not exist yet, merge in any changes in the default service file.
-			SERVICE_EXEC_LINE="$(grep -E '^ExecStart=' /etc/systemd/system/${MAP}.service)"
-
-			cat > /etc/systemd/system/${MAP}.service.d/override.conf <<EOF
-[Service]
-$SERVICE_EXEC_LINE
-EOF
-		fi
-	fi
-done
-## End Release 2023.10.31 - Issue #8
-
-
-############################################
-## Game Installation
-############################################
-
-if [ $OPT_FORCE_REINSTALL -eq 1 ]; then
-	# An option to force-reinstall the game binary,
-	# useful because occasionally Wildcard fraks something up with Steam
-	# and the only way to fix it is to force a reinstall.
+##
+# Clear the game binaries
+#
+# Generally not needed, but may be helpful sometimes when Wildcard fraks something up with Steam
+#
+function clear_game_binaries() {
 	if [ -e "$GAME_DIR/AppFiles/Engine" ]; then
 		echo "Removing Engine..."
 		rm -fr "$GAME_DIR/AppFiles/Engine"
@@ -3120,503 +3098,256 @@ if [ $OPT_FORCE_REINSTALL -eq 1 ]; then
 		echo "Removing Steam meta files..."
 		rm -fr "$GAME_DIR/AppFiles/steamapps"
 	fi
-fi
-
-
-# Install ARK Survival Ascended Dedicated
-install_application
-
-
-if [ "$GAME_VERSION" == "asaapi" ]; then
-	# ASA API requires xvfb to run.
-	install_xvfb
-	GAME_BIN="AsaApiLoader.exe"
-	# Install the ASA API loader into the game directory; this is needed to run the ASA API version of the server.
-	_FILE="$(basename "$ASA_API_SOURCE")"
-	download "$ASA_API_SOURCE" "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/$_FILE" --no-overwrite
-	chown $GAME_USER:$GAME_USER "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/$_FILE"
-	package_install "unzip"
-	sudo -u $GAME_USER unzip -o "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/$_FILE" -d "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/"
-else
-	GAME_BIN="ArkAscendedServer.exe"
-fi
-
-GAMEFLAGS="-servergamelog"
-# https://ark.wiki.gg/wiki/2023_official_server_save_files
-if [ $NEWFORMAT -eq 1 ]; then
-	GAMEFLAGS="$GAMEFLAGS -newsaveformat -usestore"
-fi
-
-# Append the cluster ID
-GAMEFLAGS="$GAMEFLAGS -clusterid=$CLUSTERID"
-
-# Install the systemd service files for ARK Survival Ascended Dedicated Server
-for MAP in $GAME_MAPS; do
-	# Different maps will have different settings, (to allow them to coexist on the same server)
-	if [ "$MAP" == "ark-island" ]; then
-		DESC="Island"
-		NAME="TheIsland_WP"
-		MODS=""
-		GAMEPORT=7701
-		RCONPORT=27001
-	elif [ "$MAP" == "ark-aberration" ]; then
-		DESC="Aberration"
-		NAME="Aberration_WP"
-		MODS=""
-		GAMEPORT=7702
-		RCONPORT=27002
-	elif [ "$MAP" == "ark-club" ]; then
-		DESC="Club"
-		NAME="BobsMissions_WP"
-		MODS="1005639"
-		GAMEPORT=7703
-		RCONPORT=27003
-	elif [ "$MAP" == "ark-scorched" ]; then
-		DESC="Scorched"
-		NAME="ScorchedEarth_WP"
-		MODS=""
-		GAMEPORT=7704
-		RCONPORT=27004
-	elif [ "$MAP" == "ark-thecenter" ]; then
-		DESC="TheCenter"
-		NAME="TheCenter_WP"
-		MODS=""
-		GAMEPORT=7705
-		RCONPORT=27005
-	elif [ "$MAP" == "ark-extinction" ]; then
-		DESC="Extinction"
-		NAME="Extinction_WP"
-		MODS=""
-		GAMEPORT=7706
-		RCONPORT=27006
-	elif [ "$MAP" == "ark-astraeos" ]; then
-		DESC="Astraeos"
-		NAME="Astraeos_WP"
-		MODS=""
-		GAMEPORT=7707
-		RCONPORT=27007
-	elif [ "$MAP" == "ark-ragnarok" ]; then
-		DESC="Ragnarok"
-		NAME="Ragnarok_WP"
-		MODS=""
-		GAMEPORT=7708
-		RCONPORT=27008
-	elif [ "$MAP" == "ark-valguero" ]; then
-		DESC="Valguero"
-		NAME="Valguero_WP"
-		MODS=""
-		GAMEPORT=7709
-		RCONPORT=27009
-	elif [ "$MAP" == "ark-lostcolony" ]; then
-		DESC="Lost Colony"
-		NAME="LostColony_WP"
-		MODS=""
-		GAMEPORT=7710
-		RCONPORT=27010
-	elif [ "$MAP" == "CUSTOM" ]; then
-		MAP="$CUSTOM_MAP_MAP"
-		DESC="$CUSTOM_MAP_DESC"
-		NAME="$CUSTOM_MAP_NAME"
-		MODS="$CUSTOM_MAP_ID"
-		GAMEPORT=$CUSTOM_MAP_PORT
-		RCONPORT=$CUSTOM_RCON_PORT
-	fi
-
-	if [ "$MODS" != "" ]; then
-		MODS_LINE="-mods=$MODS"
-	else
-		MODS_LINE=""
-	fi
-
-	if [ "$JOINEDSESSIONNAME" == "1" ]; then
-		SESSIONNAME="${COMMUNITYNAME} (${DESC})"
-	else
-		SESSIONNAME="${COMMUNITYNAME}"
-	fi
-
-
-	# Install system service file to be loaded by systemd
-	if [ "$GAME_VERSION" == "asaapi" ]; then
-		cat > /etc/systemd/system/${MAP}.service <<EOF
-[Unit]
-# DYNAMICALLY GENERATED FILE! Edit at your own risk
-Description=ARK Survival Ascended Dedicated Server (${DESC})
-After=network.target
-
-[Service]
-Type=simple
-LimitNOFILE=10000
-User=$GAME_USER
-Group=$GAME_USER
-WorkingDirectory=$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64
-Environment=XDG_RUNTIME_DIR=/run/user/$(id -u $GAME_USER)
-Environment="STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_DIR"
-Environment="STEAM_COMPAT_DATA_PATH=$GAME_DIR/prefixes/$MAP"
-Environment="DISPLAY=:99"
-ExecStop=$GAME_DIR/manage.py --pre-stop --service=${MAP}
-ExecStartPost=$GAME_DIR/manage.py --post-start --service=${MAP}
-TimeoutSec=600s
-# Check $GAME_DIR/services to adjust the CLI arguments
-Restart=on-failure
-RestartSec=20s
-
-[Install]
-WantedBy=multi-user.target
-EOF
-	else
-		cat > /etc/systemd/system/${MAP}.service <<EOF
-[Unit]
-# DYNAMICALLY GENERATED FILE! Edit at your own risk
-Description=ARK Survival Ascended Dedicated Server (${DESC})
-After=network.target
-
-[Service]
-Type=simple
-LimitNOFILE=10000
-User=$GAME_USER
-Group=$GAME_USER
-WorkingDirectory=$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64
-Environment=XDG_RUNTIME_DIR=/run/user/$(id -u $GAME_USER)
-Environment="STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_DIR"
-Environment="STEAM_COMPAT_DATA_PATH=$GAME_DIR/prefixes/$MAP"
-ExecStop=$GAME_DIR/manage.py --pre-stop --service=${MAP}
-ExecStartPost=$GAME_DIR/manage.py --post-start --service=${MAP}
-TimeoutSec=600s
-# Check $GAME_DIR/services to adjust the CLI arguments
-Restart=on-failure
-RestartSec=20s
-
-[Install]
-WantedBy=multi-user.target
-EOF
-	fi
-
-	if [ -e /etc/systemd/system/${MAP}.service.d/override.conf ]; then
-		# Override exists, check if it needs upgraded
-		CURRENT_PROTON_BIN="$(grep ExecStart /etc/systemd/system/${MAP}.service.d/override.conf | sed 's:^ExecStart=\([^ ]*\) .*:\1:')"
-		if [ "$CURRENT_PROTON_BIN" != "$PROTON_BIN" ]; then
-			# Proton binary has changed, update the override
-			echo "Upgrading Proton binary for $MAP from $CURRENT_PROTON_BIN to $PROTON_BIN"
-			sed -i "s:^ExecStart=[^ ]*:ExecStart=$PROTON_BIN:" /etc/systemd/system/${MAP}.service.d/override.conf
-		fi
-
-		CURRENT_GAME_BIN="$(grep ExecStart /etc/systemd/system/${MAP}.service.d/override.conf | sed 's:.*proton run \([^ ]*\) .*:\1:')"
-		if [ "$CURRENT_GAME_BIN" != "$GAME_BIN" ]; then
-			# Game binary has changed, update the override
-			echo "Swapping game binary for $MAP from $CURRENT_GAME_BIN to $GAME_BIN"
-			sed -i "s:proton run [^ ]* :proton run $GAME_BIN :" /etc/systemd/system/${MAP}.service.d/override.conf
-		fi
-	else
-		# Override does not exist yet, create boilerplate file.
-		# This is the main file that the admin will use to modify CLI arguments,
-		# so we do not want to overwrite their work if they have already modified it.
-		cat > /etc/systemd/system/${MAP}.service.d/override.conf <<EOF
-[Service]
-# Edit this line to adjust start parameters of the server
-# After modifying, please remember to run \`sudo systemctl daemon-reload\` to apply changes to the system.
-ExecStart=$PROTON_BIN run ${GAME_BIN} ${NAME}?listen?SessionName="${SESSIONNAME}"?RCONPort=${RCONPORT}?ServerAdminPassword=${ADMIN_PASS}?RCONEnabled=True -port=${GAMEPORT} ${GAMEFLAGS} ${MODS_LINE}
-EOF
-    fi
-
-    # Set the owner of the override to steam so that user account can modify it.
-    chown $GAME_USER:$GAME_USER /etc/systemd/system/${MAP}.service.d/override.conf
-
-    if [ $OPT_RESET_PROTON -eq 1 -a -e $GAME_DIR/prefixes/$MAP ]; then
-    	echo "Resetting proton prefix for $MAP"
-    	rm $GAME_DIR/prefixes/$MAP -r
-	fi
-
-    if [ ! -e $GAME_DIR/prefixes/$MAP ]; then
-    	# Install a new prefix for this specific map
-    	# Proton 9 seems to have issues with launching multiple binaries in the same prefix.
-    	[ -d $GAME_DIR/prefixes ] || sudo -u $GAME_USER mkdir -p $GAME_DIR/prefixes
-		sudo -u $GAME_USER cp $GAME_COMPAT_DIR $GAME_DIR/prefixes/$MAP -r
-	fi
-done
-
-# The update helper is no longer used as of v2025.12.04
-[ -e /etc/systemd/system/ark-updater.service ] && rm /etc/systemd/system/ark-updater.service
-
-if [ -e "$GAME_DIR/update.sh" ]; then
-	cat > $GAME_DIR/update.sh <<EOF
-#!/bin/bash
-#
-# Update ARK Survival Ascended Dedicated Server
-#
-# DYNAMICALLY GENERATED FILE! Edit at your own risk
-
-# List of all maps available on this platform
-GAME_USER="$GAME_USER"
-GAME_DIR="$GAME_DIR"
-STEAM_ID="$STEAM_ID"
-
-# This script is expected to be run as the steam user, (as that is the owner of the game files).
-# If another user calls this script, sudo will be used to switch to the steam user.
-if [ "\$(whoami)" == "\$GAME_USER" ]; then
-	SUDO_NEEDED=0
-else
-	SUDO_NEEDED=1
-fi
-
-function update_game {
-	echo "Running game update"
-	if [ "\$SUDO_NEEDED" -eq 1 ]; then
-		sudo -u \$GAME_USER /usr/games/steamcmd +force_install_dir \$GAME_DIR/AppFiles +login anonymous +app_update \$STEAM_ID validate +quit
-	else
-		/usr/games/steamcmd +force_install_dir \$GAME_DIR/AppFiles +login anonymous +app_update \$STEAM_ID validate +quit
-	fi
-
-	# Version 74.24 released on Nov 4th 2025 with the comment "Fixed a crash" introduces a serious bug
-	# that causes the game to segfault when attempting to load the Steam API.
-	# Being Wildcard, they don't actually provide any reason as to why they're using the Steam API for an Epic game,
-	# but it seems to work without the Steam library available.
-	#
-	# In the logs you will see:
-	# Initializing Steam Subsystem for server validation.
-	# Steam Subsystem initialized: FAILED
-	#
-	if [ -e "\$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/steamclient64.dll" ]; then
-		echo "Removing broken Steam library to prevent segfault"
-		rm -f "\$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/steamclient64.dll"
-	fi
-
-
-	if [ \$? -ne 0 ]; then
-		echo "Game update failed!" >&2
-		exit 1
-	fi
 }
 
-if \$GAME_DIR/manage.py --is-running; then
-	echo "Game server is running, not updating"
-	exit 0
-fi
-
-update_game
-EOF
-    chown $GAME_USER:$GAME_USER $GAME_DIR/update.sh
-    chmod +x $GAME_DIR/update.sh
-fi
-
-systemctl daemon-reload
-
-
-# As of v2025.11.02 this script has been ported to the management console.
-# If it exists however, replace it with the necessary call to preserve backwards compatibility.
-if [ -e "$GAME_DIR/start_all.sh" ]; then
-	cat > $GAME_DIR/start_all.sh <<EOF
-#!/bin/bash
+##
+# Clear Proton prefix directories
 #
-# Start all ARK server maps that are enabled
-# DYNAMICALLY GENERATED FILE! Edit at your own risk
-GAME_DIR="$GAME_DIR"
-
-\$GAME_DIR/update.sh
-\$GAME_DIR/manage.py --start-all
-EOF
-    chown $GAME_USER:$GAME_USER $GAME_DIR/start_all.sh
-    chmod +x $GAME_DIR/start_all.sh
-fi
-
-
-# As of v2025.11.02 this script has been ported to the management console.
-# If it exists however, replace it with the necessary call to preserve backwards compatibility.
-if [ -e "$GAME_DIR/stop_all.sh" ]; then
-	cat > $GAME_DIR/stop_all.sh <<EOF
-#!/bin/bash
+# Useful in some edge cases to fix weird Proton issues.
 #
-# Stop all ARK server maps that are enabled
-# DYNAMICALLY GENERATED FILE! Edit at your own risk
-GAME_DIR="$GAME_DIR"
+function clear_proton_prefix() {
+	if [ -e "$GAME_DIR/Environments" ]; then
+    	# Check for existing service files to determine if the service is running.
+    	# This is important to prevent conflicts with the installer trying to modify files while the service is running.
+    	for envfile in "$GAME_DIR/Environments/"*.env; do
+    		SERVICE=$(basename "$envfile" .env)
+    		# If there are no services, this will just be '*.env'.
+    		if [ "$SERVICE" != "*" ]; then
+    			echo "Resetting proton prefix for $SERVICE"
+				rm "$GAME_DIR/prefixes/$SERVICE" -r
+    		fi
+    	done
+    fi
+}
 
-\$GAME_DIR/manage.py --stop-all
-EOF
-	chown $GAME_USER:$GAME_USER $GAME_DIR/stop_all.sh
-	chmod +x $GAME_DIR/stop_all.sh
+############################################
+## Pre-exec Checks
+############################################
+
+
+# This script can run on an existing server, but should not update the game if a map is actively running.
+# Check if any maps are running; do not update an actively running server.
+for MAP in $GAME_MAPS; do
+	if [ "$(systemctl is-active $MAP)" == "active" ]; then
+		echo "${MAP} is still running, cannot continue"
+		exit 1
+	fi
+done
+
+if [ -e "$GAME_DIR/Environments" ]; then
+	# Check for existing service files to determine if the service is running.
+	# This is important to prevent conflicts with the installer trying to modify files while the service is running.
+	for envfile in "$GAME_DIR/Environments/"*.env; do
+		SERVICE=$(basename "$envfile" .env)
+		# If there are no services, this will just be '*.env'.
+		if [ "$SERVICE" != "*" ]; then
+			if systemctl -q is-active $SERVICE; then
+				echo "$GAME_DESC service is currently running, please stop all instances before running this installer."
+				echo "You can do this with: sudo systemctl stop $SERVICE"
+				exit 1
+			fi
+		fi
+	done
 fi
 
-# Use the management utility to store some preferences from the installer
-# Save the preferences for the manager
-if [ "$JOINEDSESSIONNAME" == "1" ]; then
-	"$GAME_DIR/manage.py" --set-config "Joined Session Name" True
+if [ $OPT_UNINSTALL -eq 1 ]; then
+	MODE="uninstall"
+elif [ -e "$GAME_DIR/AppFiles" ]; then
+	MODE="reinstall"
 else
-	"$GAME_DIR/manage.py" --set-config "Joined Session Name" False
+	# Default to install mode
+	MODE="install"
 fi
 
-# As of v2025.11.27 these scripts have been ported to the management console.
-if [ -e "$GAME_DIR/backup.sh" ]; then
-	cat > $GAME_DIR/backup.sh <<EOF
-#!/bin/bash
-#
-# Backup all player data
-#
-# DYNAMICALLY GENERATED FILE! Edit at your own risk
-
-GAME_MAPS="$GAME_MAPS"
-GAME_USER="$GAME_USER"
-GAME_DIR="$GAME_DIR"
-SAVE_DIR="$GAME_DIR/AppFiles/ShooterGame/Saved"
-
-# Check if any maps are running; do not update an actively running server.
-RUNNING=0
-for MAP in \$GAME_MAPS; do
-	if [ "\$(systemctl is-active \$MAP)" == "active" ]; then
-		echo "WARNING - \$MAP is still running"
-		RUNNING=1
+if [ -n "$OPT_OVERRIDE_DIR" ]; then
+	# User requested to change the install dir!
+	# This changes the GAME_DIR from the default location to wherever the user requested.
+	if [ -e "/var/lib/warlock/${WARLOCK_GUID}.app" ] ; then
+		# Check for existing installation directory based on Warlock registration
+		GAME_DIR="$(cat "/var/lib/warlock/${WARLOCK_GUID}.app")"
+		if [ "$GAME_DIR" != "$OPT_OVERRIDE_DIR" ]; then
+			echo "ERROR: $GAME_DESC already installed in $GAME_DIR, cannot override to $OPT_OVERRIDE_DIR" >&2
+			echo "If you want to move the installation, please uninstall first and then re-install to the new location." >&2
+			exit 1
+		fi
 	fi
-done
 
-if [ \$RUNNING -eq 1 ]; then
-	echo "At least one map is still running, do you still want to backup? (y/N): "
-	read UP
-	if [ "\$UP" != "y" -a "\$UP" != "Y" ]; then
-		exit 1
+	GAME_DIR="$OPT_OVERRIDE_DIR"
+	echo "Using ${GAME_DIR} as the installation directory based on explicit argument"
+elif [ -e "/var/lib/warlock/${WARLOCK_GUID}.app" ]; then
+	# Check for existing installation directory based on service file
+	GAME_DIR="$(cat "/var/lib/warlock/${WARLOCK_GUID}.app")"
+	echo "Detected installation directory of ${GAME_DIR} based on service registration"
+else
+	echo "Using default installation directory of ${GAME_DIR}"
+fi
+
+
+echo "================================================================================"
+echo "         	  ARK Survival Ascended *unofficial* Installer"
+echo ""
+
+# Operations needed to be performed during a new installation
+if [ "$MODE" == "install" ]; then
+
+	# Ask the user some information before installing.
+	if [ $SKIP_FIREWALL -eq 1 ]; then
+		echo "Firewall explictly disabled, skipping installation of a system firewall"
+		FIREWALL=0
+	elif prompt_yn -q --default-yes "Install system firewall?"; then
+		FIREWALL=1
+	else
+		FIREWALL=0
+	fi
+
+	COMMUNITYNAME="$(prompt_text --default="My Awesome ARK Server" "? What is the community name of the server?")"
+	JOINEDSESSIONNAME=$(prompt_yn --default-yes "? Include map names in instance name? e.g. My Awesome ARK Server (Island)")
+
+	# Support legacy vs newsave formats
+    # https://ark.wiki.gg/wiki/2023_official_server_save_files
+    # Legacy formats use individual files for each character whereas
+    # "new" formats save all characters along with the map.
+	if [ $OPT_NEWFORMAT -eq 1 ]; then
+    	echo "Using new save format for existing installation based on explicit argument"
+    	NEWFORMAT=1
+    else
+      	echo "Nitrado and official servers are using a new save format"
+      	echo "which combines all player data into the map save files."
+      	echo ""
+      	echo "If you plan on migrating existing content from those servers,"
+      	echo "it is highly recommended to use the new save format."
+
+      	NEWFORMAT=$(prompt_yn --default-yes "? Use new save format?")
+	fi
+
+	# Generate a cluster ID as users usually want to cluster their maps together
+    CLUSTERID="$(random_password 12)"
+
+	WHITELIST=$(prompt_yn --default-no "? Enable whitelist for players?")
+	# Admin pass, used on new installs and shared across all maps
+	ADMIN_PASS="$(random_password)"
+
+	echo ''
+	echo 'Multi-server support is provided via NFS by default,'
+	echo 'but other file synchronization are possible if you prefer a custom solution.'
+	echo ''
+	echo 'This ONLY affects the default NFS, (do not enable if you are using a custom solution like VirtIO-FS or Gluster).'
+	MULTISERVER=$(prompt_yn --default-no "? Enable multi-server NFS cluster support? (Maps spread across different servers)")
+
+	if [ "$MULTISERVER" -eq 1 ]; then
+		echo ''
+		ISPRIMARY=$(prompt_yn --default-no "? Is this the first (primary) server?")
+
+		if [ "$ISPRIMARY" -eq 1 ]; then
+			echo ''
+			SECONDARYIPS="$(prompt_text --default="" "? What are the IPs of the secondary servers? (Separate different IPs with spaces)")"
+		else
+			echo ''
+			PRIMARYIP="$(prompt_text --default="" "? What is the IP of the primary server?")"
+		fi
+	fi
+
+	install_application
+
+	# Store the necessary arguments into the game system
+	"$GAME_DIR/manage.py" set-config "Community Name" "${COMMUNITYNAME}"
+	"$GAME_DIR/manage.py" set-config "Joined Session Name" "${JOINEDSESSIONNAME}"
+	"$GAME_DIR/manage.py" set-config "Default New Save Format" "${NEWFORMAT}"
+	"$GAME_DIR/manage.py" set-config "Default Cluster ID" "${CLUSTERID}"
+	"$GAME_DIR/manage.py" set-config "Default Server Admin Password" "${ADMIN_PASS}"
+
+	# Handle NFS
+	setup_nfs
+
+	postinstall
+
+	# Print some instructions and useful tips
+    print_header "$GAME_DESC Installation Complete"
+fi
+
+# Operations needed to be performed during a reinstallation / upgrade
+if [ "$MODE" == "reinstall" ]; then
+
+	if [ $OPT_FORCE_REINSTALL -eq 1 ]; then
+    	clear_game_binaries
+    fi
+
+    if [ $OPT_RESET_PROTON -eq 1 ]; then
+    	clear_proton_prefix
+	fi
+
+	FIREWALL=0
+
+	if [ -e "$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/PlayersJoinNoCheckList.txt" ]; then
+    	WHITELIST=1
+    else
+    	WHITELIST=0
+    fi
+
+    if [ -n "$(grep "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" /etc/exports 2>/dev/null)" ]; then
+    	MULTISERVER=1
+    	ISPRIMARY=1
+    elif [ $(egrep -q "^[0-9\.]*:$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" /etc/fstab) ]; then
+    	MULTISERVER=1
+    	ISPRIMARY=0
+    	PRIMARYIP="$(grep "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" /etc/fstab | sed 's#^\(.*\):.*#\1#')"
+    else
+    	MULTISERVER=0
+    	ISPRIMARY=0
+    fi
+
+    if [ "$MULTISERVER" -eq 1 ]; then
+    	MULTISERVER=$(prompt_yn --invert --default-no "? DISABLE multi-server NFS cluster support? (Maps spread across different servers)")
+
+    	if [ "$MULTISERVER" -eq 1 ] && [ "$ISPRIMARY" -eq 1 ]; then
+    		echo ''
+    		SECONDARYIPS="$(prompt_text --default="" "? Add more secondary IPs to the cluster? (Separate different IPs with spaces, enter to just skip)")"
+    	fi
+    fi
+
+	upgrade_application
+
+	install_application
+
+	# Handle NFS
+	setup_nfs
+
+	postinstall
+
+	# Print some instructions and useful tips
+    print_header "$GAME_DESC Installation Complete"
+
+	# If there are notes generated during installation, print them now.
+    if [ -e "$GAME_DIR/Notes.txt" ]; then
+    	cat "$GAME_DIR/Notes.txt"
 	fi
 fi
 
-# Prep the various directories
-[ -e \$SAVE_DIR/.services ] || mkdir \$SAVE_DIR/.services
-[ -e \$GAME_DIR/backups ] || mkdir \$GAME_DIR/backups
-
-# Copy service files from systemd
-cp /etc/systemd/system/ark-*.service.d \$SAVE_DIR/.services -r
-
-FILES="clusters Config/WindowsServer .services SavedArks"
-TGZ="\$GAME_DIR/backups/ArkSurvivalAscended-\$(date +%Y-%m-%d_%H-%M).tgz"
-
-tar -czf \$TGZ \
-	-C \$SAVE_DIR  \
-	--exclude='*_WP_0*.ark' \
-	--exclude='*_WP_1*.ark' \
-	--exclude='*.profilebak' \
-	--exclude='*.tribebak' \
-	\$FILES
-
-if [ \$? -eq 0 ]; then
-	echo "Created backup \$TGZ"
-fi
-
-# Cleanup
-rm -fr "\$SAVE_DIR/.services"
-EOF
-	chown $GAME_USER:$GAME_USER $GAME_DIR/backup.sh
-	chmod +x $GAME_DIR/backup.sh
-fi
-
-# As of v2025.11.27 these scripts have been ported to the management console.
-if [ -e "$GAME_DIR/restore.sh" ]; then
-	cat > $GAME_DIR/restore.sh <<EOF
-#!/bin/bash
-#
-# Restore all player data from a backup file
-#
-# DYNAMICALLY GENERATED FILE! Edit at your own risk
-
-GAME_MAPS="$GAME_MAPS"
-GAME_USER="$GAME_USER"
-GAME_DIR="$GAME_DIR"
-SAVE_DIR="$GAME_DIR/AppFiles/ShooterGame/Saved"
-
-if [ \$(id -u) -ne 0 ]; then
-	echo "This script must be run as root or with sudo!" >&2
-	exit 1
-fi
-
-# Check if any maps are running; do not update an actively running server.
-RUNNING=0
-for MAP in \$GAME_MAPS; do
-	if [ "\$(systemctl is-active \$MAP)" == "active" ]; then
-		echo "WARNING - \$MAP is still running"
-		echo "Restore cannot proceed with a map actively running."
-		exit 1
+# Operations needed to be performed during an uninstallation
+if [ "$MODE" == "uninstall" ]; then
+	if [ $NONINTERACTIVE -eq 0 ]; then
+		if prompt_yn -q --invert --default-no "This will remove all game binary content"; then
+			exit 1
+		fi
+		if prompt_yn -q --invert --default-no "This will remove all player and map data"; then
+			exit 1
+		fi
 	fi
-done
 
-if [ -z "\$1" ]; then
-	echo "ERROR - no source file specified"
-	echo "Usage: \$0 <source.tgz>"
-	exit 1
-fi
+	if prompt_yn -q --default-yes "Perform a backup before everything is wiped?"; then
+		$GAME_DIR/manage.py backup
+	fi
 
-if [ ! -e "\$1" ]; then
-	echo "ERROR - cannot read source \$1"
-	echo "Usage: \$0 <source.tgz>"
-	exit 1
-fi
-
-echo "Extracting \$1"
-tar -xzf "\$1" -C \$SAVE_DIR
-if [ \$? -ne 0 ]; then
-	echo "ERROR - failed to extract \$1"
-	exit 1
-fi
-
-if [ -e \$SAVE_DIR/.services ]; then
-	echo "Restoring service files"
-	chown -R root:root \$SAVE_DIR/.services
-	cp \$SAVE_DIR/.services/* /etc/systemd/system/ -r
-	systemctl daemon-reload
-	rm -fr "\$SAVE_DIR/.services"
-fi
-
-echo "Ensuring permissions"
-chown -R \$GAME_USER:\$GAME_USER \$SAVE_DIR
-EOF
-	chown $GAME_USER:$GAME_USER $GAME_DIR/restore.sh
-	chmod +x $GAME_DIR/restore.sh
+	uninstall_application
 fi
 
 
-# Reload systemd to pick up the new service files
-systemctl daemon-reload
+############################################
+## Game Installation
+############################################
 
 # Ensure cluster resources exist
 [ -d "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" ] || sudo -u $GAME_USER mkdir -p "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters"
-
-
-############################################
-## NFS Configuration
-############################################
-
-if [ "$MULTISERVER" -eq 1 ]; then
-	# Enable / ensure enabled shared directory for multi-server support
-	if [ "$ISPRIMARY" -eq 1 ]; then
-		systemctl enable nfs-server
-		for IP in $SECONDARYIPS; do
-			# Ensure the cluster folder is shared with the various child servers
-			if [ ! $(grep -q "Saved/clusters $IP" /etc/exports) ]; then
-				echo "Adding $IP to NFS access for $GAME_DIR/AppFiles/ShooterGame/Saved/clusters"
-				echo "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters $IP/32(rw,sync,no_subtree_check)" >> /etc/exports
-			fi
-		done
-		systemctl restart nfs-server
-	else
-		if [ ! $(grep -q "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" /etc/fstab) ]; then
-			echo "Adding NFS mount to $PRIMARYIP for $GAME_DIR/AppFiles/ShooterGame/Saved/clusters"
-			echo "$PRIMARYIP:$GAME_DIR/AppFiles/ShooterGame/Saved/clusters $GAME_DIR/AppFiles/ShooterGame/Saved/clusters nfs defaults,rw,sync,soft,intr 0 0" >> /etc/fstab
-			mount -a
-		fi
-	fi
-else
-	# Disable / ensure disabled shared directory for multi-server support
-	if [ -n "$(grep "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" /etc/exports 2>/dev/null)" ]; then
-		echo "Disabling cluster share"
-		BAK="/etc/exports.bak-$(date +%Y%m%d%H%M%S)"
-		cp /etc/exports $BAK
-		cat $BAK | grep -v "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" > /etc/exports
-		systemctl restart nfs-server
-	fi
-	if [ -n "$(mount | grep "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" | grep nfs)" ]; then
-		echo "Unmounting cluster share"
-		umount "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters"
-	fi
-	if [ $(egrep -q "^[0-9\.]*:$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" /etc/fstab) ]; then
-		echo "Removing NFS mount from fstab"
-		BAK="/etc/fstab.bak-$(date +%Y%m%d%H%M%S)"
-		cp /etc/fstab $BAK
-		cat $BAK | grep -v "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" > /etc/fstab
-	fi
-fi
 
 # Ensure cluster and game resources exist
 sudo -u $GAME_USER touch "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters/PlayersJoinNoCheckList.txt"
@@ -3625,24 +3356,6 @@ if [ ! -e "$GAME_DIR/AppFiles/ShooterGame/Saved/Config/WindowsServer" ]; then
 	sudo -u $GAME_USER mkdir -p "$GAME_DIR/AppFiles/ShooterGame/Saved/Config/WindowsServer"
 fi
 sudo -u $GAME_USER touch "$GAME_DIR/AppFiles/ShooterGame/Saved/Config/WindowsServer/Game.ini"
-
-############################################
-## Security Configuration
-############################################
-
-firewall_allow --port "${PORT_GAME_START}:${PORT_GAME_END}" --udp
-firewall_allow --port "${PORT_RCON_START}:${PORT_RCON_END}" --tcp
-if [ "$MULTISERVER" -eq 1 -a "$ISPRIMARY" -eq 1 ]; then
-	# Allow NFS access from secondary servers
-	for IP in $SECONDARYIPS; do
-		firewall_allow --port "111,2049" --tcp --zone internal --source $IP/32
-		firewall_allow --port "111,2049" --udp --zone internal --source $IP/32
-	done
-fi
-if [ $OPT_INSTALL_CUSTOM_MAP -eq 1 ]; then
-	firewall_allow --port "$CUSTOM_MAP_PORT" --udp
-	firewall_allow --port "$CUSTOM_RCON_PORT" --tcp
-fi
 
 
 ############################################
@@ -3653,7 +3366,7 @@ fi
 # Setup whitelist
 WL_GAME="$GAME_DIR/AppFiles/ShooterGame/Binaries/Win64/PlayersJoinNoCheckList.txt"
 WL_CLUSTER="$GAME_DIR/AppFiles/ShooterGame/Saved/clusters/PlayersJoinNoCheckList.txt"
-if [ -e "$WL_GAME" -a ! -h "$WL_GAME" ]; then
+if [ -e "$WL_GAME" ] && [ ! -h "$WL_GAME" ]; then
 	# Whitelist already exists in the game directory, either move it to the cluster directory
 	# or back it up.  This is because this script will manage the whitelist via a symlink.
 	if [ -s "$WL_CLUSTER" ]; then
@@ -3687,26 +3400,8 @@ else
 	fi
 fi
 
-# Register with Warlock
-if [ -n "$WARLOCK_GUID" ]; then
-	[ -d "/var/lib/warlock" ] || mkdir -p "/var/lib/warlock"
-	echo -n "$GAME_DIR" > "/var/lib/warlock/$WARLOCK_GUID.app"
-fi
-
-# Install installer (this script) for uninstallation or manual work
-download "https://raw.githubusercontent.com/${REPO}/refs/heads/${BRANCH}/dist/server-install-debian12.sh" "$GAME_DIR/installer.sh"
-chmod +x "$GAME_DIR/installer.sh"
-chown $GAME_USER:$GAME_USER "$GAME_DIR/installer.sh"
-
 
 # Create some helpful links for the user.
-[ -e "$GAME_DIR/services" ] || sudo -u $GAME_USER mkdir -p "$GAME_DIR/services"
-for MAP in $GAME_MAPS; do
-	if [ "$MAP" == "CUSTOM" ]; then
-		MAP="$CUSTOM_MAP_MAP"
-	fi
-	[ -h "$GAME_DIR/services/${MAP}.conf" ] || sudo -u $GAME_USER ln -s /etc/systemd/system/${MAP}.service.d/override.conf "$GAME_DIR/services/${MAP}.conf"
-done
 [ -h "$GAME_DIR/GameUserSettings.ini" ] || sudo -u $GAME_USER ln -s $GAME_DIR/AppFiles/ShooterGame/Saved/Config/WindowsServer/GameUserSettings.ini "$GAME_DIR/GameUserSettings.ini"
 [ -h "$GAME_DIR/Game.ini" ] || sudo -u $GAME_USER ln -s $GAME_DIR/AppFiles/ShooterGame/Saved/Config/WindowsServer/Game.ini "$GAME_DIR/Game.ini"
 [ -h "$GAME_DIR/ShooterGame.log" ] || sudo -u $GAME_USER ln -s $GAME_DIR/AppFiles/ShooterGame/Saved/Logs/ShooterGame.log "$GAME_DIR/ShooterGame.log"

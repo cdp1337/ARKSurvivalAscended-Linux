@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import datetime
+import json
 import os
 
 # To allow running as a standalone script without installing the package, include the venv path for imports.
@@ -9,12 +11,14 @@ import os
 # import:org_python/venv_path_include.py
 
 import logging
+import shutil
 import zipfile
 
 # Import the appropriate type of handler for the game installer.
 # Common options are:
 # from warlock_manager.apps.base_app import BaseApp
 from warlock_manager.apps.steam_app import SteamApp
+from warlock_manager.libs.cmd import Cmd
 
 # Import the appropriate type of handler for the game services.
 # Common options are:
@@ -50,7 +54,7 @@ from warlock_manager.formatters.cli_formatter import cli_formatter
 # from warlock_manager.mods.base_mod import BaseMod
 from warlock_manager.mods.warlock_nexus_mod import WarlockNexusMod
 
-
+'''
 class ModLibrary(object):
 	_mods = None
 
@@ -85,7 +89,7 @@ class ModLibrary(object):
 		if mod_id in mods:
 			return mods[mod_id]['name']
 		return None
-
+'''
 
 class GameAPIException(Exception):
 	pass
@@ -101,7 +105,8 @@ class GameApp(SteamApp):
 
 		self.name = 'ARK:SA'
 		self.desc = 'ARK: Survival Ascended'
-		self.steam_id = '2430930'
+		#self.steam_id = '2430930'
+		self.steam_id = '90'  # TESTING - Use Half-Life Dedicated Server since it's only 90MB
 		self.service_prefix = 'ark-'
 
 		self.configs = {
@@ -124,26 +129,50 @@ class GameApp(SteamApp):
 		services = self.get_services()
 		if len(services) == 0:
 			# No services exist, auto-create the various maps supported for convenience.
+			community_name = self.get_option_value('Community Name')
 			maps = {
-				'ark-island': ('Island', 'TheIsland_WP', []),
-				'ark-aberration': ('Aberration', 'Aberration_WP', []),
-				'ark-club': ('Club', 'BobsMissions_WP', ['1005639']),
-				'ark-scorched': ('Scorched', 'ScorchedEarth_WP', []),
-				'ark-thecenter': ('The Center', 'TheCenter_WP', []),
-				'ark-extinction': ('Extinction', 'Extinction_WP', []),
-				'ark-astraeos': ('Astraeos', 'Astraeos_WP', []),
-				'ark-ragnarok': ('Ragnarok', 'Ragnarok_WP', []) ,
-				'ark-valguero': ('Valguero', 'Valguero_WP', []),
-				'ark-lostcolony': ('Lost Colony', 'LostColony_WP', [])
+				'ark-island': ('TheIsland_WP', []),
+				'ark-aberration': ('Aberration_WP', []),
+				'ark-club': ('BobsMissions_WP', ['1005639']),
+				'ark-scorched': ('ScorchedEarth_WP', []),
+				'ark-thecenter': ('TheCenter_WP', []),
+				'ark-extinction': ('Extinction_WP', []),
+				'ark-astraeos': ('Astraeos_WP', []),
+				'ark-ragnarok': ('Ragnarok_WP', []) ,
+				'ark-valguero': ('Valguero_WP', []),
+				'ark-lostcolony': ('LostColony_WP', [])
 			}
 			for map_name in maps.keys():
 				logging.info('Creating service for map %s' % (map_name,))
 				svc = self.create_service(map_name)
-				svc.set_option('Session Name', maps[map_name][0])
-				svc.set_option('Map Name', maps[map_name][1])
-				if len(maps[map_name][2]) > 0:
-					svc.set_option('Mods', ','.join(maps[map_name][2]))
+				svc.set_option('Map Name', maps[map_name][0])
+				svc.set_option('Session Name', '%s (%s)' % (community_name, svc.get_map_label()))
+				if len(maps[map_name][1]) > 0:
+					svc.set_option('Mods', ','.join(maps[map_name][1]))
 			return True
+		else:
+			# Import any legacy configurations from the previous installation
+			# This is required because between 1.0 and 2.2, breaking changes were implemented in CLI params
+			for svc in self.get_services():
+				migration_file = os.path.join(utils.get_base_directory(), 'Migrations/%s.json' % svc.service)
+				if os.path.exists(migration_file):
+					logging.info('Migrating service %s configurations' % svc.service)
+					with open(migration_file, 'r', encoding='utf-8') as f:
+						migration = json.load(f)
+						for option in migration['options']:
+							svc.set_option(option['name'], option['value'])
+					# Move the migration file to mark it as completed
+					os.rename(
+						migration_file,
+						os.path.join(
+							utils.get_base_directory(),
+							'Migrations/%s.complete-%s.json' % (svc.service, datetime.datetime.now().strftime('%Y-%m-%d'))
+						)
+					)
+				else:
+					# Just rebuild systemd to ensure it's updated
+					svc.build_systemd_config()
+					svc.reload()
 		return False
 
 	def get_option_options(self, option: str):
@@ -181,6 +210,11 @@ class GameApp(SteamApp):
 				if svc.get_option_value('Proton Path') == previous_value:
 					svc.set_option('Proton Path', new_value)
 			return True
+		elif option == 'Community Name':
+			if self.get_option_value('Joined Session Name'):
+				for svc in self.get_services():
+					svc.set_option('Session Name', '%s (%s)' % (new_value, svc.get_map_label()))
+				return True
 
 		return None
 
@@ -252,7 +286,7 @@ class GameApp(SteamApp):
 
 		:return:
 		"""
-		return os.path.join(here, 'AppFiles', 'ShooterGame', 'Saved')
+		return os.path.join(utils.get_base_directory(), 'AppFiles', 'ShooterGame', 'Saved')
 
 	def get_save_files(self):
 		ret = ['clusters']
@@ -285,7 +319,7 @@ class GameApp(SteamApp):
 		# Initializing Steam Subsystem for server validation.
 		# Steam Subsystem initialized: FAILED
 		#
-		check_path = os.path.join(here, 'AppFiles/ShooterGame/Binaries/Win64/steamclient64.dll')
+		check_path = os.path.join(utils.get_base_directory(), 'AppFiles/ShooterGame/Binaries/Win64/steamclient64.dll')
 		if os.path.exists(check_path):
 			print('Removing broken Steam library to fix build 74.24 crash...')
 			os.remove(check_path)
@@ -296,22 +330,15 @@ class GameApp(SteamApp):
 		#
 		# https://github.com/Acekorneya/Ark-Survival-Ascended-Server/issues/116
 		print('Installing Microsoft XAudio2 Redist DLL to fix build 77.34 crash...')
-		req = request.urlopen('https://www.nuget.org/api/v2/package/Microsoft.XAudio2.Redist/1.2.11', timeout=30)
-		package_data = req.read()
-		package_path = '/tmp/Microsoft.XAudio2.Redist.zip'
-		dll_dest = os.path.join(here, 'AppFiles/ShooterGame/Binaries/Win64/xaudio2_9.dll')
-		with open(package_path, 'wb') as f:
-			f.write(package_data)
-		shutil.unpack_archive(package_path, '/tmp/Microsoft.XAudio2.Redist')
-		shutil.copy(
-			'/tmp/Microsoft.XAudio2.Redist/build/native/release/bin/x64/xaudio2_9redist.dll',
-			dll_dest
-		)
-		if os.geteuid() == 0:
-			stat_info = os.stat(here)
-			uid = stat_info.st_uid
-			gid = stat_info.st_gid
-			os.chown(dll_dest, uid, gid)
+		xaudio_src = 'https://www.nuget.org/api/v2/package/Microsoft.XAudio2.Redist/1.2.11'
+		xaudio_dest = os.path.join(utils.get_base_directory(), 'Packages/Microsoft.XAudio2.Redist.zip')
+		dll_dest = os.path.join(utils.get_base_directory(), 'AppFiles/ShooterGame/Binaries/Win64/xaudio2_9.dll')
+		download_file(xaudio_src, xaudio_dest)
+		with zipfile.ZipFile(xaudio_dest, 'r') as zip_ref:
+			for file in zip_ref.namelist():
+				if file.endswith('release/bin/x64/xaudio2_9redist.dll'):
+					zip_ref.extract(file, dll_dest)
+		utils.ensure_file_ownership(dll_dest)
 
 
 class GameService(RCONService):
@@ -346,6 +373,19 @@ class GameService(RCONService):
 		# New instances should by default share the group cluster.
 		self.set_option('Cluster ID', self.game.get_option_value('Default Cluster ID'))
 
+		# New instances should use a separate save directory to allow the same map to run on separate instances
+		self.set_option('AltSaveDirectoryName', self.service)
+
+		# Ensure the prefix exists for this instance.
+		prefix_path = os.path.join(utils.get_base_directory(), 'prefixes', self.service)
+		prefix_src = os.path.join(
+			os.path.dirname(self.get_option_value('Proton Path')),
+			'files/share/default_pfx'
+		)
+		if not os.path.exists(prefix_path):
+			shutil.copytree(prefix_src, prefix_path)
+			utils.ensure_file_ownership(prefix_path)
+
 	def get_environment(self) -> dict:
 		"""
 		Get the environment variables for this service as a dictionary
@@ -362,6 +402,9 @@ class GameService(RCONService):
 
 		return ret
 
+	def get_binary(self) -> str:
+		return 'AsaApiLoader.exe' if self.get_option_value('Mod Loader') == 'ASA API Loader' else 'ArkAscendedServer.exe'
+
 	def get_executable(self) -> str:
 		"""
 		Get the full executable for this game service
@@ -369,7 +412,7 @@ class GameService(RCONService):
 		"""
 
 		proton_path = self.get_option_value('Proton Path')
-		binary = 'AsaApiLoader.exe' if self.get_option_value('Mod Loader') == 'ASA API Loader' else 'ArkAscendedServer.exe'
+		binary = self.get_binary()
 		map = self.get_option_value('Map Name')
 		options = cli_formatter(self.configs['service'], 'option', prefix='', sep='=', joiner='?')
 		options = map + '?listen?' + options
@@ -382,19 +425,6 @@ class GameService(RCONService):
 			options,
 			flags
 		])
-
-	def set_option(self, option: str, value: str | int | bool):
-		"""
-		Set a configuration option in the service config
-		:param option:
-		:param value:
-		:return:
-		"""
-		if option == 'Session Name':
-			if self.game.get_option_value('Joined Session Name'):
-				value = '%s (%s)' % (value, self.get_map_label())
-
-		super().set_option(option, value)
 
 	def get_option_options(self, option: str):
 		"""
@@ -476,7 +506,7 @@ class GameService(RCONService):
 		Get the current player count on the server, or None if the API is unavailable
 		:return:
 		"""
-		ret =  self._api_cmd('ListPlayers')
+		ret =  self.cmd('ListPlayers')
 		if ret is None:
 			return None
 		elif ret == 'No Players Connected':
@@ -489,7 +519,7 @@ class GameService(RCONService):
 		Issue a Save command on the server
 		:return:
 		"""
-		self._api_cmd('SaveWorld')
+		self.cmd('SaveWorld')
 
 	def send_message(self, message: str):
 		"""
@@ -497,7 +527,7 @@ class GameService(RCONService):
 		:param message:
 		:return:
 		"""
-		self._api_cmd('ServerChat %s' % message)
+		self.cmd('ServerChat %s' % message)
 
 	def get_game_pid(self) -> int:
 		"""
@@ -507,13 +537,12 @@ class GameService(RCONService):
 
 		# There's no quick way to get the game process PID from systemd,
 		# so use ps to find the process based on the map name
-		processes = subprocess.run([
-			'ps', 'axh', '-o', 'pid,cmd'
-		], stdout=subprocess.PIPE).stdout.decode().strip()
+		binary = self.get_binary()
+		map_name = self.get_option_value('Map Name')
 		process = 0
-		for line in processes.split('\n'):
+		for line in Cmd(['ps', 'axh', '-o', 'pid,cmd']).lines:
 			pid, cmd = line.strip().split(' ', 1)
-			if cmd.startswith('%s.exe %s?listen' % (self.bin, self.map)):
+			if cmd.startswith('%s.exe %s?listen' % (binary, map_name)):
 				_p = int(line.strip().split(' ')[0])
 				# ASA API spawns 2 processes, the first handler then the second game executable.
 				# Grab the larger PID which should be the actual game process.
@@ -521,14 +550,21 @@ class GameService(RCONService):
 		return process
 
 	def get_map_label(self) -> str:
-		if self.map == 'BobsMissions_WP':
+		"""
+		Get the label of the map
+		:return:
+		"""
+		map_name = self.get_option_value('Map Name')
+		if map_name == 'BobsMissions_WP':
 			return 'Club'
-		elif self.map.endswith('_WP'):
-			return self.map[:-3]
+		elif map_name.endswith('_WP'):
+			return map_name[:-3]
+		elif map_name == '':
+			return self.service
 		else:
-			return self.map
+			return map_name
 
-	def get_mod_names(self) -> list:
+	'''def get_mod_names(self) -> list:
 		"""
 		Get the list of mod names for this service
 		:return:
@@ -546,70 +582,7 @@ class GameService(RCONService):
 			else:
 				names.append('NOT INSTALLED (%s)' % (mod,))
 		return names
-
-	def get_saved_location(self) -> str:
-		if self.map == 'BobsMissions_WP':
-			map = 'BobsMissions'
-		else:
-			map = self.map
-
-		return os.path.join(
-			here,
-			'AppFiles',
-			'ShooterGame',
-			'Saved',
-			'SavedArks',
-			map
-		)
-
-	def get_map_file_size(self) -> int:
-		"""
-		Get the size of the map data on disk in bytes
-		:return:
-		"""
-		map_path = os.path.join(self.get_saved_location(), self.map + '.ark')
-		if os.path.exists(map_path):
-			return os.path.getsize(map_path)
-		else:
-			return 0
-
-	def add_to_table(self, table: Table):
-		row = []
-		for column in table.header:
-			if column == '#':
-				row.append(str(len(table.data) + 1))
-			else:
-				row.append(self.get_table_value(column))
-		table.add(row)
-
-	def get_table_value(self, col: str) -> str:
-		if col == 'Map':
-			return self.map
-		elif col == 'Session':
-			return self.get_option_value('Session Name')
-		elif col == 'Port':
-			return self.get_option_value('Port')
-		elif col == 'RCON':
-			return self.get_option_value('RCON Port') if self.is_api_enabled() else 'N/A'
-		elif col == 'Auto-Start':
-			return '✅ Enabled' if self.is_enabled() else '❌ Disabled'
-		elif col == 'Status':
-			return '✅ Running' if self.is_running() else '❌ Stopped'
-		elif col == 'Admin Password':
-			return self.get_option_value('Server Admin Password')
-		elif col == 'Players':
-			v = self.get_player_count()
-			return str(v) if v is not None else 'N/A'
-		elif col == 'Mods':
-			return ', '.join(self.get_mod_names())
-		elif col == 'Cluster ID':
-			return self.get_option_value('Cluster ID')
-		elif col == 'Map Size':
-			return format_filesize(self.get_map_file_size())
-		elif col == 'Mem':
-			return self.get_memory_usage()
-		else:
-			return '???'
+	'''
 
 	def enable_mod(self, mod_id):
 		"""
@@ -667,22 +640,16 @@ class GameService(RCONService):
 		self.set_option('Mods', ','.join(mods))
 		print('%s mod %s on service %s' % (action, mod_id, self.service))
 
-	def post_start(self) -> bool:
-		ret = super().post_start()
-		if not ret:
-			# Print the last few messages from the Game log to provide a hint to the user if there was a problem.
-			log = os.path.join(here, 'AppFiles/ShooterGame/Saved/Logs/ShooterGame.log')
-			if os.path.exists(log):
-				subprocess.run(['tail', '-n', '20', log])
-
-		return ret
-
 	def get_port_definitions(self) -> list:
 		"""
 		Get a list of port definitions for this service
 		:return:
 		"""
 		return [
-			('Port', 'udp', '%s game port - %s' % (self.game.desc, self.get_map_label())),
-			('RCON Port', 'tcp', '%s RCON port - %s' % (self.game.desc, self.get_map_label()))
+			('Port', 'udp', '%s game port - %s' % (self.game.name, self.get_map_label())),
+			('RCON Port', 'tcp', '%s RCON port - %s' % (self.game.name, self.get_map_label()))
 		]
+
+if __name__ == '__main__':
+	app = app_runner(GameApp())
+	app()

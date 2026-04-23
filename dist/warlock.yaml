@@ -12,14 +12,10 @@
     - "--reset-proton  - Reset proton directories back to default"
     - "--force-reinstall  - Force a reinstall of the game binaries, mods, and engine"
     - "--uninstall  - Uninstall the game server"
-    - "--install-custom-map  - Install a custom map (in addition to the defaults)"
-    - "--custom-map-id=<int> - Mod ID of the custom map to install (use with --install-custom-map) OPTIONAL"
-    - "--custom-map-name=<string> - Map Name of the custom map to install, refer to Curseforge description page (use with --install-custom-map) OPTIONAL"
     - "--dir=<string> - Use a custom installation directory instead of the default OPTIONAL"
     - "--non-interactive  - Run the installer in non-interactive mode (useful for scripted installs)"
     - "--skip-firewall  - Skip installing/configuring the firewall"
     - "--new-format  - Use the new save format (Nitrado/Official server compatible) OPTIONAL"
-    - "--game-version=<auto|official|asaapi> - Use either the official release or the latest ASA API version DEFAULT=auto OPTIONAL"
     - "--branch=<str> - Use a specific branch of the management script repository DEFAULT=main"
   image: images/asa-1920x1080.webp
   icon: images/ark-128x128.webp

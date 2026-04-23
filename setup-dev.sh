@@ -4,7 +4,7 @@
 
 HERE="$(dirname "$(realpath "$0")")"
 # Pull the requested version of the manager from the installation script
-WARLOCK_MANAGER="$(grep 'install_warlock_manager' "$HERE/src/server-install-debian12.sh" | grep -v '#' | head -n1 | cut -d ' ' -f 4 | sed 's:"::g' | sed "s:'::g")"
+WARLOCK_MANAGER="$(grep 'install_warlock_manager' "$HERE/src/server-install-debian12.sh" | grep -v '#' | head -n1 | sed 's:^[ ]*::' | cut -d ' ' -f 4 | sed 's:"::g' | sed "s:'::g")"
 WARLOCK_MANAGER="${WARLOCK_MANAGER:-main}"
 WARLOCK_NOTICE=0
 
