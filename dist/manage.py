@@ -20,6 +20,7 @@ sys.path.insert(
 import logging
 import shutil
 import zipfile
+from SystemdUnitParser import SystemdUnitParser
 from warlock_manager.apps.steam_app import SteamApp
 from warlock_manager.libs.cmd import Cmd
 from warlock_manager.services.rcon_service import RCONService
@@ -505,6 +506,18 @@ class GameService(RCONService):
 			flags
 		])
 
+	def get_systemd_config(self) -> SystemdUnitParser:
+		"""
+		Get the systemd unit configuration for this service, if available
+		:return:
+		"""
+		config = super().get_systemd_config()
+
+		# We need to change the working directory of this game to be in binaries
+		config['Service']['WorkingDirectory'] = os.path.join(utils.get_base_directory(), 'AppFiles/ShooterGame/Binaries/Win64')
+
+		return config
+
 	def get_option_options(self, option: str):
 		"""
 		Get the list of possible options for a configuration option
@@ -525,6 +538,7 @@ class GameService(RCONService):
 		:return:
 		"""
 		success = None
+		rebuild_env = False
 
 		# Special option actions
 		if option == 'Port':
@@ -537,6 +551,10 @@ class GameService(RCONService):
 			if new_value == 'ASA API Loader':
 				self.game.ensure_asa_api_loader()
 			success = True
+			rebuild_env = True
+
+		if rebuild_env:
+			self.build_environment_file()
 
 		if not self.bulk:
 			# Reload the service; all options on services control the systemd service file.
@@ -618,15 +636,13 @@ class GameService(RCONService):
 		# so use ps to find the process based on the map name
 		binary = self.get_binary()
 		map_name = self.get_option_value('Map Name')
-		process = 0
-		for line in Cmd(['ps', 'axh', '-o', 'pid,cmd']).lines:
-			pid, cmd = line.strip().split(' ', 1)
-			if cmd.startswith('%s.exe %s?listen' % (binary, map_name)):
-				_p = int(line.strip().split(' ')[0])
-				# ASA API spawns 2 processes, the first handler then the second game executable.
-				# Grab the larger PID which should be the actual game process.
-				process = max(process, _p)
-		return process
+		session_name = self.get_option_value('Session Name')
+		for line in Cmd(['pgrep', '-af', '^%s %s' % (binary, map_name)]).lines:
+			if line.strip():
+				pid, cmd = line.strip().split(' ', 1)
+				if session_name in cmd:
+					return pid
+		return 0
 
 	def get_map_label(self) -> str:
 		"""

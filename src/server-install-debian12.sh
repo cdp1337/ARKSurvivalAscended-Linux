@@ -284,7 +284,7 @@ function upgrade_application_1_0() {
 EOD
 
 			# Extract out current environment variables from the systemd file into their own dedicated file
-			egrep '^Environment' "${SERVICE_PATH}" | sed 's:^Environment=::' > "$GAME_DIR/Environments/${MAP}.env"
+			egrep '^Environment' "${SERVICE_PATH}" | sed 's:^Environment=::' | sed 's:"::g' > "$GAME_DIR/Environments/${MAP}.env"
 			chown $GAME_USER:$GAME_USER "$GAME_DIR/Environments/${MAP}.env"
 			# Trim out those envs now that they're not longer required
 			cat "${SERVICE_PATH}" | egrep -v '^Environment=' > "${SERVICE_PATH}.new"
