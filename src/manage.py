@@ -432,7 +432,7 @@ class GameService(RCONService):
 			'STEAM_COMPAT_CLIENT_INSTALL_PATH': os.path.join(utils.get_home_directory(), '.local/share/Steam'),
 			'STEAM_COMPAT_DATA_PATH': os.path.join(utils.get_base_directory(), 'prefixes', self.service),
 		}
-		if self.get_option_value('ASA API Loader') != 'None':
+		if self.get_option_value('Mod Loader') != 'None':
 			ret['DISPLAY'] = ':99'
 
 		return ret
