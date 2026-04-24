@@ -10,7 +10,6 @@ import os
 # otherwise the imports will fail when running as a standalone script.
 # import:org_python/venv_path_include.py
 
-import logging
 import shutil
 import zipfile
 
@@ -47,6 +46,7 @@ from warlock_manager.libs.firewall import Firewall
 from warlock_manager.libs import utils
 from warlock_manager.libs.proton import get_proton_paths
 from warlock_manager.libs.download import download_json, download_file
+from warlock_manager.libs.logger import logger
 
 # Useful in some games
 from warlock_manager.formatters.cli_formatter import cli_formatter
@@ -149,7 +149,7 @@ class GameApp(SteamApp):
 				'ark-lostcolony': ('LostColony_WP', [])
 			}
 			for map_name in maps.keys():
-				logging.info('Creating service for map %s' % (map_name,))
+				logger.info('Creating service for map %s' % (map_name,))
 				svc = self.create_service(map_name)
 				svc.set_option('Map Name', maps[map_name][0])
 				svc.set_option('Session Name', '%s (%s)' % (community_name, svc.get_map_label()))
@@ -363,8 +363,6 @@ class GameService(RCONService):
 		Set to True to skip rebuilding systemd on every change; useful for bulk operations
 		"""
 
-		self.load()
-
 	def create_service(self):
 		"""
 		Create the systemd service for this game, including the service file and environment file
@@ -425,14 +423,14 @@ class GameService(RCONService):
 					with open(migration_file, 'r', encoding='utf-8') as f:
 						migration_data = json.load(f)
 				except Exception as e:
-					logging.error('Failed to load migration file for service %s: %s' % (self.service, e))
+					logger.error('Failed to load migration file for service %s: %s' % (self.service, e))
 					continue
 
 				for option in migration_data:
 					try:
 						self.set_option(option['option'], option['value'])
 					except Exception as e:
-						logging.error('Failed to migrate option %s for service %s: %s' % (option['name'], self.service, e))
+						logger.error('Failed to migrate option %s for service %s: %s' % (option['name'], self.service, e))
 
 				migrations.append(migration_file)
 
@@ -475,7 +473,7 @@ class GameService(RCONService):
 			proton_path = self.game.get_proton_path()
 
 		if not proton_path:
-			logging.error('Unable to determine Proton path for %s' % self.service)
+			logger.error('Unable to determine Proton path for %s' % self.service)
 			return '/bin/false'
 
 		binary = self.get_binary()
@@ -613,6 +611,39 @@ class GameService(RCONService):
 		"""
 		self.cmd('ServerChat %s' % message)
 
+	def get_pids(self) -> list:
+		"""
+		Get all process IDs for this game instance
+		:return:
+		"""
+
+		# There's no quick way to get the game process PID from systemd,
+		# so use ps to find the process based on the map name
+		pids = [self.get_pid()]
+		binary = self.get_binary()
+		map_name = self.get_option_value('Map Name')
+		session_name = self.get_option_value('Session Name')
+		command = Cmd(['pgrep', '-af', '%s %s' % (binary, map_name)])
+		command.is_memory_cacheable(2)
+		for line in command.lines:
+			if line.strip():
+				pid, cmd = line.strip().split(' ', 1)
+				if session_name in cmd:
+					pids.append(int(pid))
+
+		# This game uses Proton, so networking is handled by the wineserver binary.
+		# Check wineservers if their environment is configured to use this instance.
+		wineservers = Cmd(['pgrep', 'wineserver']).lines
+		for wine_pid in wineservers:
+			wine_env_file = '/proc/%s/environ' % wine_pid
+			if os.path.exists(wine_env_file):
+				with open(wine_env_file, 'r', encoding='utf-8') as f:
+					wine_env = f.read()
+				if '/prefixes/%s/' % self.service in wine_env:
+					pids.append(int(wine_pid))
+
+		return list(set(pids))
+
 	def get_game_pid(self) -> int:
 		"""
 		Get the primary game process PID of the actual game server, or 0 if not running
@@ -624,7 +655,9 @@ class GameService(RCONService):
 		binary = self.get_binary()
 		map_name = self.get_option_value('Map Name')
 		session_name = self.get_option_value('Session Name')
-		for line in Cmd(['pgrep', '-af', '^%s %s' % (binary, map_name)]).lines:
+		command = Cmd(['pgrep', '-af', '^%s %s' % (binary, map_name)])
+		command.is_memory_cacheable(2)
+		for line in command.lines:
 			if line.strip():
 				pid, cmd = line.strip().split(' ', 1)
 				if session_name in cmd:
