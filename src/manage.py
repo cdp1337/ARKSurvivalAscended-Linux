@@ -159,34 +159,12 @@ class GameApp(SteamApp):
 			# Import any legacy configurations from the previous installation
 			# This is required because between 1.0 and 2.2, breaking changes were implemented in CLI params
 			for svc in self.get_services():
-				migration_file = os.path.join(utils.get_base_directory(), 'Migrations/%s.json' % svc.service)
-				if os.path.exists(migration_file):
-					logging.info('Migrating service %s configurations' % svc.service)
-					migration_data = {}
-					try:
-						with open(migration_file, 'r', encoding='utf-8') as f:
-							migration_data = json.load(f)
-					except Exception as e:
-						logging.error('Failed to load migration file for service %s: %s' % (svc.service, e))
+				# Run any migrations for this service
+				svc.run_migrations()
 
-					for option in migration_data:
-						try:
-							svc.set_option(option['option'], option['value'])
-						except Exception as e:
-							logging.error('Failed to migrate option %s for service %s: %s' % (option['name'], svc.service, e))
-
-					# Move the migration file to mark it as completed
-					os.rename(
-						migration_file,
-						os.path.join(
-							utils.get_base_directory(),
-							'Migrations/%s.complete-%s.json' % (svc.service, datetime.datetime.now().strftime('%Y-%m-%d'))
-						)
-					)
-				else:
-					# Just rebuild systemd to ensure it's updated
-					svc.build_systemd_config()
-					svc.reload()
+				# Just rebuild systemd to ensure it's updated
+				svc.build_systemd_config()
+				svc.reload()
 		return False
 
 	def get_option_options(self, option: str):
@@ -420,6 +398,39 @@ class GameService(RCONService):
 			shutil.copytree(prefix_src, prefix_path)
 			utils.ensure_file_ownership(prefix_path)
 
+	def run_migrations(self):
+		"""
+		Run any migrations from the Migrations directory
+		:return:
+		"""
+		migrations_path = os.path.join(utils.get_base_directory(), 'Migrations')
+		if not os.path.exists(migrations_path):
+			return
+
+		migrations = []
+		for filename in os.listdir(migrations_path):
+			if filename.startswith(f"{self.service}.") and filename.endswith('.json'):
+				migration_file = os.path.join(migrations_path, filename)
+				migration_data = []
+				try:
+					with open(migration_file, 'r', encoding='utf-8') as f:
+						migration_data = json.load(f)
+				except Exception as e:
+					logging.error('Failed to load migration file for service %s: %s' % (self.service, e))
+					continue
+
+				for option in migration_data:
+					try:
+						self.set_option(option['option'], option['value'])
+					except Exception as e:
+						logging.error('Failed to migrate option %s for service %s: %s' % (option['name'], self.service, e))
+
+				migrations.append(migration_file)
+
+		# Move the migrated files to mark them as completed
+		for file in migrations:
+			os.rename(file, file[:-5] + '.migrated')
+
 	def get_environment(self) -> dict:
 		"""
 		Get the environment variables for this service as a dictionary
@@ -488,7 +499,6 @@ class GameService(RCONService):
 		:param new_value:
 		:return:
 		"""
-		rebuild = False
 		success = None
 
 		# Special option actions
@@ -502,11 +512,11 @@ class GameService(RCONService):
 			if new_value == 'ASA API Loader':
 				self.game.ensure_asa_api_loader()
 			success = True
-			rebuild = True
 
-		# Reload the service
-		if rebuild:
-			self.build_systemd_config()
+		# Reload the service; all options on services control the systemd service file.
+		self.build_systemd_config()
+		self.reload()
+
 		return success
 
 	def is_api_enabled(self) -> bool:

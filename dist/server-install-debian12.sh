@@ -2992,9 +2992,13 @@ function upgrade_application_1_0() {
 
 			# Export this configuration so the new system can re-obtain all the configuration values
 			# This is important because v1 to v2.2 changed CLI parameters.
-			if [ ! -e "$GAME_DIR/Migrations/${MAP}.json" ]; then
-				"$GAME_DIR/manage.py" --service "$MAP" --get-configs > "$GAME_DIR/Migrations/${MAP}.json"
-			fi
+			"$GAME_DIR/manage.py" --service "$MAP" --get-configs > "$GAME_DIR/Migrations/${MAP}.configs-$(date +%Y%m%d%H%M%S).json"
+
+			# The map name is required in 2.2
+			MAPNAME="$(egrep '^ExecStart' /etc/systemd/system/$MAP.service.d/override.conf | sed 's:.*\.exe \(.*\)?listen.*:\1:')"
+			cat > "$GAME_DIR/Migrations/${MAP}.map-$(date +%Y%m%d%H%M%S).json" <<EOD
+[{"option": "Map Name", "value": "$MAPNAME"}]
+EOD
 
 			# Extract out current environment variables from the systemd file into their own dedicated file
 			egrep '^Environment' "${SERVICE_PATH}" | sed 's:^Environment=::' > "$GAME_DIR/Environments/${MAP}.env"
