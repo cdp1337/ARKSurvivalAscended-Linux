@@ -344,7 +344,7 @@ service:
     key: NoTransferFromFiltering
     type: bool
     help: "Prevents ARK Data usage between single player and servers who do not have a cluster ID."
-    group: Transfer
+    group: Transfers
   - name: Convert To Store
     section: flag
     key: converttostore
