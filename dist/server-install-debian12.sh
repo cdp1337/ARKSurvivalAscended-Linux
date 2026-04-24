@@ -1331,74 +1331,87 @@ service:
     key: system_mapname
     type: str
     group: Basic
+    help: System name of the map used for this instance, REQUIRED for this service to work. One of 'TheIsland_WP', 'TheCenter_WP', or any other valid map identifier.
   - key: allowicefox
     section: flag
     name: Allow Veilwyn Transfers
     type: bool
     default: false
+    group: Transfers
   - key: CrossARKAllowForeignDinoDownloads
     section: option
     name: Cross ARK Allow Foreign Dino Downloads (Instance)
     help: If true, allows non-native dinos' tribute downloads on some maps.
     type: bool
     default: false
+    group: Transfers
   - key: noTributeDownloads
     section: option
     name: No Tribute Downloads (Instance)
     help: If true, prevents Cross-ARK data downloads.
     type: bool
     default: false
+    group: Transfers
   - key: PreventDownloadDinos
     section: option
     name: Prevent Download Dinos (Instance)
     help: If true, prevents creature downloads via Cross-ARK.
     type: bool
     default: false
+    group: Transfers
   - key: PreventDownloadItems
     section: option
     name: Prevent Download Items (Instance)
     help: If true, prevents item/resource downloads via Cross-ARK.
     type: bool
     default: false
+    group: Transfers
   - key: PreventDownloadSurvivors
     section: option
     name: Prevent Download Survivors (Instance)
     help: If true, prevents survivor downloads via Cross-ARK.
     type: bool
     default: false
+    group: Transfers
   - key: PreventUploadDinos
     section: option
     name: Prevent Upload Dinos (Instance)
     help: If true, prevents creature uploads via Cross-ARK.
     type: bool
     default: false
+    group: Transfers
   - key: PreventUploadItems
     section: option
     name: Prevent Upload Items (Instance)
     help: If true, prevents item uploads via Cross-ARK.
     type: bool
     default: false
+    group: Transfers
   - key: PreventUploadSurvivors
     section: option
     name: Prevent Upload Survivors (Instance)
     help: If true, prevents survivor uploads via Cross-ARK.
     type: bool
     default: false
+    group: Transfers
   - name: Session Name
     section: option
     key: SessionName
     type: str
     help: "Set the name of the server session as it appears in the server browser."
+    group: Basic
   - name: Alt Save Directory
     section: option
     key: AltSaveDirectoryName
     type: str
     help: "Specify an alternative save directory for server data."
+    group: Settings
   - name: Always Tick Dedicated Skeletal Meshes
     section: flag
     key: AlwaysTickDedicatedSkeletalMeshes
     type: bool
     help: "Optimize performance by always ticking skeletal meshes on dedicated servers."
+    group: Performance
   - name: Auto Destroy Structures
     section: flag
     key: AutoDestroyStructures
@@ -1424,6 +1437,7 @@ service:
     key: disabledinonetrangescaling
     type: bool
     help: Disables creature's network replication range optimization.
+    group: Performance
   - name: Easter Colors
     section: flag
     key: EasterColors
@@ -1434,6 +1448,7 @@ service:
     key: exclusivejoin
     type: bool
     help: Activate a whitelist only mode on the server, allowing players to join if added to the allow list.
+    group: Security
   - name: Force Allow Cave Flyers
     section: flag
     key: ForceAllowCaveFlyers
@@ -1450,16 +1465,19 @@ service:
     type: int
     default: 35
     help: "Set the memory usage threshold (in GB) to trigger an automatic server restart."
+    group: Performance
   - name: New Save Format
     section: flag
     key: newsaveformat
     type: bool
     help: Enables the new save format for server saves, improving performance and compatibility with future updates.
+    group: Settings
   - name: Mods
     section: flag
     key: mods
     type: str
     help: Specifies CurseForge Mod Project IDs. Mods are updated automatically when starting the server.
+    group: Mods
   - name: No BattlEye
     section: flag
     key: NoBattlEye
@@ -1480,12 +1498,14 @@ service:
     key: passivemods
     type: str
     help: This option disables a mod's functionality while still loading its data. This is useful if, for example, you want to have S-Dinos on Astraeos in your cluster but prevent them from spawning on The Island while still allowing them to be transferred back and forth.
+    group: Mods
   - name: Port
     section: flag
     key: port
     type: int
     default: 7777
     help: "Set the main port for game connections."
+    group: Settings
   - name: Server Game Log
     section: flag
     key: servergamelog
@@ -1521,6 +1541,7 @@ service:
     key: usestore
     type: bool
     help: "Same basic behaviour of official (non-legacy) servers on handling player characters data: character profile file (.arkprofile) is not saved separately from map save (.ark), nor its backup."
+    group: Settings
   - name: Win Live Max Players
     section: flag
     key: WinLiveMaxPlayers
@@ -1532,16 +1553,19 @@ service:
     key: clusterid
     type: str
     help: "Set the Cluster ID for server clustering."
+    group: Basic
   - name: No Transfer From Filtering
     section: flag
     key: NoTransferFromFiltering
     type: bool
     help: "Prevents ARK Data usage between single player and servers who do not have a cluster ID."
+    group: Transfer
   - name: Convert To Store
     section: flag
     key: converttostore
     type: bool
     help: "Converts legacy save files to the store format on server save."
+    group: Settings
   - name: Custom Notification URL
     section: flag
     key: CustomNotificationURL
@@ -1602,6 +1626,7 @@ service:
     key: noperfthreads
     type: bool
     help: "Disables the use of performance threads."
+    group: Performance
   - name: No Sound
     section: flag
     key: nosound
@@ -1612,12 +1637,14 @@ service:
     key: onethread
     type: bool
     help: "Runs the server using a single thread for all processing."
+    group: Performance
   - name: Server Platform
     section: flag
     key: ServerPlatform
     type: str
     default: "ALL"
     help: "Allows the server to accept specified platforms. Options are PC for Steam, PS5 for PlayStation 5, XSX for XBOX, WINGDK for Microsoft Store, ALL for crossplay between PC (Steam and Windows Store) and all consoles."
+    group: Basic
   - name: Unstasis Dino Obstruction Check
     section: flag
     key: UnstasisDinoObstructionCheck
@@ -1628,52 +1655,61 @@ service:
     key: UseServerNetSpeedCheck
     type: bool
     help: "It should avoid players to accumulate too much movements data per server tick, discarding the last if those are too many."
+    group: Performance
   - name: Difficulty Offset
     section: option
     key: DifficultyOffset
     type: float
     default: 1.0
     help: "Sets the difficulty offset for the server, affecting wild creature levels."
+    group: Difficulty
   - name: RCON Port
     section: option
     key: RCONPort
     type: int
     default: 27020
     help: "Sets the port for RCON (Remote Console) connections."
+    group: Settings
   - name: RCON Enabled
     section: option
     key: RCONEnabled
     type: bool
     default: false
     help: "Enables or disables RCON (Remote Console) access to the server."
+    group: Settings
   - name: Server Admin Password
     section: option
     key: ServerAdminPassword
     type: str
     help: "Sets the password for server admin access via RCON."
+    group: Settings
   - name: Server Hardcore
     section: option
     key: ServerHardcore
     type: bool
     default: false
     help: "Enables hardcore mode on the server, where players have only one life."
+    group: Difficulty
   - name: Server Password
     section: option
     key: ServerPassword
     type: str
     help: "Sets a password required for players to join the server."
+    group: Security
   - name: Server PVE
     section: option
     key: serverPVE
     type: bool
     default: false
     help: "Enables Player vs Environment mode on the server, disabling player vs player combat."
+    group: Difficulty
   - name: XP Multiplier
     section: option
     key: XPMultiplier
     type: float
     default: 1.0
     help: "Sets the experience points multiplier for players on the server."
+    group: Difficulty
   - name: Mod Loader
     section: system
     key: modloader
@@ -1682,6 +1718,7 @@ service:
     options:
       - "None"
       - "ASA API Loader"
+    group: Mods
   - name: Proton Path
     key: protonpath
     section: system

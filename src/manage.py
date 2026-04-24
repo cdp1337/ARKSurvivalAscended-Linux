@@ -356,9 +356,11 @@ class GameService(RCONService):
 		self.configs = {
 			'service': INIConfig('service', os.path.join(utils.get_base_directory(), 'Configs', 'service.%s.ini' % self.service))
 		}
-		self.map = None
-		self.runner = None
-		self.bin = 'ArkAscendedServer'
+
+		self.bulk = False
+		"""
+		Set to True to skip rebuilding systemd on every change; useful for bulk operations
+		"""
 
 		self.load()
 
@@ -367,6 +369,7 @@ class GameService(RCONService):
 		Create the systemd service for this game, including the service file and environment file
 		:return:
 		"""
+		self.bulk = True
 		super().create_service()
 
 		if self.game.get_option_value('Default New Save Format'):
@@ -398,6 +401,10 @@ class GameService(RCONService):
 			shutil.copytree(prefix_src, prefix_path)
 			utils.ensure_file_ownership(prefix_path)
 
+		self.build_systemd_config()
+		self.reload()
+		self.bulk = False
+
 	def run_migrations(self):
 		"""
 		Run any migrations from the Migrations directory
@@ -407,6 +414,7 @@ class GameService(RCONService):
 		if not os.path.exists(migrations_path):
 			return
 
+		self.bulk = True
 		migrations = []
 		for filename in os.listdir(migrations_path):
 			if filename.startswith(f"{self.service}.") and filename.endswith('.json'):
@@ -430,6 +438,10 @@ class GameService(RCONService):
 		# Move the migrated files to mark them as completed
 		for file in migrations:
 			os.rename(file, file[:-5] + '.migrated')
+
+		self.build_systemd_config()
+		self.reload()
+		self.bulk = False
 
 	def get_environment(self) -> dict:
 		"""
@@ -513,9 +525,10 @@ class GameService(RCONService):
 				self.game.ensure_asa_api_loader()
 			success = True
 
-		# Reload the service; all options on services control the systemd service file.
-		self.build_systemd_config()
-		self.reload()
+		if not self.bulk:
+			# Reload the service; all options on services control the systemd service file.
+			self.build_systemd_config()
+			self.reload()
 
 		return success
 
