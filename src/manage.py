@@ -169,12 +169,11 @@ class GameApp(SteamApp):
 					except Exception as e:
 						logging.error('Failed to load migration file for service %s: %s' % (svc.service, e))
 
-					if 'options' in migration_data:
-						for option in migration_data['options']:
-							try:
-								svc.set_option(option['name'], option['value'])
-							except Exception as e:
-								logging.error('Failed to migrate option %s for service %s: %s' % (option['name'], svc.service, e))
+					for option in migration_data:
+						try:
+							svc.set_option(option['option'], option['value'])
+						except Exception as e:
+							logging.error('Failed to migrate option %s for service %s: %s' % (option['name'], svc.service, e))
 
 					# Move the migration file to mark it as completed
 					os.rename(
