@@ -142,7 +142,7 @@ class GameApp(SteamApp):
 	def first_run(self) -> bool:
 
 		# Update with Steam (or install on first install)
-		self.update()
+		# self.update()  # Disabled for testing
 
 		services = self.get_services()
 		if len(services) == 0:

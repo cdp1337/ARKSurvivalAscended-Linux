@@ -243,7 +243,7 @@ function install_application() {
     install_warlock_manager "$REPO" "$BRANCH" 2.2.8
 
     # Grab Proton from Glorious Eggroll
-    PROTON_PATH="$(install_proton "$PROTON_VERSION")"
+    PROTON_PATH="$(install_proton "$PROTON_VERSION")/proton"
     "$GAME_DIR/manage.py" set-config "Default Proton Path" "${PROTON_PATH}"
 
     # Install installer (this script) for uninstallation or manual work
