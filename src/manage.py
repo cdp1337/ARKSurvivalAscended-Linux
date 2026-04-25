@@ -12,6 +12,8 @@ import os
 
 import shutil
 import zipfile
+import random
+import string
 
 from SystemdUnitParser import SystemdUnitParser
 # Import the appropriate type of handler for the game installer.
@@ -424,6 +426,14 @@ class GameService(RCONService):
 		else:
 			self.set_option('Proton Path', self.game.get_proton_path())
 
+		# New instances should default to use RCON, as that is the management API Warlock uses for pulling metrics
+		self.set_option('RCON Enabled', True)
+		self.set_option('Server Admin Password', random.choice(string.ascii_letters + string.digits) * 12)
+
+		# New services should have the community name by default, to at least provide something.
+		# We don't have the map yet, but we at least have the service identifier.
+		self.set_option('Session Name', '%s (%s)' % (self.game.get_option_value('Community Name'), self.service))
+
 		# Ensure the prefix exists for this instance.
 		prefix_path = os.path.join(utils.get_base_directory(), 'prefixes', self.service)
 		prefix_src = os.path.join(
@@ -731,12 +741,14 @@ class GameService(RCONService):
 		session_name = self.get_option_value('Session Name')
 		command = Cmd(['pgrep', '-af', '^%s %s' % (binary, map_name)])
 		command.is_memory_cacheable(2)
+		game_pid = 0
 		for line in command.lines:
 			if line.strip():
 				pid, cmd = line.strip().split(' ', 1)
 				if session_name in cmd:
-					return pid
-		return 0
+					# Ark ASA API uses two processes for the game.  The second is the actual game server.
+					game_pid = max(game_pid, int(pid))
+		return game_pid
 
 	def get_map_label(self) -> str:
 		"""
@@ -753,16 +765,28 @@ class GameService(RCONService):
 		else:
 			return map_name
 
+	def get_enabled_mod_ids(self) -> list[str]:
+		"""
+		Get the enabled mod IDs for this service
+
+		Pulled directly from the option Mods
+		:return:
+		"""
+		enabled_mod_ids = self.get_option_value('Mods')
+		if enabled_mod_ids is None or enabled_mod_ids == '':
+			return []
+
+		enabled_mod_ids = enabled_mod_ids.split(',')
+		enabled_mod_ids = [m.strip() for m in enabled_mod_ids if m.strip() != '']
+		return enabled_mod_ids
+
 	def get_enabled_mods(self) -> list['GameMod']:
 		"""
 		Get all enabled mods that are locally available on this service
 
 		:return:
 		"""
-
-		# This game stores mods in a configuration parameter, so pull them from that.
-		enabled_mod_ids = self.get_option_value('Mods').split(',')
-		enabled_mod_ids = [m.strip() for m in enabled_mod_ids if m.strip() != '']
+		enabled_mod_ids = self.get_enabled_mod_ids()
 		enabled_mods = []
 		for mod_id in enabled_mod_ids:
 			mod = GameMod.get_mod(self, 'curseforge', mod_id)
@@ -783,15 +807,13 @@ class GameService(RCONService):
 			logger.error('Cannot add mods to a running service!')
 			return False
 
-		mods = self.get_option_value('Mods').split(',')
-		mods = [m.strip() for m in mods if m.strip() != '']
-
-		if mod.id in mods:
+		enabled_mod_ids = self.get_enabled_mod_ids()
+		if str(mod.id) in enabled_mod_ids:
 			logger.warning('Mod %s is already enabled on this service!' % (mod.id, ))
 			return True
 
-		mods.append(str(mod.id))
-		self.set_option('Mods', ','.join(mods))
+		enabled_mod_ids.append(str(mod.id))
+		self.set_option('Mods', ','.join(enabled_mod_ids))
 		logger.info('Enabled mod %s on service %s' % (mod.id, self.service))
 		return True
 
@@ -806,15 +828,13 @@ class GameService(RCONService):
 			logger.error('Cannot remove mods from a running service!')
 			return False
 
-		mods = self.get_option_value('Mods').split(',')
-		mods = [m.strip() for m in mods if m.strip() != '']
-
-		if str(mod.id) not in mods:
+		enabled_mod_ids = self.get_enabled_mod_ids()
+		if str(mod.id) not in enabled_mod_ids:
 			logger.warning('Mod %s is not enabled on this service!' % (mod.id, ))
 			return False
 
-		mods.remove(str(mod.id))
-		self.set_option('Mods', ','.join(mods))
+		enabled_mod_ids.remove(str(mod.id))
+		self.set_option('Mods', ','.join(enabled_mod_ids))
 		logger.info('Disabled mod %s on service %s' % (mod.id, self.service))
 		return True
 
@@ -823,9 +843,11 @@ class GameService(RCONService):
 		Get a list of port definitions for this service
 		:return:
 		"""
+		rcon_optional = not self.get_option_value('RCON Enabled')
+
 		return [
-			('Port', 'udp', '%s game port - %s' % (self.game.name, self.get_map_label())),
-			('RCON Port', 'tcp', '%s RCON port - %s' % (self.game.name, self.get_map_label()))
+			('Port', 'udp', '%s game port - %s' % (self.game.name, self.get_map_label()), False),
+			('RCON Port', 'tcp', '%s RCON port - %s' % (self.game.name, self.get_map_label()), rcon_optional)
 		]
 
 	def get_port(self) -> int | None:
