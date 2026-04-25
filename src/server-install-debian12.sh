@@ -240,7 +240,7 @@ function install_application() {
     sleep 5
 
     # Install the management script
-    install_warlock_manager "$REPO" "$BRANCH" 2.2.8
+    install_warlock_manager "$REPO" "$BRANCH" 2.2.9
 
     # Grab Proton from Glorious Eggroll
     PROTON_PATH="$(install_proton "$PROTON_VERSION")/proton"
