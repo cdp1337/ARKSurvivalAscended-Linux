@@ -68,42 +68,61 @@ from warlock_manager.mods.warlock_nexus_mod import WarlockNexusMod
 # Select the baseline for mod support
 # from warlock_manager.mods.base_mod import BaseMod
 
-'''
-class ModLibrary(object):
-	_mods = None
+
+class GameMod(WarlockNexusMod):
+	_library = None
 
 	@classmethod
-	def refresh_data(cls):
+	def get_mod(cls, source: 'GameService', provider: str | None, mod_id: str | int) -> 'GameMod | None':
 		"""
-		Force refresh of mod data from disk
+		Get a specific mod by ID
+
+		:param source:   Source game service to use for reference
+		:param provider: Mod provider, e.g. 'curseforge'
+		:param mod_id:   Mod ID
 		:return:
 		"""
-		ModLibrary._mods = None
+
+		# Search through the game database first.
+		library_mods = cls.get_library_mods()
+		for mod in library_mods:
+			if mod.id == int(mod_id) and mod.provider == provider:
+				return mod
+
+		# If no mod found locally, default to upstream support
+		return super().get_mod(source, provider, mod_id)
 
 	@classmethod
-	def get_mods(cls) -> dict:
-		if cls._mods is None:
-			cls._mods = {}
+	def get_library_mods(cls) -> list['GameMod']:
+		"""
+		Pull the list of mods from the library file within ARK
+
+		:return:
+		"""
+		if cls._library is None:
+			cls._library = []
+
 			# Pull mod data from the JSON library file
-			lib_file = os.path.join(here, 'AppFiles', 'ShooterGame', 'Binaries', 'Win64', 'ShooterGame', 'ModsUserData', '83374', 'library.json')
+			lib_file = os.path.join(utils.get_base_directory(), 'AppFiles', 'ShooterGame', 'Binaries', 'Win64', 'ShooterGame', 'ModsUserData', '83374', 'library.json')
 			if os.path.exists(lib_file):
 				with open(lib_file, 'r', encoding='utf-8-sig') as f:
 					mod_lib = json.load(f)
-					for mod in mod_lib['installedMods']:
-						cls._mods[str(mod['details']['iD'])] = {
-							'name': mod['details']['name'],
-							'path': mod['pathOnDisk']
-						}
+					for mod_data in mod_lib['installedMods']:
+						mod = GameMod()
+						mod.name = mod_data['details']['name']
+						mod.description = mod_data['details']['summary']
+						mod.url = mod_data['details']['links']['websiteUrl']
+						mod.info_url = mod_data['details']['links']['wikiUrl']
+						mod.id = mod_data['details']['iD']
+						mod.provider = 'curseforge'
+						if len(mod_data['details']['authors']) > 0:
+							mod.author = mod_data['details']['authors'][0]['name']
+						mod.icon = mod_data['details']['logo']['thumbnailUrl']
 
-		return cls._mods
+						cls._library.append(mod)
 
-	@classmethod
-	def resolve_mod_name(cls, mod_id) -> Union[str, None]:
-		mods = cls.get_mods()
-		if mod_id in mods:
-			return mods[mod_id]['name']
-		return None
-'''
+		return cls._library
+
 
 class GameAPIException(Exception):
 	pass
@@ -123,6 +142,7 @@ class GameApp(SteamApp):
 		#self.steam_id = '90'  # TESTING - Use Half-Life Dedicated Server since it's only 90MB
 		self.service_prefix = 'ark-'
 		self.service_handler = GameService
+		self.mod_handler = GameMod
 
 		self.configs = {
 			'game': UnrealConfig(
@@ -299,28 +319,6 @@ class GameApp(SteamApp):
 			paths = get_proton_paths()
 			return paths[0] if len(paths) > 0 else None
 
-	def get_save_directory(self):
-		"""
-		Get the save directory for the game server
-
-		:return:
-		"""
-		return os.path.join(utils.get_base_directory(), 'AppFiles', 'ShooterGame', 'Saved')
-
-	def get_save_files(self):
-		ret = ['clusters']
-		for svc in self.get_services():
-			path = svc.get_saved_location()
-			base_path = os.path.basename(path)
-			if os.path.exists(path):
-				for file in os.listdir(path):
-					if file.endswith('bak'):
-						continue
-					if '_WP_0' in file or '_WP_1' in file:
-						continue
-					ret.append(os.path.join('SavedArks', base_path, file))
-		return ret
-
 	def post_update(self):
 		"""
 		Perform any post-update actions needed for this game
@@ -465,6 +463,7 @@ class GameService(RCONService):
 			'XDG_RUNTIME_DIR': '/run/user/%s' % utils.get_app_uid(),
 			'STEAM_COMPAT_CLIENT_INSTALL_PATH': os.path.join(utils.get_home_directory(), '.local/share/Steam'),
 			'STEAM_COMPAT_DATA_PATH': os.path.join(utils.get_base_directory(), 'prefixes', self.service),
+			'PROTON_USE_XALIA': 0
 		}
 		if self.get_option_value('Mod Loader') != 'None':
 			ret['DISPLAY'] = ':99'
@@ -609,6 +608,45 @@ class GameService(RCONService):
 		else:
 			return len(ret.split('\n'))
 
+	def get_save_directory(self):
+		"""
+		Get the save directory for the game server
+
+		:return:
+		"""
+		return os.path.join(utils.get_base_directory(), 'AppFiles', 'ShooterGame', 'Saved')
+
+	def get_save_files(self):
+		ret = ['clusters']
+
+		alt_save_dir = self.get_option_value('Alt Save Directory')
+		map_name = self.get_option_value('Map Name')
+
+		if map_name == 'BobsMissions_WP':
+			map_name = 'BobsMissions'
+
+		if alt_save_dir:
+			base_path = os.path.join(alt_save_dir, map_name)
+			check_path = os.path.join(self.get_save_directory(), alt_save_dir, map_name)
+			logger.debug('Using alternate save directory: %s' % check_path)
+		else:
+			base_path = os.path.join('SavedArks', map_name)
+			check_path = os.path.join(self.get_save_directory(), 'SavedArks', map_name)
+			logger.debug('Using default save directory: %s' % check_path)
+
+		if os.path.exists(check_path):
+			for file in os.listdir(check_path):
+				if file.endswith('bak'):
+					# Skip backups
+					continue
+				if '_WP_0' in file or '_WP_1' in file:
+					# More backups to skip
+					continue
+				ret.append(os.path.join(base_path, file))
+		else:
+			logger.debug('Save directory does not exist: %s' % check_path)
+		return ret
+
 	def save_world(self):
 		"""
 		Issue a Save command on the server
@@ -692,81 +730,70 @@ class GameService(RCONService):
 		else:
 			return map_name
 
-	'''def get_mod_names(self) -> list:
+	def get_enabled_mods(self) -> list['GameMod']:
 		"""
-		Get the list of mod names for this service
+		Get all enabled mods that are locally available on this service
+
 		:return:
 		"""
-		names = []
-		mods = self.get_option_value('Mods').split(',')
 
-		for mod in mods:
-			mod = mod.strip()
-			if mod == '':
-				continue
-			mod_name = ModLibrary.resolve_mod_name(mod)
-			if mod_name is not None:
-				names.append('%s (%s)' % (mod_name, mod))
-			else:
-				names.append('NOT INSTALLED (%s)' % (mod,))
-		return names
-	'''
+		# This game stores mods in a configuration parameter, so pull them from that.
+		enabled_mod_ids = self.get_option_value('Mods').split(',')
+		enabled_mod_ids = [m.strip() for m in enabled_mod_ids if m.strip() != '']
+		enabled_mods = []
+		for mod_id in enabled_mod_ids:
+			mod = GameMod.get_mod(self, 'curseforge', mod_id)
+			if mod is not None:
+				enabled_mods.append(mod)
 
-	def enable_mod(self, mod_id):
+		return enabled_mods
+
+	def add_mod(self, mod: 'GameMod', force: bool = False) -> bool:
 		"""
 		Enable a mod for this service
 
 		:param mod_id:
+		:param force:
 		:return:
 		"""
+		if not self.is_stopped():
+			logger.error('Cannot add mods to a running service!')
+			return False
+
 		mods = self.get_option_value('Mods').split(',')
 		mods = [m.strip() for m in mods if m.strip() != '']
 
-		if mod_id in mods:
-			print('Mod %s is already enabled on this service!' % (mod_id, ))
-			return
+		if mod.id in mods:
+			logger.warning('Mod %s is already enabled on this service!' % (mod.id, ))
+			return True
 
-		mods.append(mod_id)
+		mods.append(str(mod.id))
 		self.set_option('Mods', ','.join(mods))
-		print('Enabled mod %s on service %s' % (mod_id, self.service))
+		logger.info('Enabled mod %s on service %s' % (mod.id, self.service))
+		return True
 
-	def disable_mod(self, mod_id):
+	def remove_mod(self, mod: 'BaseMod') -> bool:
 		"""
 		Disable a mod for this service
 
 		:param mod_id:
 		:return:
 		"""
+		if not self.is_stopped():
+			logger.error('Cannot remove mods from a running service!')
+			return False
+
 		mods = self.get_option_value('Mods').split(',')
 		mods = [m.strip() for m in mods if m.strip() != '']
 
-		if mod_id not in mods:
-			print('Mod %s is not enabled on this service!' % (mod_id, ))
-			return
+		if str(mod.id) not in mods:
+			logger.warning('Mod %s is not enabled on this service!' % (mod.id, ))
+			return False
 
-		mods.remove(mod_id)
+		mods.remove(str(mod.id))
 		self.set_option('Mods', ','.join(mods))
-		print('Disabled mod %s on service %s' % (mod_id, self.service))
-
-	def toggle_mod(self, mod_id):
-		"""
-		Toggle a mod for this service
-
-		:param mod_id:
-		:return:
-		"""
-		mods = self.get_option_value('Mods').split(',')
-		mods = [m.strip() for m in mods if m.strip() != '']
-
-		if mod_id in mods:
-			mods.remove(mod_id)
-			action = 'Disabled'
-		else:
-			mods.append(mod_id)
-			action = 'Enabled'
-
-		self.set_option('Mods', ','.join(mods))
-		print('%s mod %s on service %s' % (action, mod_id, self.service))
+		logger.info('Disabled mod %s on service %s' % (mod.id, self.service))
+		return True
 
 	def get_port_definitions(self) -> list:
 		"""
