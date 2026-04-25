@@ -3017,6 +3017,8 @@ function install_application() {
 #
 function upgrade_application_1_0() {
 	local SERVICE_PATH
+	local CLUSTER_ID
+	CLUSTER_ID=""
 
 	# Migrate existing service to new format
 	# This gets overwrote by the manager, but is needed to tell the system that the service is here.
@@ -3031,11 +3033,16 @@ function upgrade_application_1_0() {
 			# This is important because v1 to v2.2 changed CLI parameters.
 			"$GAME_DIR/manage.py" --service "$MAP" --get-configs > "$GAME_DIR/Migrations/${MAP}.configs-$(date +%Y%m%d%H%M%S).json"
 
-			# The map name is required in 2.2
-			MAPNAME="$(egrep '^ExecStart' /etc/systemd/system/$MAP.service.d/override.conf | sed 's:.*\.exe \(.*\)?listen.*:\1:')"
-			cat > "$GAME_DIR/Migrations/${MAP}.map-$(date +%Y%m%d%H%M%S).json" <<EOD
+			if [ -e "${SERVICE_PATH}.d/override.conf" ]; then
+				# The map name is required in 2.2
+				MAPNAME="$(egrep '^ExecStart' ${SERVICE_PATH}.d/override.conf | sed 's:.*\.exe \(.*\)?listen.*:\1:')"
+				cat > "$GAME_DIR/Migrations/${MAP}.map-$(date +%Y%m%d%H%M%S).json" <<EOD
 [{"option": "Map Name", "value": "$MAPNAME"}]
 EOD
+				if grep -q 'clusterid=' "${SERVICE_PATH}.d/override.conf"; then
+					CLUSTER_ID="$(egrep '^ExecStart' "${SERVICE_PATH}.d/override.conf" | sed 's:.*clusterid=\([^ ]*\).*:\1:')"
+				fi
+			fi
 
 			# Extract out current environment variables from the systemd file into their own dedicated file
 			egrep '^Environment' "${SERVICE_PATH}" | sed 's:^Environment=::' | sed 's:"::g' > "$GAME_DIR/Environments/${MAP}.env"
@@ -3047,6 +3054,14 @@ EOD
 			[ -e "${SERVICE_PATH}.d/override.conf" ] && rm -fr "${SERVICE_PATH}.d/override.conf"
 			[ -e "${SERVICE_PATH}.d" ] && rm -fr "${SERVICE_PATH}.d"
 		done
+
+		if [ "$CLUSTER_ID" != "" ] && ! egrep -q '^defaultclusterid' "$GAME_DIR/.settings.ini"; then
+			# Application doesn't have a default cluster ID.
+			# Technically not a requirement, but helpful to be set since the operator can easily create new services
+			cat > "$GAME_DIR/Migrations/_app.cluster-$(date +%Y%m%d%H%M%S).json" <<EOD
+[{"option": "Default Cluster ID", "value": "$CLUSTER_ID"}]
+EOD
+		fi
 	fi
 }
 
@@ -3305,11 +3320,15 @@ if [ "$MODE" == "install" ]; then
 	install_application
 
 	# Store the necessary arguments into the game system
-	"$GAME_DIR/manage.py" set-config "Community Name" "${COMMUNITYNAME}"
-	"$GAME_DIR/manage.py" set-config "Joined Session Name" "${JOINEDSESSIONNAME}"
-	"$GAME_DIR/manage.py" set-config "Default New Save Format" "${NEWFORMAT}"
-	"$GAME_DIR/manage.py" set-config "Default Cluster ID" "${CLUSTERID}"
-	"$GAME_DIR/manage.py" set-config "Default Server Admin Password" "${ADMIN_PASS}"
+	cat > "$GAME_DIR/Migrations/_app.initial-$(date +%Y%m%d%H%M%S).json" <<EOD
+[
+{"option": "Community Name", "value": "$COMMUNITYNAME"},
+{"option": "Joined Session Name", "value": "$JOINEDSESSIONNAME"},
+{"option": "Default New Save Format", "value": "$NEWFORMAT"},
+{"option": "Default Cluster ID", "value": "$CLUSTERID"},
+{"option": "Default Server Admin Password", "value": "$ADMIN_PASS"}
+]
+EOD
 
 	# Handle NFS
 	setup_nfs

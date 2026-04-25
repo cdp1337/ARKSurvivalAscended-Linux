@@ -160,10 +160,46 @@ class GameApp(SteamApp):
 		}
 		self.load()
 
+	def run_migrations(self):
+		"""
+		Run any migrations from the Migrations directory
+		:return:
+		"""
+		migrations_path = os.path.join(utils.get_base_directory(), 'Migrations')
+		if not os.path.exists(migrations_path):
+			return
+
+		migrations = []
+		for filename in os.listdir(migrations_path):
+			if filename.startswith('_app.') and filename.endswith('.json'):
+				migration_file = os.path.join(migrations_path, filename)
+				migration_data = []
+				try:
+					with open(migration_file, 'r', encoding='utf-8') as f:
+						migration_data = json.load(f)
+				except Exception as e:
+					logger.error('Failed to load migration file for game: %s' % e)
+					continue
+
+				for option in migration_data:
+					try:
+						self.set_option(option['option'], option['value'])
+					except Exception as e:
+						logger.error('Failed to migrate option %s for game: %s' % (option['name'], e))
+
+				migrations.append(migration_file)
+
+		# Move the migrated files to mark them as completed
+		for file in migrations:
+			os.rename(file, file[:-5] + '.migrated')
+
 	def first_run(self) -> bool:
 
 		# Update with Steam (or install on first install)
-		# self.update()  # Disabled for testing
+		self.update()
+
+		# Run migrations for the application
+		self.run_migrations()
 
 		services = self.get_services()
 		if len(services) == 0:
