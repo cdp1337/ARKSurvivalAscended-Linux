@@ -523,6 +523,7 @@ function os_like_macos() {
 # @arg $1 string Proton version to install
 #
 # CHANGELOG:
+#   2026.04.26 - Supress command output on Ubuntu
 #   2026.04.23 - Register proton path in alternatives to /usr/local/bin/proton
 #   2025.11.23 - Use download scriptlet for downloading
 #   2024.12.22 - Initial version
@@ -550,11 +551,11 @@ function install_proton() {
 
 	# Update distro registrations for alternative software.
 	if os_like debian; then
-		update-alternatives --install "/usr/local/bin/proton" "proton" "/opt/script-collection/$PROTON_NAME/proton" 1
+		update-alternatives --install "/usr/local/bin/proton" "proton" "/opt/script-collection/$PROTON_NAME/proton" 1 >&2
 	elif os_like rhel; then
-		alternatives --install "/usr/local/bin/proton" "proton" "/opt/script-collection/$PROTON_NAME/proton" 1
+		alternatives --install "/usr/local/bin/proton" "proton" "/opt/script-collection/$PROTON_NAME/proton" 1 >&2
 	elif os_like suse; then
-		update-alternatives --install "/usr/local/bin/proton" "proton" "/opt/script-collection/$PROTON_NAME/proton" 1
+		update-alternatives --install "/usr/local/bin/proton" "proton" "/opt/script-collection/$PROTON_NAME/proton" 1 >&2
 	fi
 
 	echo "/opt/script-collection/$PROTON_NAME"
