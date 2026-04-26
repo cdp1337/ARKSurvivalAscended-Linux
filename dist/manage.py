@@ -391,8 +391,11 @@ class GameApp(SteamApp):
 		download_file(xaudio_src, xaudio_dest)
 		with zipfile.ZipFile(xaudio_dest, 'r') as zip_ref:
 			for file in zip_ref.namelist():
+				logger.debug(file)
 				if file.endswith('release/bin/x64/xaudio2_9redist.dll'):
-					zip_ref.extract(file, dll_dest)
+					logger.info('Extracting %s -> %s' % (file, dll_dest))
+					with zip_ref.open(file) as f, open(dll_dest, 'wb') as f2:
+						shutil.copyfileobj(f, f2)
 		utils.ensure_file_ownership(dll_dest)
 
 
