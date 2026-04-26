@@ -542,7 +542,7 @@ class GameService(RCONService):
 		options = cli_formatter(self.configs['service'], 'option', prefix='', sep='=', joiner='?')
 		if map_name:
 			options = map_name + '?listen?' + options
-		flags = cli_formatter(self.configs['service'], 'flag', prefix='-', sep='=', joiner=' ')
+		flags = cli_formatter(self.configs['service'], 'flag', prefix='-', sep='=', joiner=' ', true_value=True, false_value=False)
 
 		return ' '.join([
 			proton_path,
