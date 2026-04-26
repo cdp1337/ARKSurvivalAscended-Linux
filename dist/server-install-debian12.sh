@@ -40,6 +40,14 @@
 #   --branch=<str> - Use a specific branch of the management script repository DEFAULT=main
 #
 # Changelog:
+#   20260426 - Complete rewrite of the system for API 2.2
+#            - Individual map backup/restore
+#            - Better port conflict detection
+#            - New TUI
+#            - Mod support
+#            - Custom map support
+#            - Upgrade Proton to 10.34
+#            - Add support for ASA API
 #   20251219 - Add support for Lost Colony
 #            - Add per-map options to disable downloads
 #            - Re-add option editing from CLI
