@@ -3221,7 +3221,10 @@ function postinstall() {
 	print_header "Performing postinstall"
 
 	# First run setup
-	$GAME_DIR/manage.py first-run
+	if ! $GAME_DIR/manage.py first-run; then
+		log_error "First run of game manager failed!"
+		exit 1
+	fi
 }
 
 ##
