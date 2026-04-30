@@ -478,6 +478,8 @@ function clear_proton_prefix() {
 ## Pre-exec Checks
 ############################################
 
+LOG_LEVEL=4  # Set logging to DEBUG
+
 
 # This script can run on an existing server, but should not update the game if a map is actively running.
 # Check if any maps are running; do not update an actively running server.

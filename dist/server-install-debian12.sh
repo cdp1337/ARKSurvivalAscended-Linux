@@ -205,6 +205,83 @@ function cmd_exists() {
 	which "$CMD" &>/dev/null
 	return $?
 }
+##
+# log helper by eval.bz
+#
+# Facilitates a basic logging system for Bash to print messages to stderr
+#
+# Using:
+#
+# Include this file (or however your import system works)
+# # scriptlet: bz_eval_log/log.sh
+#
+# Change logging level
+# LOG_LEVEL=3 - Set logging level to DEBUG so all messages are displayed
+# LOG_LEVEL=2 - (DEFAULT) - Set logging to info, warnings, and errors
+# LOG_LEVEL=1 - Only display warnings and errors
+# LOG_LEVEL=0 - Only display errors
+#
+# Disable coloration
+# By default this script renders messages with colors.  Disable this with the following
+# LOG_COLORS=0
+#
+# Logging messages
+# log_debug "This is a debug statement"
+# log_info "This is an informational statement"
+# log_warning "This is a warning message"
+# log_error "This is an error message"
+#
+
+# Set the verbosity level: 0=ERROR, 1=WARN, 2=INFO, 3=DEBUG
+LOG_LEVEL=${LOG_LEVEL:-2}
+
+# Set to '0' to disable ANSI colors
+LOG_COLORS=1
+
+# ANSI Color Codes
+LOG_RED='\033[0;31m'
+LOG_GREEN='\033[0;32m'
+LOG_YELLOW='\033[1;33m'
+LOG_BLUE='\033[0;34m'
+LOG_NC='\033[0m' # No Color
+
+##
+# Print a header message
+#
+# CHANGELOG:
+#   2026.04.30 - Initial version
+#
+function bz_eval_log() {
+    local level_name="$1"
+    local color
+    local message="$2"
+    local numeric_level=0
+
+    # Map level names to numbers for comparison
+    case "${level_name^^}" in
+        "ERROR") numeric_level=0; color="$LOG_RED" ;;
+        "WARN")  numeric_level=1; color="$LOG_YELLOW" ;;
+        "INFO")  numeric_level=2; color="" ;;
+        "DEBUG") numeric_level=3; color="$LOG_BLUE" ;;
+    esac
+
+    # Only print if the current log level is high enough
+    if [ "$numeric_level" -le "$LOG_LEVEL" ]; then
+        local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+        # Print to stderr (&2)
+        if [ $LOG_COLORS -eq 1 ] && [ "$color" != "" ]; then
+        	printf "${color}[%s] [%s] %s${LOG_NC}\n" "$timestamp" "$level_name" "$message" >&2
+		else
+        	printf "[%s] [%s] %s\n" "$timestamp" "$level_name" "$message" >&2
+        fi
+    fi
+}
+
+# Helper wrappers for convenience
+function log_error()   { bz_eval_log "ERROR" "$1"; }
+function log_warning() { bz_eval_log "WARN"  "$1"; }
+function log_info()    { bz_eval_log "INFO"  "$1"; }
+function log_debug()   { bz_eval_log "DEBUG" "$1"; }
 
 ##
 # Simple download utility function
@@ -220,6 +297,7 @@ function cmd_exists() {
 #   --no-overwrite       Skip download if destination file already exists
 #
 # CHANGELOG:
+#   2026.04.30 - Use logging with new logging interface
 #   2026.04.21 - Add retry in curl to retry on connection issues, (looking at you Github)
 #   2025.12.15 - Use cmd_exists to fix regression bug
 #   2025.12.04 - Add --no-overwrite option to allow skipping download if the destination file exists
@@ -245,33 +323,37 @@ function download() {
     	done
 
 	if [ -z "$SOURCE" ] || [ -z "$DESTINATION" ]; then
-		echo "download: Missing required parameters!" >&2
+		log_error "download: Missing required parameters!"
 		return 1
 	fi
 
 	if [ -f "$DESTINATION" ] && [ $OVERWRITE -eq 0 ]; then
-		echo "download: Destination file $DESTINATION already exists, skipping download." >&2
+		log_info "download: Destination file $DESTINATION already exists, skipping download."
 		return 0
 	fi
 
 	if cmd_exists curl; then
+		log_debug "download: Attempting to curl download $SOURCE"
 		if curl --connect-timeout 10 --retry 3 --retry-delay 10 -fsL "$SOURCE" -o "$TMP"; then
+			log_debug "download: Download successful, moving file to $DESTINATION"
 			mv $TMP "$DESTINATION"
 			return 0
 		else
-			echo "download: curl failed to download $SOURCE" >&2
+			log_error "download: curl failed to download $SOURCE"
 			return 1
 		fi
 	elif cmd_exists wget; then
+		log_debug "download: Attempting to wget download $SOURCE"
 		if wget -q "$SOURCE" -O "$TMP"; then
+			log_debug "download: Download successful, moving file to $DESTINATION"
 			mv $TMP "$DESTINATION"
 			return 0
 		else
-			echo "download: wget failed to download $SOURCE" >&2
+			log_error "download: wget failed to download $SOURCE"
 			return 1
 		fi
 	else
-		echo "download: Neither curl nor wget is installed, cannot download!" >&2
+		log_error "download: Neither curl nor wget is installed, cannot download!"
 		return 1
 	fi
 }
@@ -1145,83 +1227,6 @@ function print_header() {
 	printf "%*s\n" $(((${#header}+80)/2)) "$header"
     echo ""
 }
-##
-# log helper by eval.bz
-#
-# Facilitates a basic logging system for Bash to print messages to stderr
-#
-# Using:
-#
-# Include this file (or however your import system works)
-# # scriptlet: bz_eval_log/log.sh
-#
-# Change logging level
-# LOG_LEVEL=3 - Set logging level to DEBUG so all messages are displayed
-# LOG_LEVEL=2 - (DEFAULT) - Set logging to info, warnings, and errors
-# LOG_LEVEL=1 - Only display warnings and errors
-# LOG_LEVEL=0 - Only display errors
-#
-# Disable coloration
-# By default this script renders messages with colors.  Disable this with the following
-# LOG_COLORS=0
-#
-# Logging messages
-# log_debug "This is a debug statement"
-# log_info "This is an informational statement"
-# log_warning "This is a warning message"
-# log_error "This is an error message"
-#
-
-# Set the verbosity level: 0=ERROR, 1=WARN, 2=INFO, 3=DEBUG
-LOG_LEVEL=${LOG_LEVEL:-2}
-
-# Set to '0' to disable ANSI colors
-LOG_COLORS=1
-
-# ANSI Color Codes
-LOG_RED='\033[0;31m'
-LOG_GREEN='\033[0;32m'
-LOG_YELLOW='\033[1;33m'
-LOG_BLUE='\033[0;34m'
-LOG_NC='\033[0m' # No Color
-
-##
-# Print a header message
-#
-# CHANGELOG:
-#   2026.04.30 - Initial version
-#
-function bz_eval_log() {
-    local level_name="$1"
-    local color
-    local message="$2"
-    local numeric_level=0
-
-    # Map level names to numbers for comparison
-    case "${level_name^^}" in
-        "ERROR") numeric_level=0; color="$LOG_RED" ;;
-        "WARN")  numeric_level=1; color="$LOG_YELLOW" ;;
-        "INFO")  numeric_level=2; color="" ;;
-        "DEBUG") numeric_level=3; color="$LOG_BLUE" ;;
-    esac
-
-    # Only print if the current log level is high enough
-    if [ "$numeric_level" -le "$LOG_LEVEL" ]; then
-        local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-        # Print to stderr (&2)
-        if [ $LOG_COLORS -eq 1 ] && [ "$color" != "" ]; then
-        	printf "${color}[%s] [%s] %s${LOG_NC}\n" "$timestamp" "$level_name" "$message" >&2
-		else
-        	printf "[%s] [%s] %s\n" "$timestamp" "$level_name" "$message" >&2
-        fi
-    fi
-}
-
-# Helper wrappers for convenience
-function log_error()   { bz_eval_log "ERROR" "$1"; }
-function log_warning() { bz_eval_log "WARN"  "$1"; }
-function log_info()    { bz_eval_log "INFO"  "$1"; }
-function log_debug()   { bz_eval_log "DEBUG" "$1"; }
 
 ##
 # Install the management script from the project's repo
@@ -3325,6 +3330,8 @@ function clear_proton_prefix() {
 ############################################
 ## Pre-exec Checks
 ############################################
+
+LOG_LEVEL=4  # Set logging to DEBUG
 
 
 # This script can run on an existing server, but should not update the game if a map is actively running.
