@@ -2966,7 +2966,7 @@ function install_application() {
     # Ensure the target directory exists and is owned by the game user
 	if [ ! -d "$GAME_DIR" ]; then
 		mkdir -p "$GAME_DIR"
-		chown $GAME_USER:$GAME_USER "$GAME_DIR"
+		chown $GAME_USER:$GAME_USER "$GAME_DIR" -R
 	fi
 
     # Preliminary requirements
@@ -2986,6 +2986,7 @@ function install_application() {
     [ -e "$GAME_DIR/Configs" ] || sudo -u $GAME_USER mkdir -p "$GAME_DIR/Configs"
     [ -e "$GAME_DIR/Packages" ] || sudo -u $GAME_USER mkdir -p "$GAME_DIR/Packages"
     [ -e "$GAME_DIR/Environments" ] || sudo -u $GAME_USER mkdir -p "$GAME_DIR/Environments"
+    [ -e "$GAME_DIR/Migrations" ] || sudo -u $GAME_USER mkdir -p "$GAME_DIR/Migrations"
 
     # Setup the ssh directory for ths steam user; this will save some steps later
     # should the user want to access the files via SFTP.
