@@ -40,6 +40,8 @@
 #   BRANCH=--branch=<str> - Use a specific branch of the management script repository DEFAULT=main
 #
 # Changelog:
+#   20260430 - Implement better logging throughout application
+#            - Handle mismatching/incorrect user permissions on target user home
 #   20260426 - Complete rewrite of the system for API 2.2
 #            - Individual map backup/restore
 #            - Better port conflict detection
@@ -134,6 +136,7 @@ GAME_MAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter ark-ext
 # scriptlet:bz_eval_tui/print_header.sh
 # scriptlet:warlock/install_warlock_manager.sh
 # scriptlet:xvfb/install.sh
+# scriptlet:bz_eval_log/log.sh
 
 
 ## Handle NFS setup
@@ -205,11 +208,31 @@ function install_application() {
     # This will create the account with no password, so if you need to log in with this user,
     # run `sudo passwd steam` to set a password.
     if [ -z "$(getent passwd $GAME_USER)" ]; then
+    	log_info "Creating user account ${GAME_USER}"
     	useradd -m -U $GAME_USER
     fi
 
+    # Retrieve the home directory for the specified user
+    USER_HOME=$(getent passwd "$GAME_USER" | cut -d: -f6)
+
+    # Check if the retrieval was successful
+    if [ -z "$USER_HOME" ]; then
+        log_error "Could not find home directory for user '$GAME_USER'"
+        exit 1
+    fi
+
+    # If the target home directory already exists, ensure it's owned by the actual user.
+    # This is important in case the operator does something like 'mkdir /home/steam' as root
+    # without realizing that would completely break permissions for that target.
+    #if [ -e "$USER_HOME" ]; then
+    #	log_info "Ensuring correct ownership of ${USER_HOME}"
+    #	chown $GAME_USER:$GAME_USER "$USER_HOME" -R
+	#fi
+	# @todo Put this back in as soon as testing this problem is done.
+
     # Ensure the target directory exists and is owned by the game user
 	if [ ! -d "$GAME_DIR" ]; then
+		log_info "Creating game directory ${GAME_DIR}"
 		mkdir -p "$GAME_DIR"
 		chown $GAME_USER:$GAME_USER "$GAME_DIR" -R
 	fi
@@ -245,12 +268,18 @@ function install_application() {
     install_steamcmd
 
     # Run Steamcmd to ensure it's available; fixes the ERROR! Failed to install app '...' (Missing configuration) issue
-    sudo -u $GAME_USER /usr/games/steamcmd +login anonymous +quit
-    sleep 5
+
+    if ! sudo -u $GAME_USER /usr/games/steamcmd +login anonymous +quit; then
+    	log_error "Steamcmd could not be ran!  Unable to install game"
+    	exit 1
+	fi
 
     # Install the management script
     #install_warlock_manager "$REPO" "$BRANCH" 2.2.9
-    install_warlock_manager "$REPO" "$BRANCH" main
+    if ! install_warlock_manager "$REPO" "$BRANCH" dev; then
+    	log_error "Warlock Manager could not be installed!  Unable to install game"
+    	exit 1
+	fi
 
     # Grab Proton from Glorious Eggroll
     PROTON_PATH="$(install_proton "$PROTON_VERSION")/proton"
