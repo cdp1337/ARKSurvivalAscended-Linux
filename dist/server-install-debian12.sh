@@ -3072,11 +3072,10 @@ function install_application() {
     # If the target home directory already exists, ensure it's owned by the actual user.
     # This is important in case the operator does something like 'mkdir /home/steam' as root
     # without realizing that would completely break permissions for that target.
-    #if [ -e "$USER_HOME" ]; then
-    #	log_info "Ensuring correct ownership of ${USER_HOME}"
-    #	chown $GAME_USER:$GAME_USER "$USER_HOME" -R
-	#fi
-	# @todo Put this back in as soon as testing this problem is done.
+    if [ -e "$USER_HOME" ]; then
+    	log_info "Ensuring correct ownership of ${USER_HOME}"
+    	chown $GAME_USER:$GAME_USER "$USER_HOME" -R
+	fi
 
     # Ensure the target directory exists and is owned by the game user
 	if [ ! -d "$GAME_DIR" ]; then
