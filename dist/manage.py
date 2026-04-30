@@ -357,7 +357,7 @@ class GameApp(SteamApp):
 			paths = get_proton_paths()
 			return paths[0] if len(paths) > 0 else None
 
-	def post_update(self):
+	def post_update(self) -> bool:
 		"""
 		Perform any post-update actions needed for this game
 
@@ -388,6 +388,10 @@ class GameApp(SteamApp):
 		xaudio_src = 'https://www.nuget.org/api/v2/package/Microsoft.XAudio2.Redist/1.2.11'
 		xaudio_dest = os.path.join(utils.get_base_directory(), 'Packages/Microsoft.XAudio2.Redist.zip')
 		dll_dest = os.path.join(utils.get_base_directory(), 'AppFiles/ShooterGame/Binaries/Win64/xaudio2_9.dll')
+		if not os.path.exists(os.path.dirname(dll_dest)):
+			logger.error('Binary directory does not exist: %s - Unable to install Microsoft XAudio2 Redist DLL' % dll_dest)
+			return False
+
 		download_file(xaudio_src, xaudio_dest)
 		with zipfile.ZipFile(xaudio_dest, 'r') as zip_ref:
 			for file in zip_ref.namelist():
@@ -397,6 +401,8 @@ class GameApp(SteamApp):
 					with zip_ref.open(file) as f, open(dll_dest, 'wb') as f2:
 						shutil.copyfileobj(f, f2)
 		utils.ensure_file_ownership(dll_dest)
+
+		return True
 
 
 class GameService(RCONService):
