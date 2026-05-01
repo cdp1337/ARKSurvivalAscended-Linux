@@ -275,10 +275,13 @@ class GameApp(SteamApp):
 					svc.set_option('Proton Path', new_value)
 			return True
 		elif option == 'Community Name':
-			if self.get_option_value('Joined Session Name'):
-				for svc in self.get_services():
-					svc.set_option('Session Name', '%s (%s)' % (new_value, svc.get_map_label()))
-				return True
+			# Auto-update any service with the old name.
+			# This allows the operator to set the community name once and have it propagate to all maps.
+			for svc in self.get_services():
+				service_name = svc.get_option_value('Session Name')
+				if service_name.startswith('%s (' % previous_value):
+					svc.set_option('Session Name', service_name.replace('%s (' % previous_value, '%s (' % new_value))
+			return True
 
 		return None
 

@@ -113,6 +113,11 @@
 # https://github.com/GloriousEggroll/proton-ge-custom
 PROTON_VERSION="10-34"
 WARLOCK_GUID="0c2de651-ec30-d4ac-c53f-ebdb67398324"
+
+# Set the version of the Warlock Manager API to use for this project
+# https://github.com/BitsNBytes25/Warlock-Manager
+#MANAGER_VERSION="2.2.9"
+MANAGER_VERSION="dev"
 GAME="ArkSurvivalAscended"
 GAME_USER="steam"
 GAME_DIR="/home/$GAME_USER/$GAME"
@@ -3055,6 +3060,7 @@ function setup_nfs() {
 #   GAME_DESC    - Description of the game (for logging purposes)
 #   GAME_SERVICE - Service name to install with Systemd
 #   SAVE_DIR     - Directory to store game save files
+#   MANAGER_VERSION - Version of Warlock manager to use
 #
 function install_application() {
 	# Create a "steam" user account
@@ -3127,8 +3133,7 @@ function install_application() {
 	fi
 
     # Install the management script
-    #install_warlock_manager "$REPO" "$BRANCH" 2.2.9
-    if ! install_warlock_manager "$REPO" "$BRANCH" dev; then
+    if ! install_warlock_manager "$REPO" "$BRANCH" "$MANAGER_VERSION"; then
     	log_error "Warlock Manager could not be installed!  Unable to install game"
     	exit 1
 	fi
