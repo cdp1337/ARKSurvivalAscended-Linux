@@ -127,8 +127,8 @@ class GameApp(SteamApp):
 
 		self.name = 'ARK:SA'
 		self.desc = 'ARK: Survival Ascended'
-		#self.steam_id = '2430930'
-		self.steam_id = '90'  # TESTING - Use Half-Life Dedicated Server since it's only 90MB
+		self.steam_id = '2430930'
+		# self.steam_id = '90'  # TESTING - Use Half-Life Dedicated Server since it's only 90MB
 		self.service_prefix = 'ark-'
 		self.service_handler = GameService
 		self.mod_handler = GameMod
