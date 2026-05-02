@@ -162,43 +162,12 @@ class GameApp(SteamApp):
 		}
 		self.load()
 
-	def run_migrations(self):
-		"""
-		Run any migrations from the Migrations directory
-		:return:
-		"""
-		migrations_path = os.path.join(utils.get_base_directory(), 'Migrations')
-		if not os.path.exists(migrations_path):
-			return
-
-		migrations = []
-		for filename in os.listdir(migrations_path):
-			if filename.startswith('_app.') and filename.endswith('.json'):
-				migration_file = os.path.join(migrations_path, filename)
-				migration_data = []
-				try:
-					with open(migration_file, 'r', encoding='utf-8') as f:
-						migration_data = json.load(f)
-				except Exception as e:
-					logger.error('Failed to load migration file for game: %s' % e)
-					continue
-
-				for option in migration_data:
-					try:
-						self.set_option(option['option'], option['value'])
-					except Exception as e:
-						logger.error('Failed to migrate option %s for game: %s' % (option['name'], e))
-
-				migrations.append(migration_file)
-
-		# Move the migrated files to mark them as completed
-		for file in migrations:
-			os.rename(file, file[:-5] + '.migrated')
-
 	def first_run(self) -> bool:
 
 		# Update with Steam (or install on first install)
-		self.update()
+		if not self.update():
+			logger.error('Failed to update Steam')
+			return False
 
 		# Run migrations for the application
 		self.run_migrations()
@@ -226,7 +195,6 @@ class GameApp(SteamApp):
 				svc.set_option('Session Name', '%s (%s)' % (community_name, svc.get_map_label()))
 				if len(maps[map_name][1]) > 0:
 					svc.set_option('Mods', ','.join(maps[map_name][1]))
-			return True
 		else:
 			# Import any legacy configurations from the previous installation
 			# This is required because between 1.0 and 2.2, breaking changes were implemented in CLI params
@@ -234,10 +202,7 @@ class GameApp(SteamApp):
 				# Run any migrations for this service
 				svc.run_migrations()
 
-				# Just rebuild systemd to ensure it's updated
-				svc.build_systemd_config()
-				svc.reload()
-		return False
+		return True
 
 	def get_option_options(self, option: str):
 		"""
@@ -398,11 +363,12 @@ class GameApp(SteamApp):
 		download_file(xaudio_src, xaudio_dest)
 		with zipfile.ZipFile(xaudio_dest, 'r') as zip_ref:
 			for file in zip_ref.namelist():
-				logger.debug(file)
 				if file.endswith('release/bin/x64/xaudio2_9redist.dll'):
 					logger.info('Extracting %s -> %s' % (file, dll_dest))
 					with zip_ref.open(file) as f, open(dll_dest, 'wb') as f2:
 						shutil.copyfileobj(f, f2)
+				else:
+					logger.debug('Skipping %s' % file)
 		utils.ensure_file_ownership(dll_dest)
 
 		return True
@@ -478,37 +444,14 @@ class GameService(RCONService):
 		Run any migrations from the Migrations directory
 		:return:
 		"""
-		migrations_path = os.path.join(utils.get_base_directory(), 'Migrations')
-		if not os.path.exists(migrations_path):
-			return
-
+		# Switch to bulk storing so the service doesn't have to be rebuilt each config
 		self.bulk = True
-		migrations = []
-		for filename in os.listdir(migrations_path):
-			if filename.startswith(f"{self.service}.") and filename.endswith('.json'):
-				migration_file = os.path.join(migrations_path, filename)
-				migration_data = []
-				try:
-					with open(migration_file, 'r', encoding='utf-8') as f:
-						migration_data = json.load(f)
-				except Exception as e:
-					logger.error('Failed to load migration file for service %s: %s' % (self.service, e))
-					continue
-
-				for option in migration_data:
-					try:
-						self.set_option(option['option'], option['value'])
-					except Exception as e:
-						logger.error('Failed to migrate option %s for service %s: %s' % (option['name'], self.service, e))
-
-				migrations.append(migration_file)
-
-		# Move the migrated files to mark them as completed
-		for file in migrations:
-			os.rename(file, file[:-5] + '.migrated')
-
+		# Perform all migrations using the standard procedure
+		super().run_migrations()
+		# Rebuild the systemd service file
 		self.build_systemd_config()
 		self.reload()
+		# Reset bulk back to default
 		self.bulk = False
 
 	def get_environment(self) -> dict:
