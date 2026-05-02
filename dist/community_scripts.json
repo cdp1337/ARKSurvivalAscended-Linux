@@ -15,7 +15,8 @@
             "--non-interactive  - Run the installer in non-interactive mode (useful for scripted installs)",
             "--skip-firewall  - Skip installing/configuring the firewall",
             "--new-format  - Use the new save format (Nitrado/Official server compatible) OPTIONAL",
-            "--branch=<str> - Use a specific branch of the management script repository DEFAULT=main"
+            "--branch=<str> - Use a specific branch of the management script repository DEFAULT=main",
+            "--debug  - Include to show debug output"
         ],
         "default_timeout": "600",
         "shell": "shell",

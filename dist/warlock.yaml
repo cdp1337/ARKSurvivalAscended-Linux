@@ -17,6 +17,7 @@
     - "--skip-firewall  - Skip installing/configuring the firewall"
     - "--new-format  - Use the new save format (Nitrado/Official server compatible) OPTIONAL"
     - "--branch=<str> - Use a specific branch of the management script repository DEFAULT=main"
+    - "--debug  - Include to show debug output"
   image: images/asa-1920x1080.webp
   icon: images/ark-128x128.webp
   thumbnail: images/ark_460x215.webp

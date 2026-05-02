@@ -38,6 +38,7 @@
 #   SKIP_FIREWALL=--skip-firewall - Skip installing/configuring the firewall
 #   OPT_NEWFORMAT=--new-format - Use the new save format (Nitrado/Official server compatible) OPTIONAL
 #   BRANCH=--branch=<str> - Use a specific branch of the management script repository DEFAULT=main
+#   OPT_DEBUG=--debug - Include to show debug output
 #
 # Changelog:
 #   20260430 - Implement better logging throughout application
@@ -210,6 +211,12 @@ function setup_nfs() {
 #   MANAGER_VERSION - Version of Warlock manager to use
 #
 function install_application() {
+	local debug
+	debug=''
+	if [ $OPT_DEBUG -eq 1 ]; then
+		debug='--debug'
+	fi
+
 	# Create a "steam" user account
     # This will create the account with no password, so if you need to log in with this user,
     # run `sudo passwd steam` to set a password.
@@ -287,7 +294,7 @@ function install_application() {
 
     # Grab Proton from Glorious Eggroll
     PROTON_PATH="$(install_proton "$PROTON_VERSION")/proton"
-    "$GAME_DIR/manage.py" set-config "Default Proton Path" "${PROTON_PATH}"
+    "$GAME_DIR/manage.py" $debug set-config "Default Proton Path" "${PROTON_PATH}"
 
     # Install installer (this script) for uninstallation or manual work
 	download "https://raw.githubusercontent.com/${REPO}/refs/heads/${BRANCH}/dist/server-install-debian12.sh" "$GAME_DIR/installer.sh"
@@ -307,7 +314,12 @@ function install_application() {
 function upgrade_application_1_0() {
 	local SERVICE_PATH
 	local CLUSTER_ID
+	local debug
 	CLUSTER_ID=""
+	debug=''
+	if [ $OPT_DEBUG -eq 1 ]; then
+		debug='--debug'
+	fi
 
 	# Migrate existing service to new format
 	# This gets overwrote by the manager, but is needed to tell the system that the service is here.
@@ -320,7 +332,7 @@ function upgrade_application_1_0() {
 
 			# Export this configuration so the new system can re-obtain all the configuration values
 			# This is important because v1 to v2.2 changed CLI parameters.
-			"$GAME_DIR/manage.py" --service "$MAP" --get-configs > "$GAME_DIR/Migrations/${MAP}.configs-$(date +%Y%m%d%H%M%S).json"
+			"$GAME_DIR/manage.py" $debug --service "$MAP" --get-configs > "$GAME_DIR/Migrations/${MAP}.configs-$(date +%Y%m%d%H%M%S).json"
 
 			if [ -e "${SERVICE_PATH}.d/override.conf" ]; then
 				# The map name is required in 2.2
@@ -371,9 +383,14 @@ function upgrade_application() {
 #
 function postinstall() {
 	print_header "Performing postinstall"
+	local debug
+	debug=''
+	if [ $OPT_DEBUG -eq 1 ]; then
+		debug='--debug'
+	fi
 
 	# First run setup
-	if ! $GAME_DIR/manage.py first-run; then
+	if ! $GAME_DIR/manage.py $debug first-run; then
 		log_error "First run of game manager failed!"
 		exit 1
 	fi
@@ -486,7 +503,9 @@ function clear_proton_prefix() {
 ## Pre-exec Checks
 ############################################
 
-LOG_LEVEL=4  # Set logging to DEBUG
+if [ $OPT_DEBUG -eq 1 ]; then
+	LOG_LEVEL=4  # Set logging to DEBUG
+fi
 
 
 # This script can run on an existing server, but should not update the game if a map is actively running.
