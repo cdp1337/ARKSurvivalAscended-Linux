@@ -280,7 +280,6 @@ function install_application() {
     install_steamcmd
 
     # Run Steamcmd to ensure it's available; fixes the ERROR! Failed to install app '...' (Missing configuration) issue
-
     if ! sudo -u $GAME_USER /usr/games/steamcmd +login anonymous +quit; then
     	log_error "Steamcmd could not be ran!  Unable to install game"
     	exit 1

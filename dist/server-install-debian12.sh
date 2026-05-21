@@ -1830,6 +1830,19 @@ service:
     group: Settings
     type: str
     help: "The Proton path to use for this instance."
+  - name: Multi Home
+    section: flag
+    key: MULTIHOME
+    type: str
+    group: Advanced
+    help: "Set to a specific IP address to listen on, defaults to 0.0.0.0 to listen on all interfaces"
+  - name: Public IP
+    section: flag
+    key: PublicIP
+    type: str
+    group: Advanced
+    help: "Set to the Public IP address to advertise on the server browser"
+
 gus:
   - key: LimitBunkersPerTribe
     section: ServerSettings
@@ -3136,7 +3149,6 @@ function install_application() {
     install_steamcmd
 
     # Run Steamcmd to ensure it's available; fixes the ERROR! Failed to install app '...' (Missing configuration) issue
-
     if ! sudo -u $GAME_USER /usr/games/steamcmd +login anonymous +quit; then
     	log_error "Steamcmd could not be ran!  Unable to install game"
     	exit 1
