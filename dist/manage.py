@@ -19,8 +19,6 @@ sys.path.insert(
 )
 import shutil
 import zipfile
-import random
-import string
 from SystemdUnitParser import SystemdUnitParser
 from warlock_manager.apps.steam_app import SteamApp
 from warlock_manager.libs.cmd import Cmd
@@ -35,6 +33,7 @@ from warlock_manager.libs.proton import get_proton_paths
 from warlock_manager.libs.download import download_json, download_file
 from warlock_manager.libs.logger import logger
 from warlock_manager.libs.ip import get_local_ips, get_wan_ip
+from warlock_manager.libs.utils import random_passphrase
 from warlock_manager.formatters.cli_formatter import cli_formatter
 from warlock_manager.mods.warlock_nexus_mod import WarlockNexusMod
 # To allow running as a standalone script without installing the package, include the venv path for imports.
@@ -172,6 +171,12 @@ class GameApp(SteamApp):
 
 		# Run migrations for the application
 		self.run_migrations()
+
+		# Set required variables for a new install, also apply to existing.
+		passphrase_keys = ('Default Cluster ID', 'Default Server Admin Password')
+		for option in passphrase_keys:
+			if self.get_option_value(option) is None or self.get_option_value(option) == '':
+				self.set_option(option, random_passphrase())
 
 		services = self.get_services()
 		if len(services) == 0:
@@ -420,7 +425,7 @@ class GameService(RCONService):
 
 		# New instances should default to use RCON, as that is the management API Warlock uses for pulling metrics
 		self.set_option('RCON Enabled', True)
-		self.set_option('Server Admin Password', random.choice(string.ascii_letters + string.digits) * 12)
+		self.set_option('Server Admin Password', self.game.get_option_value('Default Server Admin Password'))
 
 		# New services should have the community name by default, to at least provide something.
 		# We don't have the map yet, but we at least have the service identifier.

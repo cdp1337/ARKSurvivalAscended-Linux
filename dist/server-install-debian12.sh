@@ -40,71 +40,7 @@
 #   --branch=<str> - Use a specific branch of the management script repository DEFAULT=main
 #   --debug  - Include to show debug output
 #
-# Changelog:
-#   20260430 - Implement better logging throughout application
-#            - Handle mismatching/incorrect user permissions on target user home
-#   20260426 - Complete rewrite of the system for API 2.2
-#            - Individual map backup/restore
-#            - Better port conflict detection
-#            - New TUI
-#            - Mod support
-#            - Custom map support
-#            - Upgrade Proton to 10.34
-#            - Add support for ASA API
-#   20251219 - Add support for Lost Colony
-#            - Add per-map options to disable downloads
-#            - Re-add option editing from CLI
-#            - Regression fix for Debian 12
-#            - New Warlock features
-#   20251207 - Support custom installation directory
-#            - Add support for some custom usecases of the installer
-#            - Bump Proton to 10.25
-#            - Fix for more flexible support for game options
-#            - Backport 74.24 Steam fix into legacy start/stop scripts
-#            - Add support for --new-format as an argument to support Warlock
-#            - Fix support for JoinedSessionName (ini uses lowercase keys)
-#            - Support for Warlock management system
-#   20251105 - Fix broken Steam library in update 74.24
-#            - Add support for skipping firewall installation
-#            - Add support for using completely custom session names
-#   20251102 - Add support for uninstalling the server and all data
-#            - Refactor how options are handled in the management console
-#            - Add support for backup/start/stop maps as arguments to the management console
-#            - Add support for custom modded maps
-#   20251101 - Add support for Nitrado and Official server save formats
-#            - Fix for if mods library is missing
-#            - Add support for customizing all player messages
-#            - Add memory usage statistics to management console
-#            - Cleanup and simplify startup reporting
-#   20251019 - Add support for displaying the name of the mods installed
-#            - Assist user with troubleshooting by displaying the log on failure to start
-#            - Add backup/restore interface in management console
-#            - Add wipe player data functionality in management console
-#   20251016 - Add auto-updater checks
-#            - Fix support for Debian 13
-#            - Add Valguero map
-#   20250620 - Fix $GAME_USER for non-standard installs - thanks techgo!
-#            - Add Ragnarok support
-#   20250525 - Fix excessive question marks in options
-#            - Expand exception handling in RCON for more meaningful error messages
-#            - Add checks to prevent changes while a game is running
-#            - Auto-create steam .ssh directory for convenience
-#            - Auto-create Game.ini for convenience
-#   20250505 - Add backup and restore scripts
-#   20250502 - Add checks for running out of memory
-#            - Add timeout to RCON for a more responsive UI when there are problems
-#            - Modify map start logic to watch for memory issues in the first minute
-#            - Update table listing to be Markdown compliant
-#   20250310 - Add support for Discord integration on start/stop
-#   20250217 - Switch to Proton 9.22
-#            - Add Astraeos map
-#            - Add management script
-#            - Add --reset-proton option
-#            - Add --force-reinstall option
-#            - Add service upgrade check (when changing Proton versions)
-#   20250128 - Fix missing escape character
-#   20241220 - Switch to UFW
-#            - Add Extinction
+# Changelog: https://github.com/cdp1337/ARKSurvivalAscended-Linux/blob/main/CHANGELOG.md
 #
 
 ############################################
@@ -1057,11 +993,6 @@ function firewall_allow() {
 		echo 'Please report this at https://github.com/cdp1337/ScriptsCollection/issues' >&2
 		return 1
 	fi
-}
-##
-# Generate a random password, (using characters that are easy to read and type)
-function random_password() {
-	< /dev/urandom tr -dc _cdefhjkmnprtvwxyACDEFGHJKLMNPQRTUVWXY2345689 | head -c${1:-24};echo;
 }
 ##
 # Determine if the current shell session is non-interactive.
@@ -3209,7 +3140,11 @@ function upgrade_application_1_0() {
 [{"option": "Map Name", "value": "$MAPNAME"}]
 EOD
 				if grep -q 'clusterid=' "${SERVICE_PATH}.d/override.conf"; then
+					# Store the Cluster ID as a variable to store in the default system AND update the game to use this.
 					CLUSTER_ID="$(egrep '^ExecStart' "${SERVICE_PATH}.d/override.conf" | sed 's:.*clusterid=\([^ ]*\).*:\1:')"
+					cat > "$GAME_DIR/Migrations/${MAP}.clusterid-$(date +%Y%m%d%H%M%S).json" <<EOD
+[{"option": "Cluster ID", "value": "$CLUSTER_ID"}]
+EOD
 				fi
 			fi
 
@@ -3471,12 +3406,7 @@ if [ "$MODE" == "install" ]; then
       	NEWFORMAT=$(prompt_yn --default-yes "? Use new save format?")
 	fi
 
-	# Generate a cluster ID as users usually want to cluster their maps together
-    CLUSTERID="$(random_password 12)"
-
 	WHITELIST=$(prompt_yn --default-no "? Enable whitelist for players?")
-	# Admin pass, used on new installs and shared across all maps
-	ADMIN_PASS="$(random_password)"
 
 	echo ''
 	echo 'Multi-server support is provided via NFS by default,'
@@ -3506,8 +3436,6 @@ if [ "$MODE" == "install" ]; then
 {"option": "Community Name", "value": "$COMMUNITYNAME"},
 {"option": "Joined Session Name", "value": "$JOINEDSESSIONNAME"},
 {"option": "Default New Save Format", "value": "$NEWFORMAT"},
-{"option": "Default Cluster ID", "value": "$CLUSTERID"},
-{"option": "Default Server Admin Password", "value": "$ADMIN_PASS"}
 ]
 EOD
 
