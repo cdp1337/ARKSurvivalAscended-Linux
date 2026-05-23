@@ -1835,7 +1835,7 @@ service:
     key: MULTIHOME
     type: str
     group: Advanced
-    help: "Set to a specific IP address to listen on, defaults to 0.0.0.0 to listen on all interfaces"
+    help: "Set to a specific LOCAL IP address to listen on, defaults to 0.0.0.0 to listen on all interfaces."
   - name: Public IP
     section: flag
     key: PublicIP

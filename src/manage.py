@@ -49,6 +49,7 @@ from warlock_manager.libs import utils
 from warlock_manager.libs.proton import get_proton_paths
 from warlock_manager.libs.download import download_json, download_file
 from warlock_manager.libs.logger import logger
+from warlock_manager.libs.ip import get_local_ips
 
 # Useful in some games
 from warlock_manager.formatters.cli_formatter import cli_formatter
@@ -511,6 +512,8 @@ class GameService(RCONService):
 		"""
 		if option == 'Proton Path':
 			return get_proton_paths()
+		elif option == 'Multi Home':
+			return [''] + get_local_ips()
 		else:
 			return super().get_option_options(option)
 
