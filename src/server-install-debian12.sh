@@ -117,8 +117,8 @@ WARLOCK_GUID="0c2de651-ec30-d4ac-c53f-ebdb67398324"
 
 # Set the version of the Warlock Manager API to use for this project
 # https://github.com/BitsNBytes25/Warlock-Manager
-MANAGER_VERSION="2.2.11"
-#MANAGER_VERSION="dev"
+#MANAGER_VERSION="2.2.13"
+MANAGER_VERSION="main"
 GAME="ArkSurvivalAscended"
 GAME_USER="steam"
 GAME_DIR="/home/$GAME_USER/$GAME"

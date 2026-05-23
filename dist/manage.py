@@ -34,7 +34,7 @@ from warlock_manager.libs import utils
 from warlock_manager.libs.proton import get_proton_paths
 from warlock_manager.libs.download import download_json, download_file
 from warlock_manager.libs.logger import logger
-from warlock_manager.libs.ip import get_local_ips
+from warlock_manager.libs.ip import get_local_ips, get_wan_ip
 from warlock_manager.formatters.cli_formatter import cli_formatter
 from warlock_manager.mods.warlock_nexus_mod import WarlockNexusMod
 # To allow running as a standalone script without installing the package, include the venv path for imports.
@@ -504,6 +504,19 @@ class GameService(RCONService):
 			options,
 			flags
 		])
+
+	def get_ip(self) -> str:
+		"""
+		Get the IP to connect to, can also be a hostname if necessary.
+
+		By default it just returns the WAN IP of the server.
+		:return:
+		"""
+		override_ip = self.get_option_value('Server IP')
+		if override_ip:
+			return override_ip
+		else:
+			return get_wan_ip()
 
 	def get_systemd_config(self) -> SystemdUnitParser:
 		"""

@@ -117,8 +117,8 @@ WARLOCK_GUID="0c2de651-ec30-d4ac-c53f-ebdb67398324"
 
 # Set the version of the Warlock Manager API to use for this project
 # https://github.com/BitsNBytes25/Warlock-Manager
-MANAGER_VERSION="2.2.11"
-#MANAGER_VERSION="dev"
+#MANAGER_VERSION="2.2.13"
+MANAGER_VERSION="main"
 GAME="ArkSurvivalAscended"
 GAME_USER="steam"
 GAME_DIR="/home/$GAME_USER/$GAME"
@@ -1835,13 +1835,13 @@ service:
     key: MULTIHOME
     type: str
     group: Advanced
-    help: "Set to a specific LOCAL IP address to listen on, defaults to 0.0.0.0 to listen on all interfaces."
-  - name: Public IP
+    help: "Set to a specific LOCAL IP address to listen on, defaults to empty to listen on all interfaces."
+  - name: Server IP
     section: flag
-    key: PublicIP
+    key: ServerIP
     type: str
     group: Advanced
-    help: "Set to the Public IP address to advertise on the server browser"
+    help: "Set to the Public WAN IP address to advertise on the server browser, if set, this MUST BE YOUR PUBLIC WAN IP, not your local LAN IP!  Pro-tip: you probably don't need to change this as ASA should automatically determine the correct IP most of the time."
 
 gus:
   - key: LimitBunkersPerTribe

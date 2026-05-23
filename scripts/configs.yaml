@@ -515,13 +515,13 @@ service:
     key: MULTIHOME
     type: str
     group: Advanced
-    help: "Set to a specific LOCAL IP address to listen on, defaults to 0.0.0.0 to listen on all interfaces."
-  - name: Public IP
+    help: "Set to a specific LOCAL IP address to listen on, defaults to empty to listen on all interfaces."
+  - name: Server IP
     section: flag
-    key: PublicIP
+    key: ServerIP
     type: str
     group: Advanced
-    help: "Set to the Public IP address to advertise on the server browser"
+    help: "Set to the Public WAN IP address to advertise on the server browser, if set, this MUST BE YOUR PUBLIC WAN IP, not your local LAN IP!  Pro-tip: you probably don't need to change this as ASA should automatically determine the correct IP most of the time."
 
 gus:
   - key: LimitBunkersPerTribe
