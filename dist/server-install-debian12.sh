@@ -53,8 +53,8 @@ WARLOCK_GUID="0c2de651-ec30-d4ac-c53f-ebdb67398324"
 
 # Set the version of the Warlock Manager API to use for this project
 # https://github.com/BitsNBytes25/Warlock-Manager
-#MANAGER_VERSION="2.2.13"
-MANAGER_VERSION="main"
+MANAGER_VERSION="2.2.13"
+#MANAGER_VERSION="main"
 GAME="ArkSurvivalAscended"
 GAME_USER="steam"
 GAME_DIR="/home/$GAME_USER/$GAME"
@@ -3208,18 +3208,12 @@ function postinstall() {
 #   SAVE_DIR     - Directory where game save files are stored
 #
 function uninstall_application() {
+
+	# The game manager can now handle removing the core services and configuration
+	"$GAME_DIR/manage.py" remove --confirm
+
 	echo "Removing proton prefixes"
 	[ -e "$GAME_DIR/prefixes" ] && rm "$GAME_DIR/prefixes" -r
-
-	echo "Removing service files"
-	ls -1 "$GAME_DIR/services" | while read SERVICE; do
-		SERVICE="${SERVICE:0:-5}"
-		systemctl disable $SERVICE
-		[ -h "$GAME_DIR/services/${SERVICE}.conf" ] && unlink "$GAME_DIR/services/${SERVICE}.conf"
-		[ -e "/etc/systemd/system/${SERVICE}.service" ] && rm "/etc/systemd/system/${SERVICE}.service"
-		[ -e "/etc/systemd/system/${SERVICE}.service.d" ] && rm -r "/etc/systemd/system/${SERVICE}.service.d"
-	done
-	[ -e "/etc/systemd/system/ark-updater.service" ] && rm "/etc/systemd/system/ark-updater.service"
 	[ -e "$GAME_DIR/services" ] && rm "$GAME_DIR/services" -r
 
 	echo "Removing application data"
@@ -3518,10 +3512,12 @@ if [ "$MODE" == "uninstall" ]; then
 	fi
 
 	if prompt_yn -q --default-yes "Perform a backup before everything is wiped?"; then
+		log_info "Performing a backup... please wait a minute."
 		$GAME_DIR/manage.py backup
 	fi
 
 	uninstall_application
+	exit 0
 fi
 
 
