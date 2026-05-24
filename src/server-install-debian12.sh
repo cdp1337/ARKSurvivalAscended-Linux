@@ -564,7 +564,7 @@ if [ "$MODE" == "install" ]; then
 [
 {"option": "Community Name", "value": "$COMMUNITYNAME"},
 {"option": "Joined Session Name", "value": "$JOINEDSESSIONNAME"},
-{"option": "Default New Save Format", "value": "$NEWFORMAT"},
+{"option": "Default New Save Format", "value": "$NEWFORMAT"}
 ]
 EOD
 
