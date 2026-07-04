@@ -1,3 +1,13 @@
+## 2026-07-04
+
+### Changed
+
+* Updated first-run to ensure default maps exist, useful for new maps
+
+### Added
+
+* Add Genesis 1 map to default list
+
 ## 2026-05-23
 
 ### Changed

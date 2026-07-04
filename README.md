@@ -605,6 +605,7 @@ Below is a table of each map (as of 73.42) and the approximate RAM required for 
 | Ragnarok                  |           10.2 GB |
 | Valguero                  |            8.6 GB |
 | Lost Colony               |           20.0 GB |
+| Genesis 1                 |           12.0 GB |
 
 
 **Fix**

@@ -177,6 +177,8 @@ class GameApp(SteamApp):
 			existing_maps.append(svc.service)
 
 		community_name = self.get_option_value('Community Name')
+		if community_name == '':
+			community_name = 'My Awesome ARK Server'
 		maps = {
 			'ark-island': ('TheIsland_WP', []),
 			'ark-aberration': ('Aberration_WP', []),
