@@ -165,35 +165,41 @@ class GameApp(SteamApp):
 			if self.get_option_value(option) is None or self.get_option_value(option) == '':
 				self.set_option(option, random_passphrase())
 
-		services = self.get_services()
-		if len(services) == 0:
-			# No services exist, auto-create the various maps supported for convenience.
-			community_name = self.get_option_value('Community Name')
-			maps = {
-				'ark-island': ('TheIsland_WP', []),
-				'ark-aberration': ('Aberration_WP', []),
-				'ark-club': ('BobsMissions_WP', ['1005639']),
-				'ark-scorched': ('ScorchedEarth_WP', []),
-				'ark-thecenter': ('TheCenter_WP', []),
-				'ark-extinction': ('Extinction_WP', []),
-				'ark-astraeos': ('Astraeos_WP', []),
-				'ark-ragnarok': ('Ragnarok_WP', []) ,
-				'ark-valguero': ('Valguero_WP', []),
-				'ark-lostcolony': ('LostColony_WP', [])
-			}
-			for map_name in maps.keys():
-				logger.info('Creating service for map %s' % (map_name,))
-				svc = self.create_service(map_name)
-				svc.set_option('Map Name', maps[map_name][0])
+		# Import any legacy configurations from the previous installation
+		# This is required because between 1.0 and 2.2, breaking changes were implemented in CLI params
+		for svc in self.get_services():
+			# Run any migrations for this service
+			svc.run_migrations()
+
+		# Ensure the default maps exist, this applies to both new runs and upgrades, (for when new maps are released)
+		existing_maps = []
+		for svc in self.get_services():
+			existing_maps.append(svc.service)
+
+		community_name = self.get_option_value('Community Name')
+		maps = {
+			'ark-island': ('TheIsland_WP', []),
+			'ark-aberration': ('Aberration_WP', []),
+			'ark-club': ('BobsMissions_WP', ['1005639']),
+			'ark-scorched': ('ScorchedEarth_WP', []),
+			'ark-thecenter': ('TheCenter_WP', []),
+			'ark-extinction': ('Extinction_WP', []),
+			'ark-astraeos': ('Astraeos_WP', []),
+			'ark-ragnarok': ('Ragnarok_WP', []) ,
+			'ark-valguero': ('Valguero_WP', []),
+			'ark-lostcolony': ('LostColony_WP', []),
+			'ark-genesis': ('Genesis_WP', []),
+		}
+
+		for service_name in maps.keys():
+			map_name = maps[service_name][0]
+			if service_name not in existing_maps:
+				logger.info('Creating service for map %s' % (service_name,))
+				svc = self.create_service(service_name)
+				svc.set_option('Map Name', map_name)
 				svc.set_option('Session Name', '%s (%s)' % (community_name, svc.get_map_label()))
-				if len(maps[map_name][1]) > 0:
-					svc.set_option('Mods', ','.join(maps[map_name][1]))
-		else:
-			# Import any legacy configurations from the previous installation
-			# This is required because between 1.0 and 2.2, breaking changes were implemented in CLI params
-			for svc in self.get_services():
-				# Run any migrations for this service
-				svc.run_migrations()
+				if len(maps[service_name][1]) > 0:
+					svc.set_option('Mods', ','.join(maps[service_name][1]))
 
 		return True
 
