@@ -22,6 +22,7 @@
 # Supports:
 #   Debian 12, 13
 #   Ubuntu 24.04
+#   Arch
 #
 # Requirements:
 #   None
@@ -665,10 +666,77 @@ function os_version() {
 }
 
 ##
+# Install a package with the system's package manager.
+#
+# Uses Redhat's yum, Debian's apt-get, and SuSE's zypper.
+#
+# Usage:
+#
+# ```syntax-shell
+# package_install apache2 php7.0 mariadb-server
+# ```
+#
+# @param $1..$N string
+#        Package, (or packages), to install.  Accepts multiple packages at once.
+#
+#
+# CHANGELOG:
+#   2026.07.08 - Add paru support for Arch's AUR
+#   2026.01.09 - Cleanup os_like a bit and add support for RHEL 9's dnf
+#   2025.04.10 - Set Debian frontend to noninteractive
+#
+function package_install (){
+	echo "package_install: Installing $*..."
+
+	if os_like_bsd -q; then
+		pkg install -y $*
+	elif os_like_debian -q; then
+		DEBIAN_FRONTEND="noninteractive" apt-get -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" install -y $*
+	elif os_like_rhel -q; then
+		if [ "$(os_version)" -ge 9 ]; then
+			dnf install -y $*
+		else
+			yum install -y $*
+		fi
+	elif os_like_arch -q; then
+		if ! cmd_exists paru; then
+			# Install paru before handling the user packages
+			_package_install_paru
+		fi
+		paru -Syu --noconfirm $*
+	elif os_like_suse -q; then
+		zypper install -y $*
+	else
+		echo 'package_install: Unsupported or unknown OS' >&2
+		echo 'Please report this at https://github.com/eVAL-Agency/ScriptsCollection/issues' >&2
+		exit 1
+	fi
+}
+
+##
+# Special handler to ensure paru is installed on an Arch system.
+#
+# Useful to allow packages to install from the AUR by default.
+#
+function _package_install_paru() {
+	pacman -S git base-devel make
+
+	[ -e /opt/script-collection/ ] || mkdir -p /opt/script-collection
+	if [ ! -e /opt/script-collection/paru ]; then
+		git clone https://aur.archlinux.org/paru.git /opt/script-collection/paru
+	fi
+
+	cd /opt/script-collection/paru
+	makepkg -si
+	cd -
+}
+
+##
 # Install SteamCMD
 #
 # CHANGELOG:
 #
+#   2026.07.08 - Add support for Arch
 #   2025.12.16 - Ensure steam GPG key is readable by apt
 #   2025.11.09 - Switch to using download to support curl/wget abstraction
 #   2025.11.03 - Add support for Debian 13
@@ -680,6 +748,7 @@ function install_steamcmd() {
 
 	TYPE_DEBIAN="$(os_like_debian)"
 	TYPE_UBUNTU="$(os_like_ubuntu)"
+	TYPE_ARCH="$(os_like_arch)"
 	OS_VERSION="$(os_version)"
 
 	# Preliminary requirements
@@ -739,51 +808,11 @@ function install_steamcmd() {
 		# Install steam binary and steamcmd
 		apt update
 		apt install -y steamcmd
+	elif [ "$TYPE_ARCH" == 1 ]; then
+		# Steam is available in the AUR for Arch, so the default package_install can handle it.
+		package_install steamcmd
 	else
 		echo 'Unsupported or unknown OS' >&2
-		exit 1
-	fi
-}
-
-##
-# Install a package with the system's package manager.
-#
-# Uses Redhat's yum, Debian's apt-get, and SuSE's zypper.
-#
-# Usage:
-#
-# ```syntax-shell
-# package_install apache2 php7.0 mariadb-server
-# ```
-#
-# @param $1..$N string
-#        Package, (or packages), to install.  Accepts multiple packages at once.
-#
-#
-# CHANGELOG:
-#   2026.01.09 - Cleanup os_like a bit and add support for RHEL 9's dnf
-#   2025.04.10 - Set Debian frontend to noninteractive
-#
-function package_install (){
-	echo "package_install: Installing $*..."
-
-	if os_like_bsd -q; then
-		pkg install -y $*
-	elif os_like_debian -q; then
-		DEBIAN_FRONTEND="noninteractive" apt-get -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" install -y $*
-	elif os_like_rhel -q; then
-		if [ "$(os_version)" -ge 9 ]; then
-			dnf install -y $*
-		else
-			yum install -y $*
-		fi
-	elif os_like_arch -q; then
-		pacman -Syu --noconfirm $*
-	elif os_like_suse -q; then
-		zypper install -y $*
-	else
-		echo 'package_install: Unsupported or unknown OS' >&2
-		echo 'Please report this at https://github.com/eVAL-Agency/ScriptsCollection/issues' >&2
 		exit 1
 	fi
 }
@@ -849,6 +878,8 @@ function firewall_install() {
 	elif os_like_rhel -q; then
 		install_firewalld
 	elif os_like_suse -q; then
+		install_firewalld
+	elif os_like_arch -q; then
 		install_firewalld
 	else
 		install_ufw
@@ -2903,6 +2934,7 @@ EOF
 #   install_xvfb [--no-daemon] [--display <int>] [--service <name>]
 #
 # Changelog:
+#   20260708 - Add support for Arch
 #   20260216 - Initial version
 #
 function install_xvfb() {
@@ -2919,7 +2951,11 @@ function install_xvfb() {
 		shift
 	done
 
-	package_install xvfb
+	if os_like_arch -q;	then
+		package_install xorg-server-xvfb
+	else
+		package_install xvfb
+	fi
 
 	if [ "$NO_DAEMON" -eq 0 ]; then
 		# Install the daemon helper script
@@ -2950,9 +2986,9 @@ EOL
 function setup_nfs() {
 	if [ "$MULTISERVER" -eq 1 ]; then
 		if [ "$ISPRIMARY" -eq 1 ]; then
-			apt install -y nfs-kernel-server nfs-common
+			package_install nfs-kernel-server nfs-common
 		else
-			apt install -y nfs-common
+			package_install nfs-common
 		fi
 
 		# Enable / ensure enabled shared directory for multi-server support
@@ -3050,7 +3086,7 @@ function install_application() {
 	fi
 
     # Preliminary requirements
-    apt install -y curl sudo python3-venv
+    package_install curl sudo python3-venv
 
     # ASA API requires xvfb to run.
 	install_xvfb

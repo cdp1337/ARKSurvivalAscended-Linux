@@ -6,6 +6,7 @@
   author: Charlie Powell <cdp1337@bitsnbytes.dev>
   category: Game Server
   supports:
+    - "Arch"
     - "Debian 12, 13"
     - "Ubuntu 24.04"
   syntax:

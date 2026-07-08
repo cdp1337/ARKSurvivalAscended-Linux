@@ -22,6 +22,7 @@
 # Supports:
 #   Debian 12, 13
 #   Ubuntu 24.04
+#   Arch
 #
 # Requirements:
 #   None
@@ -78,6 +79,7 @@ GAME_MAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter ark-ext
 # scriptlet:warlock/install_warlock_manager.sh
 # scriptlet:xvfb/install.sh
 # scriptlet:bz_eval_log/log.sh
+# scriptlet:_common/package_install.sh
 
 
 ## Handle NFS setup
@@ -85,9 +87,9 @@ GAME_MAPS="ark-island ark-aberration ark-club ark-scorched ark-thecenter ark-ext
 function setup_nfs() {
 	if [ "$MULTISERVER" -eq 1 ]; then
 		if [ "$ISPRIMARY" -eq 1 ]; then
-			apt install -y nfs-kernel-server nfs-common
+			package_install nfs-kernel-server nfs-common
 		else
-			apt install -y nfs-common
+			package_install nfs-common
 		fi
 
 		# Enable / ensure enabled shared directory for multi-server support
@@ -185,7 +187,7 @@ function install_application() {
 	fi
 
     # Preliminary requirements
-    apt install -y curl sudo python3-venv
+    package_install curl sudo python3-venv
 
     # ASA API requires xvfb to run.
 	install_xvfb
