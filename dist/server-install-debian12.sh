@@ -3026,7 +3026,7 @@ function setup_nfs() {
     		echo "Unmounting cluster share"
     		umount "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters"
     	fi
-    	if [ $(egrep -q "^[0-9\.]*:$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" /etc/fstab) ]; then
+    	if [ $(grep -E -q "^[0-9\.]*:$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" /etc/fstab) ]; then
     		echo "Removing NFS mount from fstab"
     		BAK="/etc/fstab.bak-$(date +%Y%m%d%H%M%S)"
     		cp /etc/fstab $BAK
@@ -3113,10 +3113,17 @@ function install_application() {
     chmod 600 "/home/$GAME_USER/.ssh/authorized_keys"
 
     # Install steam binary and steamcmd
-    install_steamcmd
+    # If steamcmd is already installed (eg for Arch), skip installation.
+    if [ -e /usr/bin/steamcmd ]; then
+    	STEAMCMD=/usr/bin/steamcmd
+	else
+		# Default procedure for Debian/Ubuntu/literally everything else
+    	install_steamcmd
+    	STEAMCMD=/usr/games/steamcmd
+    fi
 
     # Run Steamcmd to ensure it's available; fixes the ERROR! Failed to install app '...' (Missing configuration) issue
-    if ! sudo -u $GAME_USER /usr/games/steamcmd +login anonymous +quit; then
+    if ! sudo -u $GAME_USER $STEAMCMD +login anonymous +quit; then
     	log_error "Steamcmd could not be ran!  Unable to install game"
     	exit 1
 	fi
@@ -3171,13 +3178,13 @@ function upgrade_application_1_0() {
 
 			if [ -e "${SERVICE_PATH}.d/override.conf" ]; then
 				# The map name is required in 2.2
-				MAPNAME="$(egrep '^ExecStart' ${SERVICE_PATH}.d/override.conf | sed 's:.*\.exe \(.*\)?listen.*:\1:')"
+				MAPNAME="$(grep -E '^ExecStart' ${SERVICE_PATH}.d/override.conf | sed 's:.*\.exe \(.*\)?listen.*:\1:')"
 				cat > "$GAME_DIR/Migrations/${MAP}.map-$(date +%Y%m%d%H%M%S).json" <<EOD
 [{"option": "Map Name", "value": "$MAPNAME"}]
 EOD
 				if grep -q 'clusterid=' "${SERVICE_PATH}.d/override.conf"; then
 					# Store the Cluster ID as a variable to store in the default system AND update the game to use this.
-					CLUSTER_ID="$(egrep '^ExecStart' "${SERVICE_PATH}.d/override.conf" | sed 's:.*clusterid=\([^ ]*\).*:\1:')"
+					CLUSTER_ID="$(grep -E '^ExecStart' "${SERVICE_PATH}.d/override.conf" | sed 's:.*clusterid=\([^ ]*\).*:\1:')"
 					cat > "$GAME_DIR/Migrations/${MAP}.clusterid-$(date +%Y%m%d%H%M%S).json" <<EOD
 [{"option": "Cluster ID", "value": "$CLUSTER_ID"}]
 EOD
@@ -3185,17 +3192,17 @@ EOD
 			fi
 
 			# Extract out current environment variables from the systemd file into their own dedicated file
-			egrep '^Environment' "${SERVICE_PATH}" | sed 's:^Environment=::' | sed 's:"::g' > "$GAME_DIR/Environments/${MAP}.env"
+			grep -E '^Environment' "${SERVICE_PATH}" | sed 's:^Environment=::' | sed 's:"::g' > "$GAME_DIR/Environments/${MAP}.env"
 			chown $GAME_USER:$GAME_USER "$GAME_DIR/Environments/${MAP}.env"
 			# Trim out those envs now that they're not longer required
-			cat "${SERVICE_PATH}" | egrep -v '^Environment=' > "${SERVICE_PATH}.new"
+			cat "${SERVICE_PATH}" | grep -E -v '^Environment=' > "${SERVICE_PATH}.new"
 			mv "${SERVICE_PATH}.new" "${SERVICE_PATH}"
 
 			[ -e "${SERVICE_PATH}.d/override.conf" ] && rm -fr "${SERVICE_PATH}.d/override.conf"
 			[ -e "${SERVICE_PATH}.d" ] && rm -fr "${SERVICE_PATH}.d"
 		done
 
-		if [ "$CLUSTER_ID" != "" ] && ! egrep -q '^defaultclusterid' "$GAME_DIR/.settings.ini"; then
+		if [ "$CLUSTER_ID" != "" ] && ! grep -E -q '^defaultclusterid' "$GAME_DIR/.settings.ini"; then
 			# Application doesn't have a default cluster ID.
 			# Technically not a requirement, but helpful to be set since the operator can easily create new services
 			cat > "$GAME_DIR/Migrations/_app.cluster-$(date +%Y%m%d%H%M%S).json" <<EOD
@@ -3500,7 +3507,7 @@ if [ "$MODE" == "reinstall" ]; then
     if [ -n "$(grep "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" /etc/exports 2>/dev/null)" ]; then
     	MULTISERVER=1
     	ISPRIMARY=1
-    elif [ $(egrep -q "^[0-9\.]*:$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" /etc/fstab) ]; then
+    elif [ $(grep -E -q "^[0-9\.]*:$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" /etc/fstab) ]; then
     	MULTISERVER=1
     	ISPRIMARY=0
     	PRIMARYIP="$(grep "$GAME_DIR/AppFiles/ShooterGame/Saved/clusters" /etc/fstab | sed 's#^\(.*\):.*#\1#')"
