@@ -315,8 +315,8 @@ function os_like() {
 	local OS="$1"
 
 	if [ -f '/etc/os-release' ]; then
-		ID="$(egrep '^ID=' /etc/os-release | sed 's:ID=::')"
-		LIKE="$(egrep '^ID_LIKE=' /etc/os-release | sed 's:ID_LIKE=::')"
+		ID="$(grep -E '^ID=' /etc/os-release | sed 's:ID=::')"
+		LIKE="$(grep -E '^ID_LIKE=' /etc/os-release | sed 's:ID_LIKE=::')"
 
 		if [[ "$LIKE" =~ "$OS" ]] || [ "$ID" == "$OS" ]; then
 			return 0;
@@ -639,7 +639,7 @@ function os_version() {
 		fi
 
 	elif [ -f '/etc/os-release' ]; then
-		local VERS="$(egrep '^VERSION_ID=' /etc/os-release | sed 's:VERSION_ID=::')"
+		local VERS="$(grep -E '^VERSION_ID=' /etc/os-release | sed 's:VERSION_ID=::')"
 
 		if [[ "$VERS" =~ '"' ]]; then
 			# Strip quotes around the OS name
